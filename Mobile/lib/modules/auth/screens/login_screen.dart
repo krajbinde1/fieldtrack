@@ -150,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      'Manage Sales, Orders, Attendance, Collections and Team Performance from one place.',
+                      'Manage Attendance, Admissions, Leave and Field Activities from one place.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.white.withValues(alpha: 0.84),
@@ -176,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Use your Login ID to continue.',
+                              'Use your registered Login ID to continue.',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -284,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      'Sales  |  Attendance  |  Orders  |  Collections',
+                      'Attendance | Admissions | Leave | Routes',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppColors.textMuted,
