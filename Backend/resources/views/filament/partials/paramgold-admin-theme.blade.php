@@ -841,35 +841,133 @@
         }
     }
 
-    .admission-view-infolist,
-    .fi-resource-admissions.fi-resource-view-record .fi-sc,
-    .fi-resource-admissions.fi-resource-view-record .fi-infolist,
-    .fi-resource-admissions.fi-resource-view-record .fi-page-content {
-        gap: 0.5rem;
-        row-gap: 0.5rem;
+    .fi-resource-admissions.fi-resource-view-record .fi-page-content,
+    .admission-view-infolist {
+        gap: 0.75rem;
+        row-gap: 0.75rem;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .admission-view-row {
+        width: 100%;
+        align-items: start;
+        gap: 0.75rem;
+    }
+
+    .admission-view-row > * {
+        min-width: 0;
+        width: 100%;
     }
 
     .admission-view-infolist .fi-section,
     .admission-view-infolist .fi-sc-section,
-    .fi-resource-admissions.fi-resource-view-record .fi-section,
-    .fi-resource-admissions.fi-resource-view-record .fi-sc-section {
+    .admission-view-card {
         height: auto;
         min-height: 0;
         align-self: start;
+        width: 100%;
     }
 
     .admission-view-infolist .fi-section-content,
-    .admission-view-infolist .fi-sc-section-content,
-    .fi-resource-admissions.fi-resource-view-record .fi-section-content,
-    .fi-resource-admissions.fi-resource-view-record .fi-sc-section-content {
-        padding: 0.7rem 0.85rem;
+    .admission-view-infolist .fi-sc-section-content {
+        padding: 0.75rem 1rem;
     }
 
-    .admission-view-infolist .fi-in-repeatable,
-    .admission-view-infolist .fi-in-table-repeatable,
-    .fi-resource-admissions.fi-resource-view-record .fi-in-repeatable,
-    .fi-resource-admissions.fi-resource-view-record .fi-in-table-repeatable {
-        min-height: 0;
+    .admission-review-actions,
+    .admission-review-actions .fi-ac,
+    .admission-review-actions .fi-sc-actions {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .admission-review-actions .fi-btn,
+    .admission-review-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .admission-view-documents .fi-section-content,
+    .admission-view-documents .fi-sc-section-content {
+        padding: 0.5rem 0.75rem 0.75rem;
+        overflow-x: auto;
+    }
+
+    .admission-docs-empty {
+        margin: 0;
+        padding: 0.5rem 0.25rem;
+        color: rgb(100 116 139);
+        font-size: 0.875rem;
+    }
+
+    .admission-docs-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .admission-docs-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: auto;
+        font-size: 0.8125rem;
+    }
+
+    .admission-docs-table th,
+    .admission-docs-table td {
+        padding: 0.5rem 0.65rem;
+        text-align: left;
+        vertical-align: middle;
+        border-bottom: 1px solid rgb(226 232 240);
+        white-space: nowrap;
+    }
+
+    .admission-docs-table th {
+        font-weight: 700;
+        color: rgb(71 85 105);
+        background: rgb(248 250 252);
+    }
+
+    .admission-docs-num {
+        width: 2.25rem;
+        text-align: center !important;
+        color: rgb(100 116 139);
+    }
+
+    .admission-docs-name {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        max-width: 22rem;
+    }
+
+    .admission-docs-actions {
+        white-space: nowrap;
+        width: 1%;
+    }
+
+    .admission-docs-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 0.35rem;
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.4rem;
+        border: 1px solid rgb(203 213 225);
+        background: #fff;
+        color: rgb(30 41 59);
+        font-size: 0.75rem;
+        font-weight: 700;
+        line-height: 1.2;
+        cursor: pointer;
+    }
+
+    .admission-docs-btn-primary {
+        border-color: rgb(37 99 235);
+        background: rgb(37 99 235);
+        color: #fff;
+        margin-right: 0;
     }
 
 </style>

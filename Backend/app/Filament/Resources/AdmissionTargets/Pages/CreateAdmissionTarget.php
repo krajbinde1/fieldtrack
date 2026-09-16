@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\AdmissionTargets\Pages;
 
-use App\Filament\Concerns\RedirectsToPreviousPageAfterSave;
 use App\Filament\Resources\AdmissionTargets\AdmissionTargetResource;
 use App\Filament\Support\TodayDateFilter;
 use App\Services\AdmissionTargetService;
@@ -11,8 +10,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class CreateAdmissionTarget extends CreateRecord
 {
-    use RedirectsToPreviousPageAfterSave;
-
     protected static string $resource = AdmissionTargetResource::class;
 
     /**
@@ -24,6 +21,11 @@ class CreateAdmissionTarget extends CreateRecord
         abort_unless($user !== null, 403);
 
         return app(AdmissionTargetService::class)->assign($user, self::payload($data));
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return static::getResource()::getUrl('index');
     }
 
     /**
