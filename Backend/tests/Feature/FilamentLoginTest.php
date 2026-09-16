@@ -46,6 +46,8 @@ it('lets an admin open organization, people, and field-operation pages', functio
         '/admin/admissions',
         '/admin/leave-requests',
         '/admin/reports',
+        '/admin/app-update-settings',
+        '/admin/device-management',
     ] as $uri) {
         $this->actingAs($admin)->get($uri)->assertOk();
     }
@@ -65,6 +67,8 @@ it('lets a director view assigned-scope pages but not admin-only management', fu
     $this->actingAs($director)->get('/admin/attendances')->assertOk();
     $this->actingAs($director)->get('/admin/reports')->assertOk();
     $this->actingAs($director)->get('/admin/directors')->assertForbidden();
+    $this->actingAs($director)->get('/admin/app-update-settings')->assertForbidden();
+    $this->actingAs($director)->get('/admin/device-management')->assertForbidden();
     $this->actingAs($director)->get('/admin/schemes')->assertForbidden();
     $this->actingAs($director)->get('/admin/projects/create')->assertForbidden();
 });

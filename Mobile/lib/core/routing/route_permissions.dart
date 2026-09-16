@@ -8,7 +8,10 @@ class RoutePermissions {
       return true;
     }
 
-    if (path == '/dashboard' || path == '/splash' || path == '/login') {
+    if (path == '/dashboard' ||
+        path == '/splash' ||
+        path == '/login' ||
+        path == '/update-required') {
       return true;
     }
 

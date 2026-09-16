@@ -109,6 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final lower = raw.toLowerCase();
     if (lower.contains('session expired')) return raw;
     if (lower.contains('signed in on another device')) return raw;
+    if (lower.contains('registered on another device')) return raw;
     return _friendlyLoginError;
   }
 

@@ -1,0 +1,331 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+
+import 'apk_installer.dart';
+import 'app_update_api.dart';
+import 'app_update_store.dart';
+import 'app_version_info.dart';
+
+enum AppUpdateDownloadState { idle, downloading, failed, ready }
+
+/// In-app APK update gate. Force Update ON blocks the app; OFF allows Skip/Later.
+class AppUpdateController extends ChangeNotifier {
+  AppUpdateController({
+    AppUpdateApi? api,
+    AppUpdateStore? store,
+    ApkInstaller? installer,
+  })  : _api = api ?? AppUpdateApi(),
+        _store = store ?? AppUpdateStore(),
+        _installer = installer ?? ApkInstaller() {
+    unawaited(initialize());
+  }
+
+  final AppUpdateApi _api;
+  final AppUpdateStore _store;
+  final ApkInstaller _installer;
+  final Dio _downloadDio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(minutes: 5),
+      sendTimeout: const Duration(seconds: 20),
+      followRedirects: true,
+      maxRedirects: 5,
+    ),
+  );
+
+  bool checking = true;
+  bool required = false;
+  bool optional = false;
+  String installedVersion = '';
+  int installedBuild = 0;
+  AppVersionInfo? latest;
+  String? permissionHint;
+  String? downloadError;
+  AppUpdateDownloadState downloadState = AppUpdateDownloadState.idle;
+  double downloadProgress = 0;
+  String? _downloadedPath;
+  Future<void>? _inFlightCheck;
+
+  bool get shouldShowUpdate => required || optional;
+
+  String get latestVersion => latest?.latestVersion ?? '';
+  String get message =>
+      latest?.message ??
+      'A new version of Param FieldTrack is available. Please update to continue.';
+  String get apkUrl => latest?.apkUrl ?? AppVersionInfo.permanentApkUrl;
+
+  void _notify() {
+    if (!hasListeners) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.idle ||
+        phase == SchedulerPhase.postFrameCallbacks) {
+      notifyListeners();
+      return;
+    }
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) notifyListeners();
+    });
+  }
+
+  Future<void> initialize() {
+    return _runExclusiveCheck(_initialize);
+  }
+
+  Future<void> retryCheck() => initialize();
+
+  /// Recheck `/api/app-version` after login so a missed startup check still runs.
+  Future<void> checkAfterLogin() {
+    if (required || downloadState == AppUpdateDownloadState.downloading) {
+      return Future.value();
+    }
+    return _runExclusiveCheck(_checkFromForeground, skipIfBusy: true);
+  }
+
+  /// Recheck `/api/app-version` after a real background → foreground return.
+  Future<void> checkOnForegroundResume() {
+    if (required || downloadState == AppUpdateDownloadState.downloading) {
+      return Future.value();
+    }
+    return _runExclusiveCheck(_checkFromForeground, skipIfBusy: true);
+  }
+
+  Future<void> skipOptionalUpdate() async {
+    if (required || latest == null) return;
+    await _store.saveSkippedBuild(latest!.latestBuild);
+    optional = false;
+    _notify();
+  }
+
+  Future<void> _runExclusiveCheck(
+    Future<void> Function() work, {
+    bool skipIfBusy = false,
+  }) async {
+    final inFlight = _inFlightCheck;
+    if (inFlight != null) {
+      if (skipIfBusy) return;
+      await inFlight;
+      return;
+    }
+
+    final future = work();
+    _inFlightCheck = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_inFlightCheck, future)) {
+        _inFlightCheck = null;
+      }
+    }
+  }
+
+  Future<void> _initialize() async {
+    checking = true;
+    _notify();
+    try {
+      if (!Platform.isAndroid) {
+        required = false;
+        optional = false;
+        return;
+      }
+
+      final info = await PackageInfo.fromPlatform();
+      installedVersion = info.version;
+      installedBuild = int.tryParse(info.buildNumber) ?? 0;
+
+      final persisted = await _store.readConfirmed();
+      if (persisted != null && installedBuild >= persisted.latestBuild) {
+        await _store.clearConfirmed();
+      } else if (persisted != null &&
+          persisted.forceUpdate &&
+          installedBuild < persisted.latestBuild) {
+        latest = persisted;
+        required = true;
+        optional = false;
+        checking = false;
+        _notify();
+      }
+
+      await _refreshFromApi();
+    } catch (error) {
+      debugPrint('App update initialize failed: $error');
+      await _applyPersistedIfStillOutdated();
+    } finally {
+      checking = false;
+      _notify();
+    }
+  }
+
+  Future<void> _checkFromForeground() async {
+    try {
+      if (!Platform.isAndroid) return;
+
+      if (installedBuild <= 0 || installedVersion.isEmpty) {
+        final info = await PackageInfo.fromPlatform();
+        installedVersion = info.version;
+        installedBuild = int.tryParse(info.buildNumber) ?? 0;
+      }
+
+      final wasRequired = required;
+      final wasOptional = optional;
+      await _refreshFromApi();
+      if (required != wasRequired || optional != wasOptional) {
+        _notify();
+      }
+    } catch (error) {
+      debugPrint('App update resume check failed: $error');
+    }
+  }
+
+  Future<void> _refreshFromApi() async {
+    try {
+      final remote = await _api.fetch();
+      latest = remote;
+      if (installedBuild < remote.latestBuild) {
+        if (remote.forceUpdate) {
+          required = true;
+          optional = false;
+          await _store.saveConfirmed(remote);
+          await _store.clearSkipped();
+        } else {
+          required = false;
+          await _store.clearConfirmed();
+          final skippedBuild = await _store.readSkippedBuild();
+          optional = skippedBuild < remote.latestBuild;
+        }
+      } else {
+        required = false;
+        optional = false;
+        await _store.clear();
+        downloadState = AppUpdateDownloadState.idle;
+        downloadError = null;
+        _downloadedPath = null;
+      }
+    } catch (error) {
+      debugPrint('App version API failed: $error');
+      await _applyPersistedIfStillOutdated();
+    }
+  }
+
+  Future<void> _applyPersistedIfStillOutdated() async {
+    final persisted = await _store.readConfirmed();
+    if (persisted != null &&
+        persisted.forceUpdate &&
+        installedBuild < persisted.latestBuild) {
+      latest = persisted;
+      required = true;
+      optional = false;
+    }
+  }
+
+  Future<void> updateNow() async {
+    if ((!required && !optional) ||
+        downloadState == AppUpdateDownloadState.downloading) {
+      return;
+    }
+
+    permissionHint = null;
+    downloadError = null;
+
+    final canInstall = await _installer.canInstallPackages();
+    if (!canInstall) {
+      permissionHint =
+          'Allow Param FieldTrack to install updates, then tap Update Now again.';
+      _notify();
+      await _installer.openInstallPermissionSettings();
+      return;
+    }
+
+    final existing = _downloadedPath;
+    if (existing != null && File(existing).existsSync()) {
+      try {
+        await _installer.installApk(existing);
+        downloadState = AppUpdateDownloadState.ready;
+        _notify();
+      } on ApkInstallException catch (error) {
+        downloadState = AppUpdateDownloadState.failed;
+        downloadError = error.message;
+        _notify();
+      }
+      return;
+    }
+
+    try {
+      downloadState = AppUpdateDownloadState.downloading;
+      downloadProgress = 0;
+      _notify();
+
+      final path = await _downloadApk();
+      _downloadedPath = path;
+      downloadProgress = 1;
+      downloadState = AppUpdateDownloadState.ready;
+      _notify();
+      await _installer.installApk(path);
+    } on ApkInstallException catch (error) {
+      downloadState = AppUpdateDownloadState.failed;
+      downloadError = error.message;
+      _notify();
+    } catch (_) {
+      downloadState = AppUpdateDownloadState.failed;
+      downloadError =
+          'Update download failed. Please check your internet connection and try again.';
+      _notify();
+    }
+  }
+
+  /// After returning from Install unknown apps settings, continue install if the APK is already downloaded.
+  Future<void> resumeAfterSettings() async {
+    if ((!required && !optional) ||
+        downloadState == AppUpdateDownloadState.downloading) {
+      return;
+    }
+    final existing = _downloadedPath;
+    if (existing == null || !File(existing).existsSync()) return;
+    if (!await _installer.canInstallPackages()) return;
+    permissionHint = null;
+    try {
+      await _installer.installApk(existing);
+    } on ApkInstallException catch (error) {
+      downloadError = error.message;
+      downloadState = AppUpdateDownloadState.failed;
+      _notify();
+    }
+  }
+
+  Future<String> _downloadApk() async {
+    final dir = await getTemporaryDirectory();
+    final folder = Directory('${dir.path}/updates');
+    if (!await folder.exists()) {
+      await folder.create(recursive: true);
+    }
+    final file = File('${folder.path}/paramfieldtrack-latest.apk');
+    if (await file.exists()) {
+      await file.delete();
+    }
+
+    await _downloadDio.download(
+      apkUrl,
+      file.path,
+      onReceiveProgress: (received, total) {
+        if (total > 0) {
+          downloadProgress = (received / total).clamp(0.0, 1.0);
+        } else {
+          downloadProgress = 0;
+        }
+        _notify();
+      },
+    );
+
+    if (!await file.exists() || await file.length() < 1024) {
+      throw const ApkInstallException(
+        'Update download failed. Please check your internet connection and try again.',
+      );
+    }
+    return file.path;
+  }
+}

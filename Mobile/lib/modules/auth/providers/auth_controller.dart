@@ -231,6 +231,7 @@ class AuthController extends ChangeNotifier {
     final lower = shortened.toLowerCase();
     if (lower.contains('session expired')) return shortened;
     if (lower.contains('signed in on another device')) return shortened;
+    if (lower.contains('registered on another device')) return shortened;
     return 'Unable to login. Please check your credentials or connection.';
   }
 }

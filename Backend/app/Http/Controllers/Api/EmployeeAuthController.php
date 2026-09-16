@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
+use App\Exceptions\DeviceRegisteredException;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\User;
@@ -48,10 +49,14 @@ class EmployeeAuthController extends Controller
             ], 403);
         }
 
-        $session = $this->mobileSessions->startSession(
-            $user,
-            $credentials['device_id'] ?? $request->header('X-Device-Id'),
-        );
+        try {
+            $session = $this->mobileSessions->startSession(
+                $user,
+                $credentials['device_id'] ?? $request->header('X-Device-Id'),
+            );
+        } catch (DeviceRegisteredException) {
+            return $this->mobileSessions->deviceRegisteredResponse();
+        }
 
         $user->load(['employee.reportingManager']);
 

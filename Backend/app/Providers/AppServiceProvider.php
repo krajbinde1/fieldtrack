@@ -21,6 +21,10 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
+        config([
+            'livewire.temporary_file_upload.rules' => ['file', 'max:122880'],
+        ]);
+
         Table::configureUsing(function (Table $table): void {
             $table
                 ->persistFiltersInSession()

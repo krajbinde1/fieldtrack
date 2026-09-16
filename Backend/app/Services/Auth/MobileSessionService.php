@@ -2,15 +2,17 @@
 
 namespace App\Services\Auth;
 
+use App\Exceptions\DeviceRegisteredException;
 use App\Models\DeviceToken;
 use App\Models\RevokedMobileToken;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
 
 /**
- * Enforces a single active mobile Sanctum session per user.
+ * Enforces a single registered mobile device per locked role.
  * Admin Filament / web sessions are untouched.
  */
 final class MobileSessionService
@@ -22,7 +24,8 @@ final class MobileSessionService
     public const MESSAGE_SESSION_REPLACED = 'Your account was signed in on another device.';
 
     /**
-     * Start a new mobile session. Latest login wins; previous mobile tokens are revoked.
+     * Start a mobile session. First login binds the device; another device is blocked
+     * until Admin resets it. Same-device re-login rotates the Sanctum token.
      *
      * @return array{token: string, session_id: string, device_id: string|null}
      */
@@ -37,6 +40,19 @@ final class MobileSessionService
             /** @var User $locked */
             $locked = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
 
+            if ($locked->shouldLockMobileDevice()) {
+                if ($deviceId === null || $deviceId === '') {
+                    throw ValidationException::withMessages([
+                        'device_id' => 'Device ID is required.',
+                    ]);
+                }
+
+                $bound = $locked->active_mobile_device_id;
+                if (filled($bound) && ! hash_equals((string) $bound, $deviceId)) {
+                    throw new DeviceRegisteredException;
+                }
+            }
+
             $this->revokeExistingMobileTokens($locked);
 
             $sessionId = (string) Str::uuid();
@@ -46,7 +62,7 @@ final class MobileSessionService
 
             $locked->forceFill([
                 'active_mobile_session_id' => $sessionId,
-                'active_mobile_device_id' => $deviceId,
+                'active_mobile_device_id' => $deviceId ?? $locked->active_mobile_device_id,
                 'active_mobile_token_id' => $tokenId,
                 'active_mobile_login_at' => now(),
             ])->save();
@@ -65,11 +81,14 @@ final class MobileSessionService
             return [
                 'token' => $plainText,
                 'session_id' => $sessionId,
-                'device_id' => $deviceId,
+                'device_id' => $locked->active_mobile_device_id,
             ];
         });
     }
 
+    /**
+     * Sign out of the current mobile session without releasing the registered device.
+     */
     public function endSession(User $user, ?PersonalAccessToken $currentToken = null): void
     {
         DB::transaction(function () use ($user, $currentToken): void {
@@ -83,6 +102,27 @@ final class MobileSessionService
 
             $locked->tokens()->where('name', self::TOKEN_NAME)->delete();
 
+            DeviceToken::query()->where('user_id', $locked->id)->delete();
+
+            $locked->forceFill([
+                'active_mobile_session_id' => null,
+                'active_mobile_token_id' => null,
+                'active_mobile_login_at' => null,
+            ])->save();
+        });
+    }
+
+    /**
+     * Admin Device Change: clear the registered device and invalidate the old session.
+     * The next successful mobile login binds the new device.
+     */
+    public function resetDevice(User $user): void
+    {
+        DB::transaction(function () use ($user): void {
+            /** @var User $locked */
+            $locked = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+
+            $this->revokeExistingMobileTokens($locked);
             DeviceToken::query()->where('user_id', $locked->id)->delete();
 
             $locked->forceFill([
@@ -130,6 +170,15 @@ final class MobileSessionService
             'code' => self::CODE_SESSION_REPLACED,
             'message' => self::MESSAGE_SESSION_REPLACED,
         ], 401);
+    }
+
+    public function deviceRegisteredResponse()
+    {
+        return response()->json([
+            'success' => false,
+            'code' => DeviceRegisteredException::CODE,
+            'message' => DeviceRegisteredException::MESSAGE,
+        ], 403);
     }
 
     private function revokeExistingMobileTokens(User $user): void

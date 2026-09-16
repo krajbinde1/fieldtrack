@@ -47,6 +47,7 @@ class AdminPanelProvider extends PanelProvider
                 'Admissions',
                 'Leave',
                 'Reports',
+                'System',
             ])
             ->navigation(fn (): bool => ! request()->routeIs('filament.admin.resources.employee-routes.view'))
             ->topbar(fn (): bool => ! request()->routeIs('filament.admin.resources.employee-routes.view'))

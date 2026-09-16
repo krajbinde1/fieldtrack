@@ -131,6 +131,23 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasRole(UserRole::Employee);
     }
 
+    /**
+     * Mobile roles that bind to a single registered device.
+     * Admin web login is never device-locked.
+     */
+    public function shouldLockMobileDevice(): bool
+    {
+        return $this->isDirector()
+            || $this->isProjectHead()
+            || $this->isCenterManager()
+            || $this->isEmployeeUser();
+    }
+
+    public function hasRegisteredMobileDevice(): bool
+    {
+        return filled($this->active_mobile_device_id);
+    }
+
     public function canLoginToMobile(): bool
     {
         if ($this->is_active !== true) {

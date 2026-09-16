@@ -7,6 +7,7 @@ import '../../../core/design/app_spacing.dart';
 import '../../../core/widgets/app_version_label.dart';
 import '../../../core/widgets/design/pg_card.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
+import '../../auth/models/auth_session.dart';
 import '../../auth/providers/auth_controller.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -69,7 +70,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       listenable: widget.auth,
       builder: (context, _) {
         final employee = widget.auth.session?.employee;
-        if (employee == null) return const SizedBox.shrink();
+        final user = widget.auth.session?.user;
+        if (employee == null || employee.id == 0) {
+          return _settingsProfile(context, user);
+        }
 
         final rows = <(String, String)>[
           ('Employee Code', employee.employeeCode),
@@ -215,6 +219,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _settingsProfile(BuildContext context, AuthUser? user) {
+    final rows = <(String, String)>[
+      ('Login ID', user?.loginId ?? '—'),
+      ('Role', widget.auth.userRole.label),
+    ];
+
+    return PgPageScaffold(
+      auth: widget.auth,
+      title: 'My Profile',
+      showBack: true,
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        children: [
+          PgCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: rows.map((row) {
+                return ListTile(
+                  title: Text(
+                    row.$1,
+                    style: Theme.of(context).textTheme.labelMedium
+                        ?.copyWith(color: AppColors.textSecondary),
+                  ),
+                  subtitle: Text(
+                    row.$2,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.password_outlined),
+            label: const Text('Change Password'),
+            onPressed: () => context.push('/change-password'),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Logout'),
+            onPressed: widget.auth.loading
+                ? null
+                : () async => widget.auth.logout(),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          const AppVersionLabel(),
+        ],
+      ),
     );
   }
 }

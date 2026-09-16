@@ -7,6 +7,7 @@ import 'core/api/api_config.dart';
 import 'core/design/app_theme.dart';
 import 'core/design/material_icon_retention.dart';
 import 'core/routing/app_router.dart';
+import 'core/updates/app_update_controller.dart';
 import 'modules/attendance/route_tracking/route_tracking_config.dart';
 import 'modules/attendance/route_tracking/route_tracking_lifecycle.dart';
 import 'modules/attendance/route_tracking/route_tracking_log.dart';
@@ -14,10 +15,12 @@ import 'modules/attendance/route_tracking/route_tracking_service.dart';
 import 'modules/auth/providers/auth_controller.dart';
 
 final authController = AuthController();
+final appUpdateController = AppUpdateController();
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = createRouter(
   authController,
+  appUpdateController,
   navigatorKey: rootNavigatorKey,
 );
 
@@ -51,8 +54,54 @@ Future<void> _safeStartupHousekeeping() async {
   }
 }
 
-class ParamFieldTrackApp extends StatelessWidget {
+class ParamFieldTrackApp extends StatefulWidget {
   const ParamFieldTrackApp({super.key});
+
+  @override
+  State<ParamFieldTrackApp> createState() => _ParamFieldTrackAppState();
+}
+
+class _ParamFieldTrackAppState extends State<ParamFieldTrackApp>
+    with WidgetsBindingObserver {
+  bool _returnedFromBackground = false;
+  bool _wasAuthenticated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _wasAuthenticated = authController.authenticated;
+    authController.addListener(_onAuthChanged);
+  }
+
+  @override
+  void dispose() {
+    authController.removeListener(_onAuthChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void _onAuthChanged() {
+    final isAuth = authController.authenticated;
+    if (isAuth && !_wasAuthenticated) {
+      unawaited(appUpdateController.checkAfterLogin());
+    }
+    _wasAuthenticated = isAuth;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _returnedFromBackground = true;
+      return;
+    }
+    if (state != AppLifecycleState.resumed || !_returnedFromBackground) {
+      return;
+    }
+    _returnedFromBackground = false;
+    unawaited(appUpdateController.checkOnForegroundResume());
+  }
 
   @override
   Widget build(BuildContext context) => RouteTrackingLifecycle(

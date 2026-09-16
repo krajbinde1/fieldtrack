@@ -27,25 +27,33 @@ import '../../modules/leaves/screens/supervisor_leave_list_screen.dart';
 import '../../modules/manager/screens/manager_route_tracking_screen.dart';
 import '../../modules/manager/screens/manager_team_attendance_screen.dart';
 import '../../modules/profile/screens/profile_screen.dart';
+import '../../modules/updates/screens/force_update_screen.dart';
+import '../updates/app_update_controller.dart';
 
 GoRouter createRouter(
-  AuthController auth, {
+  AuthController auth,
+  AppUpdateController updates, {
   GlobalKey<NavigatorState>? navigatorKey,
 }) =>
     GoRouter(
       navigatorKey: navigatorKey,
       initialLocation: '/dashboard',
-      refreshListenable: auth,
+      refreshListenable: Listenable.merge([auth, updates]),
       redirect: (_, state) {
         final location = state.matchedLocation;
-        if (auth.initializing) {
+        if (updates.shouldShowUpdate) {
+          return location == '/update-required' ? null : '/update-required';
+        }
+        if (auth.initializing || updates.checking) {
           return location == '/splash' ? null : '/splash';
         }
         if (!auth.authenticated) return location == '/login' ? null : '/login';
         if (auth.mustChangePassword) {
           return location == '/change-password' ? null : '/change-password';
         }
-        if (location == '/login' || location == '/splash') {
+        if (location == '/login' ||
+            location == '/splash' ||
+            location == '/update-required') {
           return '/dashboard';
         }
 
@@ -59,6 +67,10 @@ GoRouter createRouter(
         GoRoute(
           path: '/splash',
           builder: (_, _) => SplashScreen(auth: auth),
+        ),
+        GoRoute(
+          path: '/update-required',
+          builder: (_, _) => ForceUpdateScreen(updates: updates),
         ),
         GoRoute(
           path: '/login',

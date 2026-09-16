@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminEmployeeRouteController;
+use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AdmissionLookupController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\DashboardController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Api\SupervisorAdmissionController;
 use App\Http\Controllers\Api\SupervisorLeaveController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('app-version', AppVersionController::class);
 Route::post('login', [EmployeeAuthController::class, 'login']);
 
 Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
