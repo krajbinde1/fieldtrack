@@ -258,14 +258,21 @@ final class OrganizationAccessService
 
     public function canReviewAdmission(User $user, Admission $admission): bool
     {
-        if (! $user->isCenterManager() || ! $admission->isSubmitted()) {
+        if (! $admission->isSubmitted() || ! $this->canViewAdmission($user, $admission)) {
+            return false;
+        }
+
+        if ($this->hasOrganizationWideAccess($user)) {
+            return true;
+        }
+
+        if (! $user->isCenterManager()) {
             return false;
         }
 
         $centerIds = $this->visibleCenterIds($user) ?? [];
 
-        return in_array((int) $admission->center_id, $centerIds, true)
-            && $this->canViewAdmission($user, $admission);
+        return in_array((int) $admission->center_id, $centerIds, true);
     }
 
     public function canManageSchemes(User $user): bool
@@ -342,7 +349,7 @@ final class OrganizationAccessService
         abort_unless(
             $this->canReviewAdmission($user, $admission),
             403,
-            'Only the employee\'s assigned Center Manager can review this admission.',
+            'Only an assigned Center Manager or an organization admin can review this admission.',
         );
     }
 
