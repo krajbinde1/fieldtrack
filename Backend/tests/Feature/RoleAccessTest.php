@@ -466,3 +466,146 @@ it('gives a director organization-wide access without project or center assignme
         ->and($access->canManageOrgUser($org['director'], $org['projectHead']))->toBeTrue()
         ->and($access->canManageOrgUser($org['director'], $org['centerManager']))->toBeTrue();
 });
+
+it('registers the Center Manager mobile module API routes', function () {
+    $uris = collect(Illuminate\Support\Facades\Route::getRoutes())
+        ->map(fn ($route) => $route->uri())
+        ->all();
+
+    foreach ([
+        'api/manager/employees',
+        'api/manager/admissions',
+        'api/manager/admission-targets',
+        'api/manager/leaves',
+        'api/manager/team-attendance',
+        'api/manager/route-tracking',
+    ] as $uri) {
+        expect($uris)->toContain($uri);
+    }
+});
+
+it('lets a center manager login and load a center-scoped mobile dashboard', function () {
+    $org = seedOrg();
+
+    $login = $this->postJson('/api/login', [
+        'login_id' => 'centermgr',
+        'password' => 'CenterMgr@123',
+        'device_id' => 'cm-device-1',
+    ])->assertOk();
+
+    $login->assertJsonPath('success', true)
+        ->assertJsonPath('user.role', UserRole::CenterManager->value)
+        ->assertJsonPath('permissions.0', 'center_manager_dashboard');
+
+    Sanctum::actingAs($org['centerManager']);
+
+    $dashboard = $this->getJson('/api/dashboard')->assertOk();
+    $dashboard->assertJsonPath('success', true)
+        ->assertJsonPath('data.role', UserRole::CenterManager->value)
+        ->assertJsonPath('data.centers', 1)
+        ->assertJsonPath('data.employees', 1);
+
+    $employees = $this->getJson('/api/manager/employees')->assertOk()->json('data');
+    $ids = collect($employees)->pluck('id')->all();
+    expect($ids)->toContain($org['empA']->id)
+        ->and($ids)->not->toContain($org['empB']->id);
+
+    $ownTarget = \App\Models\AdmissionTarget::create([
+        'employee_id' => $org['empA']->id,
+        'center_id' => $org['centerA']->id,
+        'scheme_id' => $org['projectA']->id,
+        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'period_start' => '2026-09-14',
+        'period_end' => '2026-09-20',
+        'target_count' => 4,
+    ]);
+    $hiddenTarget = \App\Models\AdmissionTarget::create([
+        'employee_id' => $org['empB']->id,
+        'center_id' => $org['centerB']->id,
+        'scheme_id' => $org['projectB']->id,
+        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'period_start' => '2026-09-14',
+        'period_end' => '2026-09-20',
+        'target_count' => 9,
+    ]);
+
+    $targets = $this->getJson('/api/manager/admission-targets')->assertOk()->json('data');
+    $targetIds = collect($targets)->pluck('id')->all();
+    expect($targetIds)->toContain($ownTarget->id)
+        ->and($targetIds)->not->toContain($hiddenTarget->id);
+
+    $this->getJson('/api/manager/admission-targets/'.$ownTarget->id)->assertOk();
+    $this->getJson('/api/manager/admission-targets/'.$hiddenTarget->id)->assertForbidden();
+
+    $ownAdmission = \App\Models\Admission::create([
+        'scheme_id' => $org['projectA']->id,
+        'center_id' => $org['centerA']->id,
+        'employee_id' => $org['empA']->id,
+        'first_name' => 'Own',
+        'last_name' => 'Admission',
+    ]);
+    $hiddenAdmission = \App\Models\Admission::create([
+        'scheme_id' => $org['projectB']->id,
+        'center_id' => $org['centerB']->id,
+        'employee_id' => $org['empB']->id,
+        'first_name' => 'Hidden',
+        'last_name' => 'Admission',
+    ]);
+    $admissions = collect($this->getJson('/api/manager/admissions')->assertOk()->json('data'))->pluck('id')->all();
+    expect($admissions)->toContain($ownAdmission->id)
+        ->and($admissions)->not->toContain($hiddenAdmission->id);
+    $this->getJson('/api/manager/admissions/'.$ownAdmission->id)->assertOk();
+    $this->getJson('/api/manager/admissions/'.$hiddenAdmission->id)->assertForbidden();
+
+    $ownLeave = $this->actingAs($org['userA'], 'sanctum')
+        ->postJson('/api/leaves', [
+            'leave_type' => 'casual',
+            'from_date' => '2026-09-20',
+            'to_date' => '2026-09-21',
+            'reason' => 'Assigned center leave',
+        ])
+        ->json('data.id');
+    $userB = User::query()->where('login_id', '9000000002')->firstOrFail();
+    $hiddenLeave = $this->actingAs($userB, 'sanctum')
+        ->postJson('/api/leaves', [
+            'leave_type' => 'casual',
+            'from_date' => '2026-09-20',
+            'to_date' => '2026-09-21',
+            'reason' => 'Other center leave',
+        ])
+        ->json('data.id');
+    Sanctum::actingAs($org['centerManager']);
+    $leaves = collect($this->getJson('/api/manager/leaves')->assertOk()->json('data'))->pluck('id')->all();
+    expect($leaves)->toContain($ownLeave)
+        ->and($leaves)->not->toContain($hiddenLeave);
+
+    $ownAttendance = Attendance::create([
+        'employee_id' => $org['empA']->id,
+        'attendance_date' => AttendanceCalendar::today()->toDateString(),
+        'punch_in_time' => '09:00:00',
+        'attendance_status' => 'Punched In',
+        'approval_status' => 'Pending',
+    ]);
+    $hiddenAttendance = Attendance::create([
+        'employee_id' => $org['empB']->id,
+        'attendance_date' => AttendanceCalendar::today()->toDateString(),
+        'punch_in_time' => '09:00:00',
+        'attendance_status' => 'Punched In',
+        'approval_status' => 'Pending',
+    ]);
+    $attendanceIds = collect($this->getJson('/api/manager/team-attendance')->assertOk()->json('data'))
+        ->pluck('employee_id')
+        ->all();
+    expect($attendanceIds)->toContain($org['empA']->id)
+        ->and($attendanceIds)->not->toContain($org['empB']->id);
+    $this->getJson('/api/manager/team-attendance/'.$ownAttendance->id)->assertOk();
+    $this->getJson('/api/manager/team-attendance/'.$hiddenAttendance->id)->assertForbidden();
+
+    $routeIds = collect($this->getJson('/api/manager/route-tracking')->assertOk()->json('data'))
+        ->pluck('employee_id')
+        ->all();
+    expect($routeIds)->toContain($org['empA']->id)
+        ->and($routeIds)->not->toContain($org['empB']->id);
+    $this->getJson('/api/manager/route-tracking/'.$ownAttendance->id)->assertOk();
+    $this->getJson('/api/manager/route-tracking/'.$hiddenAttendance->id)->assertForbidden();
+});

@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\EmployeeAdmissionController;
 use App\Http\Controllers\Api\EmployeeAuthController;
 use App\Http\Controllers\Api\EmployeeLeaveController;
 use App\Http\Controllers\Api\EmployeeRoutePointController;
+use App\Http\Controllers\Api\Manager\ManagerAdmissionTargetController;
+use App\Http\Controllers\Api\Manager\ManagerEmployeeController;
 use App\Http\Controllers\Api\Manager\ManagerRouteTrackingController;
 use App\Http\Controllers\Api\Manager\ManagerTeamAttendanceController;
 use App\Http\Controllers\Api\SupervisorAdmissionController;
@@ -34,19 +36,33 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
     });
 
     Route::middleware('role:project_head,center_manager')->prefix('manager')->group(function () {
-        Route::get('team-attendance', [ManagerTeamAttendanceController::class, 'index']);
-        Route::get('team-attendance/employees/{employee}', [ManagerTeamAttendanceController::class, 'employeeHistory']);
-        Route::get('team-attendance/{attendance}', [ManagerTeamAttendanceController::class, 'show']);
-        Route::get('route-tracking', [ManagerRouteTrackingController::class, 'index']);
-        Route::get('route-tracking/{attendance}', [ManagerRouteTrackingController::class, 'show']);
+        Route::get('employees', [ManagerEmployeeController::class, 'index']);
+        Route::get('admission-targets', [ManagerAdmissionTargetController::class, 'index']);
+        Route::get('admission-targets/{admissionTarget}', [ManagerAdmissionTargetController::class, 'show'])
+            ->whereNumber('admissionTarget');
         Route::get('admissions', [SupervisorAdmissionController::class, 'index']);
-        Route::get('admissions/{admission}', [SupervisorAdmissionController::class, 'show']);
-        Route::get('admissions/{admission}/documents/{document}', [SupervisorAdmissionController::class, 'downloadDocument']);
+        Route::get('admissions/{admission}', [SupervisorAdmissionController::class, 'show'])
+            ->whereNumber('admission');
+        Route::get('admissions/{admission}/documents/{document}', [SupervisorAdmissionController::class, 'downloadDocument'])
+            ->whereNumber('admission')
+            ->whereNumber('document');
         Route::get('leaves', [SupervisorLeaveController::class, 'index']);
-        Route::get('leaves/{leave}', [SupervisorLeaveController::class, 'show']);
-        Route::post('leaves/{leave}/approve', [SupervisorLeaveController::class, 'approve']);
-        Route::post('leaves/{leave}/reject', [SupervisorLeaveController::class, 'reject']);
-        Route::get('leaves/{leave}/document', [SupervisorLeaveController::class, 'downloadDocument']);
+        Route::get('leaves/{leave}', [SupervisorLeaveController::class, 'show'])
+            ->whereNumber('leave');
+        Route::post('leaves/{leave}/approve', [SupervisorLeaveController::class, 'approve'])
+            ->whereNumber('leave');
+        Route::post('leaves/{leave}/reject', [SupervisorLeaveController::class, 'reject'])
+            ->whereNumber('leave');
+        Route::get('leaves/{leave}/document', [SupervisorLeaveController::class, 'downloadDocument'])
+            ->whereNumber('leave');
+        Route::get('team-attendance', [ManagerTeamAttendanceController::class, 'index']);
+        Route::get('team-attendance/employees/{employee}', [ManagerTeamAttendanceController::class, 'employeeHistory'])
+            ->whereNumber('employee');
+        Route::get('team-attendance/{attendance}', [ManagerTeamAttendanceController::class, 'show'])
+            ->whereNumber('attendance');
+        Route::get('route-tracking', [ManagerRouteTrackingController::class, 'index']);
+        Route::get('route-tracking/{attendance}', [ManagerRouteTrackingController::class, 'show'])
+            ->whereNumber('attendance');
     });
 
     Route::middleware('role:admin,director')->prefix('director')->group(function () {

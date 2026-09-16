@@ -248,6 +248,11 @@ final class OrganizationAccessService
         return $this->canViewEmployee($user, $target->employee ?? new Employee(['id' => $target->employee_id]));
     }
 
+    public function assertCanViewAdmissionTarget(User $user, AdmissionTarget $target): void
+    {
+        abort_unless($this->canViewAdmissionTarget($user, $target), 403, 'You are not authorized to view this admission target.');
+    }
+
     public function admissionTargetQuery(User $user): Builder
     {
         $query = AdmissionTarget::query();

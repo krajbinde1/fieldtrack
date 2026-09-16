@@ -164,4 +164,37 @@ class ManagerApi {
       throw mapApiError(error);
     }
   }
+
+  Future<List<Map<String, dynamic>>> listEmployees({String? search}) async {
+    try {
+      final response = await _dio.get(
+        '/manager/employees',
+        queryParameters: {
+          if (search != null && search.isNotEmpty) 'search': search,
+        },
+      );
+      final rows = (response.data as Map)['data'];
+      if (rows is! List) return const [];
+      return rows
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listAdmissionTargets() async {
+    try {
+      final response = await _dio.get('/manager/admission-targets');
+      final rows = (response.data as Map)['data'];
+      if (rows is! List) return const [];
+      return rows
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
 }

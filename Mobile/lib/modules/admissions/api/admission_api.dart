@@ -81,6 +81,14 @@ class AdmissionApi {
     return AdmissionRecord.fromJson(_map(data));
   }
 
+  Future<List<AdmissionRecord>> supervisorList(String prefix) =>
+      _list('/$prefix/admissions');
+
+  Future<AdmissionRecord> supervisorShow(String prefix, int id) async {
+    final data = await _get('/$prefix/admissions/$id');
+    return AdmissionRecord.fromJson(_map(data));
+  }
+
   Future<AdmissionRecord> saveDraft(Map<String, dynamic> payload, {int? id}) async {
     try {
       final response = id == null

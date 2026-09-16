@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\LeaveStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Services\OrganizationAccessService;
@@ -51,6 +52,13 @@ class DashboardController extends Controller
                 'punched_out_today' => $punchedOut,
                 'active_routes' => $activeRoutes,
                 'not_punched_in_today' => max(0, $employeeIds->count() - $punchedIn),
+                'admissions' => $access->admissionQuery($user)->count(),
+                'pending_leaves' => $access->leaveQuery($user)
+                    ->where('status', LeaveStatus::Pending->value)
+                    ->count(),
+                'admission_targets' => $access->admissionTargetQuery($user)
+                    ->whereNull('parent_id')
+                    ->count(),
             ],
         ]);
     }

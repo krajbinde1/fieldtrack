@@ -5,6 +5,8 @@ import 'route_permissions.dart';
 import '../../modules/admissions/screens/admission_hub_screen.dart';
 import '../../modules/admissions/screens/admission_list_screen.dart';
 import '../../modules/admissions/screens/admission_wizard_screen.dart';
+import '../../modules/admissions/screens/supervisor_admission_detail_screen.dart';
+import '../../modules/admissions/screens/supervisor_admission_list_screen.dart';
 import '../../modules/attendance/models/attendance.dart';
 import '../../modules/attendance/screens/attendance_detail.dart';
 import '../../modules/attendance/screens/attendance_history.dart';
@@ -24,6 +26,8 @@ import '../../modules/leaves/screens/leave_hub_screen.dart';
 import '../../modules/leaves/screens/leave_list_screen.dart';
 import '../../modules/leaves/screens/supervisor_leave_detail_screen.dart';
 import '../../modules/leaves/screens/supervisor_leave_list_screen.dart';
+import '../../modules/manager/screens/manager_admission_targets_screen.dart';
+import '../../modules/manager/screens/manager_employees_screen.dart';
 import '../../modules/manager/screens/manager_route_tracking_screen.dart';
 import '../../modules/manager/screens/manager_team_attendance_screen.dart';
 import '../../modules/profile/screens/profile_screen.dart';
@@ -179,6 +183,29 @@ GoRouter createRouter(
           ),
         ),
         GoRoute(
+          path: '/manager/employees',
+          builder: (_, _) => ManagerEmployeesScreen(auth: auth),
+        ),
+        GoRoute(
+          path: '/manager/admissions',
+          builder: (_, _) => SupervisorAdmissionListScreen(
+            auth: auth,
+            apiPrefix: 'manager',
+          ),
+        ),
+        GoRoute(
+          path: '/manager/admissions/:id',
+          builder: (_, state) => SupervisorAdmissionDetailScreen(
+            auth: auth,
+            apiPrefix: 'manager',
+            admissionId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: '/manager/admission-targets',
+          builder: (_, _) => ManagerAdmissionTargetsScreen(auth: auth),
+        ),
+        GoRoute(
           path: '/manager/leaves',
           builder: (_, _) => SupervisorLeaveListScreen(
             auth: auth,
@@ -206,6 +233,21 @@ GoRouter createRouter(
           builder: (_, state) => DirectorRouteMapScreen(
             auth: auth,
             attendanceId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: '/director/admissions',
+          builder: (_, _) => SupervisorAdmissionListScreen(
+            auth: auth,
+            apiPrefix: 'director',
+          ),
+        ),
+        GoRoute(
+          path: '/director/admissions/:id',
+          builder: (_, state) => SupervisorAdmissionDetailScreen(
+            auth: auth,
+            apiPrefix: 'director',
+            admissionId: int.parse(state.pathParameters['id']!),
           ),
         ),
         GoRoute(
