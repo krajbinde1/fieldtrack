@@ -30,7 +30,12 @@ class EmployeeAuthController extends Controller
         ]);
 
         $user = User::query()
-            ->with(['employee.reportingManager', 'employee.center.project'])
+            ->with([
+                'employee.reportingManager',
+                'employee.createdByUser',
+                'employee.center.project',
+                'employee.center.centerManagers',
+            ])
             ->where('login_id', $credentials['login_id'])
             ->whereIn('role', UserRole::mobileValues())
             ->first();
@@ -72,7 +77,12 @@ class EmployeeAuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['employee.reportingManager', 'employee.center.project']);
+        $user = $request->user()->load([
+            'employee.reportingManager',
+            'employee.createdByUser',
+            'employee.center.project',
+            'employee.center.centerManagers',
+        ]);
 
         if (! $user->canLoginToMobile()) {
             $request->user()->currentAccessToken()?->delete();
@@ -205,6 +215,10 @@ class EmployeeAuthController extends Controller
             'joining_date' => $employee->joining_date?->toDateString(),
             'profile_photo_url' => $this->profilePhotoUrl($employee),
             'active' => (bool) $employee->status,
+            'staff_role' => $employee->staffRoleEnum()->value,
+            'staff_role_label' => $employee->staffRoleEnum()->label(),
+            'center_manager_name' => $employee->createdByUser?->name
+                ?? $employee->center?->centerManagers->pluck('name')->first(),
         ];
     }
 

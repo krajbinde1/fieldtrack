@@ -110,10 +110,12 @@ class DemoOrganizationSeeder extends Seeder
                 'full_name' => 'Field Employee',
                 'email' => 'employee@fieldtrack.local',
                 'department' => 'Field',
-                'designation' => 'Field Executive',
+                'designation' => 'Mobilizer',
                 'joining_date' => now()->toDateString(),
                 'base_location' => 'Pune',
                 'status' => true,
+                'staff_role' => \App\Enums\CenterStaffRole::Mobilizer->value,
+                'created_by_user_id' => $centerManager->id,
             ],
         );
 
@@ -137,10 +139,12 @@ class DemoOrganizationSeeder extends Seeder
                 'full_name' => 'Other Employee',
                 'email' => 'other.employee@fieldtrack.local',
                 'department' => 'Field',
-                'designation' => 'Field Executive',
+                'designation' => 'Mobilizer',
                 'joining_date' => now()->toDateString(),
                 'base_location' => 'Nashik',
                 'status' => true,
+                'staff_role' => \App\Enums\CenterStaffRole::Mobilizer->value,
+                'created_by_user_id' => $otherManager->id,
             ],
         );
 

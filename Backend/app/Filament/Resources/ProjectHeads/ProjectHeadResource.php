@@ -39,11 +39,14 @@ class ProjectHeadResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-
-        return (bool) ($user && app(OrganizationAccessService::class)->canManageProjectHeads($user));
+        return false;
     }
 
     public static function getEloquentQuery(): Builder

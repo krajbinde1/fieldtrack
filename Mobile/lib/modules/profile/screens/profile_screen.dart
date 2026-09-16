@@ -82,6 +82,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ('Email', employee.email ?? '—'),
           ('Department', employee.department),
           ('Designation', employee.designation),
+          if (employee.staffRoleLabel != null &&
+              employee.staffRoleLabel!.trim().isNotEmpty)
+            ('Login Role', employee.staffRoleLabel!),
           ('Reporting Manager', employee.reportingManager ?? '—'),
           ('Base Location', employee.baseLocation),
           ('Joining Date', employee.joiningDate ?? '—'),

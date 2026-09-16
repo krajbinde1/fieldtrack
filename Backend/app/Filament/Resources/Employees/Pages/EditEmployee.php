@@ -2,9 +2,14 @@
 
 namespace App\Filament\Resources\Employees\Pages;
 
+use App\Enums\CenterStaffRole;
 use App\Filament\Resources\Employees\EmployeeResource;
+use App\Models\Center;
+use App\Services\OrganizationAccessService;
 use App\Support\LoginId;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class EditEmployee extends EditRecord
 {
@@ -12,21 +17,46 @@ class EditEmployee extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $data['login_id'] = $this->record->user?->login_id;
+        $employee = $this->record;
+        $data['login_id'] = $employee->user?->login_id;
+        $data['project_name'] = $employee->center?->project?->name ?: '—';
+        $data['center_manager_name'] = $employee->createdByUser?->name
+            ?: $employee->center?->centerManagers->pluck('name')->join(', ')
+            ?: '—';
 
         return $data;
     }
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        unset($data['login_id']);
+        $actor = auth()->user();
+        abort_unless($actor !== null, 403);
+
+        $access = app(OrganizationAccessService::class);
+        $centerIds = $access->visibleCenterIds($actor) ?? [];
+        if (count($centerIds) === 1) {
+            $data['center_id'] = $centerIds[0];
+        }
+
+        $center = Center::query()->find($data['center_id'] ?? $this->record->center_id);
+        abort_unless(
+            $center !== null && $access->canManageEmployees($actor, $center),
+            403,
+            'You can only manage users for your own Center.',
+        );
+
+        $role = CenterStaffRole::tryFromMixed($data['staff_role'] ?? $this->record->staff_role);
+        $data['staff_role'] = $role->value;
+        $data['designation'] = $role->label();
+
+        unset($data['login_id'], $data['login_password'], $data['project_name'], $data['center_manager_name']);
 
         return $data;
     }
 
     protected function afterSave(): void
     {
-        $employee = $this->record;
+        $employee = $this->record->fresh(['user']);
         $user = $employee->user;
         if ($user === null) {
             return;
@@ -37,12 +67,28 @@ class EditEmployee extends EditRecord
             'is_active' => (bool) $employee->status,
         ];
 
+        if (filled($employee->email)) {
+            $payload['email'] = $employee->email;
+        }
+
         $loginId = trim((string) ($this->data['login_id'] ?? ''));
         if ($loginId !== '') {
             LoginId::assertUnique($loginId, $user->id);
             $payload['login_id'] = $loginId;
         }
 
-        $user->update($payload);
+        $password = $this->data['login_password'] ?? null;
+        if (filled($password)) {
+            $payload['password'] = Hash::make($password);
+            $payload['must_change_password'] = true;
+        }
+
+        try {
+            $user->update($payload);
+        } catch (\Illuminate\Database\QueryException $exception) {
+            throw ValidationException::withMessages([
+                'email' => 'Email must be unique.',
+            ]);
+        }
     }
 }

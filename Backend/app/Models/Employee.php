@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CenterStaffRole;
 use App\Support\EmployeeCodeGenerator;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -66,6 +67,8 @@ class Employee extends Authenticatable
         'account_number',
         'ifsc_code',
         'reporting_manager_id',
+        'created_by_user_id',
+        'staff_role',
     ];
 
     protected function casts(): array
@@ -77,6 +80,16 @@ class Employee extends Authenticatable
             'travel_allowance' => 'decimal:2',
             'status' => 'boolean',
         ];
+    }
+
+    public function createdByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function staffRoleEnum(): CenterStaffRole
+    {
+        return CenterStaffRole::tryFromMixed($this->staff_role);
     }
 
     public function center(): BelongsTo

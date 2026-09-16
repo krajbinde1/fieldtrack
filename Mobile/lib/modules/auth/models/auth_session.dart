@@ -59,6 +59,8 @@ class EmployeeProfile {
     this.email,
     required this.department,
     required this.designation,
+    this.staffRole,
+    this.staffRoleLabel,
     this.reportingManager,
     required this.baseLocation,
     this.joiningDate,
@@ -73,6 +75,8 @@ class EmployeeProfile {
   final String? email;
   final String department;
   final String designation;
+  final String? staffRole;
+  final String? staffRoleLabel;
   final String? reportingManager;
   final String baseLocation;
   final String? joiningDate;
@@ -89,6 +93,8 @@ class EmployeeProfile {
         // Live API often returns null for these optional HR fields.
         department: _asString(json['department']),
         designation: _asString(json['designation']),
+        staffRole: _asNullableString(json['staff_role']),
+        staffRoleLabel: _asNullableString(json['staff_role_label']),
         reportingManager: _asNullableString(json['reporting_manager']),
         baseLocation: _asString(json['base_location']),
         joiningDate: _asNullableString(json['joining_date']),
@@ -115,6 +121,8 @@ class EmployeeProfile {
     String? email,
     String? department,
     String? designation,
+    String? staffRole,
+    String? staffRoleLabel,
     String? reportingManager,
     String? baseLocation,
     String? joiningDate,
@@ -128,6 +136,8 @@ class EmployeeProfile {
         email: email ?? this.email,
         department: department ?? this.department,
         designation: designation ?? this.designation,
+        staffRole: staffRole ?? this.staffRole,
+        staffRoleLabel: staffRoleLabel ?? this.staffRoleLabel,
         reportingManager: reportingManager ?? this.reportingManager,
         baseLocation: baseLocation ?? this.baseLocation,
         joiningDate: joiningDate ?? this.joiningDate,
@@ -143,6 +153,8 @@ class EmployeeProfile {
         'email': email,
         'department': department,
         'designation': designation,
+        'staff_role': staffRole,
+        'staff_role_label': staffRoleLabel,
         'reporting_manager': reportingManager,
         'base_location': baseLocation,
         'joining_date': joiningDate,

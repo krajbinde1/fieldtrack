@@ -39,11 +39,14 @@ class CenterManagerResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedIdentification;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-
-        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isProjectHead());
+        return false;
     }
 
     public static function canCreate(): bool

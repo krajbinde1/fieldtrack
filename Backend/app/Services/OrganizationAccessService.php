@@ -350,20 +350,6 @@ final class OrganizationAccessService
 
     public function canManageEmployees(User $user, ?Center $center = null): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
-
-        if ($user->isProjectHead()) {
-            if ($center === null) {
-                return true;
-            }
-
-            $ids = $this->visibleCenterIds($user) ?? [];
-
-            return in_array((int) $center->id, $ids, true);
-        }
-
         if (! $user->isCenterManager()) {
             return false;
         }
@@ -375,6 +361,91 @@ final class OrganizationAccessService
         $ids = $this->visibleCenterIds($user) ?? [];
 
         return in_array((int) $center->id, $ids, true);
+    }
+
+    public function canAccessOrgUsers(User $user): bool
+    {
+        return $user->isAdmin() || $user->isDirector() || $user->isProjectHead();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function creatableOrgUserRoles(User $user): array
+    {
+        if ($user->isAdmin()) {
+            return [
+                UserRole::Director->value,
+                UserRole::ProjectHead->value,
+                UserRole::CenterManager->value,
+            ];
+        }
+
+        if ($user->isDirector()) {
+            return [UserRole::ProjectHead->value];
+        }
+
+        if ($user->isProjectHead()) {
+            return [UserRole::CenterManager->value];
+        }
+
+        return [];
+    }
+
+    public function canManageOrgUser(User $actor, User $record): bool
+    {
+        if (! in_array($record->role, [
+            UserRole::Director->value,
+            UserRole::ProjectHead->value,
+            UserRole::CenterManager->value,
+        ], true)) {
+            return false;
+        }
+
+        if ($actor->isAdmin()) {
+            return true;
+        }
+
+        if ($actor->isDirector() && $record->isProjectHead()) {
+            $projectIds = $this->visibleProjectIds($actor) ?? [];
+
+            return $record->headedProjects()->whereIn('projects.id', $projectIds)->exists();
+        }
+
+        if ($actor->isProjectHead() && $record->isCenterManager()) {
+            $centerIds = $this->visibleCenterIds($actor) ?? [];
+
+            return $record->managedCenters()->whereIn('centers.id', $centerIds)->exists();
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function visibleOrgUserRoles(User $user): array
+    {
+        if ($user->isAdmin()) {
+            return [
+                UserRole::Director->value,
+                UserRole::ProjectHead->value,
+                UserRole::CenterManager->value,
+            ];
+        }
+
+        if ($user->isDirector()) {
+            return [
+                UserRole::ProjectHead->value,
+                UserRole::CenterManager->value,
+            ];
+        }
+
+        if ($user->isProjectHead()) {
+            return [UserRole::CenterManager->value];
+        }
+
+        return [];
     }
 
     public function supervisorRoles(): array

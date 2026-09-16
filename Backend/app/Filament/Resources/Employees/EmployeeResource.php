@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Employees;
 
+use App\Enums\CenterStaffRole;
 use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\Employees\Pages\CreateEmployee;
 use App\Filament\Resources\Employees\Pages\EditEmployee;
@@ -11,11 +12,11 @@ use App\Models\Employee;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -29,17 +30,23 @@ class EmployeeResource extends Resource
 
     protected static ?string $model = Employee::class;
 
+    protected static ?string $slug = 'center-users';
+
+    protected static ?string $navigationLabel = 'Users';
+
+    protected static ?string $modelLabel = 'User';
+
+    protected static ?string $pluralModelLabel = 'Users';
+
     protected static string|\UnitEnum|null $navigationGroup = 'People';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 0;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-
-        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isProjectHead() || $user?->isCenterManager());
+        return auth()->user()?->isCenterManager() === true;
     }
 
     public static function canCreate(): bool
@@ -60,6 +67,8 @@ class EmployeeResource extends Resource
     {
         $access = app(OrganizationAccessService::class);
         $user = auth()->user();
+        $centerIds = $user ? ($access->visibleCenterIds($user) ?? []) : [];
+        $singleCenter = count($centerIds) === 1;
 
         return $schema->components([
             Select::make('center_id')
@@ -71,23 +80,49 @@ class EmployeeResource extends Resource
                 )
                 ->required()
                 ->preload()
-                ->searchable(),
-            TextInput::make('full_name')->required()->maxLength(255),
-            TextInput::make('mobile')->required()->length(10)->regex('/^[6-9][0-9]{9}$/')->unique(ignoreRecord: true),
-            LoginIdInput::make()->dehydrated(false),
-            TextInput::make('email')->email()->nullable(),
-            TextInput::make('designation')->default('Employee')->required(),
-            TextInput::make('department')->default('Field'),
-            DatePicker::make('joining_date')->default(now()),
-            TextInput::make('base_location')->maxLength(255),
-            Toggle::make('status')->label('Active')->default(true),
+                ->searchable()
+                ->default($singleCenter ? $centerIds[0] : null)
+                ->disabled($singleCenter)
+                ->dehydrated(),
+            TextInput::make('full_name')->label('Name')->required()->maxLength(255),
+            TextInput::make('mobile')
+                ->label('Mobile Number')
+                ->required()
+                ->length(10)
+                ->regex('/^[6-9][0-9]{9}$/')
+                ->unique(ignoreRecord: true),
+            TextInput::make('email')->label('Email')->email()->nullable(),
+            LoginIdInput::make(),
             TextInput::make('login_password')
-                ->label('Temporary password')
+                ->label('Password')
                 ->password()
                 ->revealable()
                 ->dehydrated(false)
-                ->helperText('Leave blank to use last 4 digits of mobile.')
-                ->visibleOn('create'),
+                ->required(fn (string $operation): bool => $operation === 'create')
+                ->helperText(fn (string $operation): string => $operation === 'edit'
+                    ? 'Leave blank to keep the current password.'
+                    : 'Required. The Center User will sign in with Login ID and this password.'),
+            Select::make('staff_role')
+                ->label('Login Role')
+                ->options(CenterStaffRole::options())
+                ->required()
+                ->native(false),
+            Toggle::make('status')->label('Active')->default(true),
+            Section::make('Organization')
+                ->description('Linked automatically from the Center Manager assignment.')
+                ->schema([
+                    TextInput::make('project_name')
+                        ->label('Project')
+                        ->disabled()
+                        ->dehydrated(false),
+                    TextInput::make('center_manager_name')
+                        ->label('Center Manager')
+                        ->disabled()
+                        ->dehydrated(false),
+                ])
+                ->visibleOn('edit')
+                ->columns(2)
+                ->collapsed(),
         ]);
     }
 
@@ -95,16 +130,19 @@ class EmployeeResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('employee_code')->label('Code')->searchable()->sortable(),
-                TextColumn::make('full_name')->searchable()->sortable(),
-                TextColumn::make('center.project.name')->label('Project'),
+                TextColumn::make('full_name')->label('Name')->searchable()->sortable(),
+                TextColumn::make('mobile')->label('Mobile'),
+                TextColumn::make('email')->toggleable(),
+                TextColumn::make('user.login_id')->label('Login ID')->searchable(),
+                TextColumn::make('staff_role')
+                    ->label('Login Role')
+                    ->formatStateUsing(fn (?string $state): string => CenterStaffRole::tryFromMixed($state)->label())
+                    ->badge(),
                 TextColumn::make('center.name')->label('Center'),
-                TextColumn::make('mobile'),
-                TextColumn::make('user.login_id')->label('Login ID'),
                 IconColumn::make('status')->boolean()->label('Active'),
             ])
             ->filters([
-                SelectFilter::make('center_id')->label('Center')->relationship('center', 'name')->preload(),
+                SelectFilter::make('staff_role')->label('Login Role')->options(CenterStaffRole::options()),
             ])
             ->recordActions([
                 EditAction::make(),
