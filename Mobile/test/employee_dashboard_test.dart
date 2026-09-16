@@ -41,7 +41,7 @@ void main() {
     expect(find.byIcon(Icons.expand_more_rounded), findsOneWidget);
     expect(find.text('Attendance'), findsOneWidget);
     expect(find.text('Mark your attendance'), findsOneWidget);
-    expect(find.text('History'), findsOneWidget);
+    expect(find.text('History'), findsNothing);
     expect(find.text('Admission'), findsOneWidget);
     expect(find.text('Leave'), findsOneWidget);
     expect(find.text('My Targets'), findsOneWidget);

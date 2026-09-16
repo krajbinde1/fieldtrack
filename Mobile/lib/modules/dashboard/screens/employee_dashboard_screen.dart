@@ -147,13 +147,6 @@ class EmployeeDashboardView extends StatelessWidget {
       path: '/attendance',
     ),
     _EmployeeModule(
-      icon: Icon(Icons.history_rounded),
-      label: 'History',
-      subtitle: 'View attendance history',
-      color: AppColors.secondary,
-      path: '/attendance/history',
-    ),
-    _EmployeeModule(
       icon: Icon(Icons.how_to_reg_rounded),
       label: 'Admission',
       subtitle: 'Add new admission',
