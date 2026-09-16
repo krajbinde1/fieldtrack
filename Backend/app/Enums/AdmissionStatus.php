@@ -27,7 +27,7 @@ enum AdmissionStatus: string
             self::Draft => 'warning',
             self::Submitted => 'info',
             self::Confirmed => 'success',
-            self::Reverted => 'warning',
+            self::Reverted => 'orange',
             self::Rejected => 'danger',
         };
     }

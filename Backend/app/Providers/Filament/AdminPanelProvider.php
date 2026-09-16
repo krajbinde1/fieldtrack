@@ -26,7 +26,7 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        $panel = $panel
             ->default()
             ->id('admin')
             ->path('admin')
@@ -34,11 +34,12 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('Param FieldTrack')
             ->maxContentWidth(Width::Full)
             ->colors([
-                'primary' => Color::Indigo,
+                'primary' => Color::Violet,
                 'success' => Color::Green,
-                'warning' => Color::Orange,
+                'warning' => Color::Amber,
                 'danger' => Color::Red,
                 'info' => Color::Blue,
+                'orange' => Color::Orange,
             ])
             ->navigationGroups([
                 'Organization',
@@ -59,7 +60,6 @@ class AdminPanelProvider extends PanelProvider
                 Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
-            ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('filament.partials.paramgold-admin-theme'))
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -74,6 +74,10 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ]);
+
+        $panel = $this->applyOptionalPanelMethods($panel);
+
+        return $this->registerFieldTrackRenderHooks($panel);
     }
 
     public function register(): void
@@ -81,5 +85,66 @@ class AdminPanelProvider extends PanelProvider
         parent::register();
 
         $this->app->bind(LoginResponseContract::class, LoginResponse::class);
+    }
+
+    private function applyOptionalPanelMethods(Panel $panel): Panel
+    {
+        if (method_exists($panel, 'darkMode')) {
+            $panel = $panel->darkMode(false);
+        }
+
+        if (method_exists($panel, 'sidebarCollapsibleOnDesktop')) {
+            $panel = $panel->sidebarCollapsibleOnDesktop();
+        }
+
+        return $panel;
+    }
+
+    private function registerFieldTrackRenderHooks(Panel $panel): Panel
+    {
+        $searchHook = $this->firstExistingRenderHook(['TOPBAR_LOGO_AFTER', 'TOPBAR_START', 'TOPBAR_END']);
+        $userHook = $this->firstExistingRenderHook(['USER_MENU_BEFORE', 'TOPBAR_END']);
+
+        if ($this->renderHookExists('HEAD_END')) {
+            $panel = $panel->renderHook(
+                constant(PanelsRenderHook::class.'::HEAD_END'),
+                fn () => view('filament.partials.fieldtrack-admin-theme'),
+            );
+        }
+
+        if ($searchHook !== null) {
+            $panel = $panel->renderHook(
+                constant(PanelsRenderHook::class.'::'.$searchHook),
+                fn () => view('filament.partials.fieldtrack-topbar-search'),
+            );
+        }
+
+        if ($userHook !== null) {
+            $panel = $panel->renderHook(
+                constant(PanelsRenderHook::class.'::'.$userHook),
+                fn () => view('filament.partials.fieldtrack-topbar-user'),
+            );
+        }
+
+        return $panel;
+    }
+
+    /**
+     * @param  list<string>  $names
+     */
+    private function firstExistingRenderHook(array $names): ?string
+    {
+        foreach ($names as $name) {
+            if ($this->renderHookExists($name)) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    private function renderHookExists(string $name): bool
+    {
+        return defined(PanelsRenderHook::class.'::'.$name);
     }
 }

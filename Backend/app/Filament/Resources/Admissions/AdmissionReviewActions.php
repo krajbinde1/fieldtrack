@@ -52,7 +52,7 @@ final class AdmissionReviewActions
     {
         return Action::make($namePrefix.'revert')
             ->label('Revert')
-            ->color('warning')
+            ->color('orange')
             ->visible(fn (?Admission $record): bool => self::canReview($record))
             ->form([
                 Textarea::make('reason')
