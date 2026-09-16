@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Enums\UserRole;
+use App\Models\Admission;
+use App\Models\AdmissionTarget;
 use App\Models\Attendance;
 use App\Models\Center;
 use App\Models\Employee;
+use App\Models\LeaveRequest;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,8 +20,12 @@ final class OrganizationAccessService
      */
     public function visibleProjectIds(User $user): ?array
     {
-        if ($user->isDirector()) {
+        if ($user->isAdmin()) {
             return null;
+        }
+
+        if ($user->isDirector()) {
+            return $user->directedProjects()->pluck('projects.id')->map(fn ($id) => (int) $id)->all();
         }
 
         if ($user->isProjectHead()) {
@@ -47,11 +54,11 @@ final class OrganizationAccessService
      */
     public function visibleCenterIds(User $user): ?array
     {
-        if ($user->isDirector()) {
+        if ($user->isAdmin()) {
             return null;
         }
 
-        if ($user->isProjectHead()) {
+        if ($user->isDirector() || $user->isProjectHead()) {
             $projectIds = $this->visibleProjectIds($user) ?? [];
 
             return Center::query()
@@ -77,7 +84,7 @@ final class OrganizationAccessService
      */
     public function visibleEmployeeIds(User $user): ?array
     {
-        if ($user->isDirector()) {
+        if ($user->isAdmin()) {
             return null;
         }
 
@@ -142,6 +149,30 @@ final class OrganizationAccessService
         return $query->whereIn('employee_id', $ids);
     }
 
+    public function admissionQuery(User $user): Builder
+    {
+        $query = Admission::query();
+        $ids = $this->visibleEmployeeIds($user);
+
+        if ($ids === null) {
+            return $query;
+        }
+
+        return $query->whereIn('employee_id', $ids);
+    }
+
+    public function leaveQuery(User $user): Builder
+    {
+        $query = LeaveRequest::query();
+        $ids = $this->visibleEmployeeIds($user);
+
+        if ($ids === null) {
+            return $query;
+        }
+
+        return $query->whereIn('employee_id', $ids);
+    }
+
     public function canViewEmployee(User $user, Employee $employee): bool
     {
         $ids = $this->visibleEmployeeIds($user);
@@ -156,6 +187,71 @@ final class OrganizationAccessService
         return $ids === null || in_array((int) $attendance->employee_id, $ids, true);
     }
 
+    public function canViewAdmission(User $user, Admission $admission): bool
+    {
+        $ids = $this->visibleEmployeeIds($user);
+
+        return $ids === null || in_array((int) $admission->employee_id, $ids, true);
+    }
+
+    public function canViewLeave(User $user, LeaveRequest $leave): bool
+    {
+        $ids = $this->visibleEmployeeIds($user);
+
+        return $ids === null || in_array((int) $leave->employee_id, $ids, true);
+    }
+
+    public function canApproveLeave(User $user, LeaveRequest $leave): bool
+    {
+        if (! $user->isCenterManager() || ! $leave->isPending()) {
+            return false;
+        }
+
+        $centerIds = $this->visibleCenterIds($user) ?? [];
+
+        return in_array((int) $leave->center_id, $centerIds, true)
+            && $this->canViewLeave($user, $leave);
+    }
+
+    public function canManageSchemes(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function canManageDirectors(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function canAssignAdmissionTarget(User $user, Employee $employee): bool
+    {
+        if (! $user->isCenterManager()) {
+            return false;
+        }
+
+        $centerIds = $this->visibleCenterIds($user) ?? [];
+
+        return $employee->center_id !== null
+            && in_array((int) $employee->center_id, $centerIds, true);
+    }
+
+    public function canViewAdmissionTarget(User $user, AdmissionTarget $target): bool
+    {
+        return $this->canViewEmployee($user, $target->employee ?? new Employee(['id' => $target->employee_id]));
+    }
+
+    public function admissionTargetQuery(User $user): Builder
+    {
+        $query = AdmissionTarget::query();
+        $ids = $this->visibleEmployeeIds($user);
+
+        if ($ids === null) {
+            return $query;
+        }
+
+        return $query->whereIn('employee_id', $ids);
+    }
+
     public function assertCanViewEmployee(User $user, Employee $employee): void
     {
         abort_unless($this->canViewEmployee($user, $employee), 403, 'You are not authorized to view this employee.');
@@ -166,19 +262,57 @@ final class OrganizationAccessService
         abort_unless($this->canViewAttendance($user, $attendance), 403, 'You are not authorized to view this record.');
     }
 
-    public function canManageProjects(User $user): bool
+    public function assertCanViewAdmission(User $user, Admission $admission): void
     {
-        return $user->isDirector();
+        abort_unless($this->canViewAdmission($user, $admission), 403, 'You are not authorized to view this admission.');
     }
 
-    public function canManageProjectHeads(User $user): bool
+    public function assertCanViewLeave(User $user, LeaveRequest $leave): void
     {
-        return $user->isDirector();
+        abort_unless($this->canViewLeave($user, $leave), 403, 'You are not authorized to view this leave request.');
+    }
+
+    public function assertCanApproveLeave(User $user, LeaveRequest $leave): void
+    {
+        abort_unless($this->canApproveLeave($user, $leave), 403, 'Only the assigned Center Manager can approve or reject this leave.');
+    }
+
+    public function assertCanAssignAdmissionTarget(User $user, Employee $employee): void
+    {
+        abort_unless(
+            $this->canAssignAdmissionTarget($user, $employee),
+            403,
+            'Only the employee\'s assigned Center Manager can set this admission target.',
+        );
+    }
+
+    public function canManageProjects(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function canManageProjectHeads(User $user, ?Project $project = null): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if (! $user->isDirector()) {
+            return false;
+        }
+
+        if ($project === null) {
+            return true;
+        }
+
+        $ids = $this->visibleProjectIds($user) ?? [];
+
+        return in_array((int) $project->id, $ids, true);
     }
 
     public function canManageCenters(User $user, ?Project $project = null): bool
     {
-        if ($user->isDirector()) {
+        if ($user->isAdmin()) {
             return true;
         }
 
@@ -197,7 +331,7 @@ final class OrganizationAccessService
 
     public function canManageCenterManagers(User $user, ?Center $center = null): bool
     {
-        if ($user->isDirector()) {
+        if ($user->isAdmin()) {
             return true;
         }
 
@@ -216,7 +350,7 @@ final class OrganizationAccessService
 
     public function canManageEmployees(User $user, ?Center $center = null): bool
     {
-        if ($user->isDirector()) {
+        if ($user->isAdmin()) {
             return true;
         }
 
@@ -246,6 +380,7 @@ final class OrganizationAccessService
     public function supervisorRoles(): array
     {
         return [
+            UserRole::Admin->value,
             UserRole::Director->value,
             UserRole::ProjectHead->value,
             UserRole::CenterManager->value,

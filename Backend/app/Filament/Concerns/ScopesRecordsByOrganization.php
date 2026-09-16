@@ -2,9 +2,12 @@
 
 namespace App\Filament\Concerns;
 
+use App\Models\Admission;
+use App\Models\AdmissionTarget;
 use App\Models\Attendance;
 use App\Models\Center;
 use App\Models\Employee;
+use App\Models\LeaveRequest;
 use App\Models\Project;
 use App\Services\OrganizationAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,7 +29,7 @@ trait ScopesRecordsByOrganization
         $ids = match ($model) {
             Project::class => $access->visibleProjectIds($user),
             Center::class => $access->visibleCenterIds($user),
-            Employee::class, Attendance::class => $access->visibleEmployeeIds($user),
+            Employee::class, Attendance::class, Admission::class, LeaveRequest::class, AdmissionTarget::class => $access->visibleEmployeeIds($user),
             default => null,
         };
 
@@ -36,6 +39,32 @@ trait ScopesRecordsByOrganization
 
         if ($model === Attendance::class) {
             return $query->whereIn('employee_id', $ids)->with(['employee.center.project']);
+        }
+
+        if ($model === Admission::class) {
+            return $query->whereIn('employee_id', $ids)->with([
+                'scheme',
+                'employee.center.project',
+                'district',
+                'taluka',
+            ]);
+        }
+
+        if ($model === LeaveRequest::class) {
+            return $query->whereIn('employee_id', $ids)->with([
+                'employee.center.project',
+                'center',
+                'project',
+            ]);
+        }
+
+        if ($model === AdmissionTarget::class) {
+            return $query->whereNull('parent_id')->whereIn('employee_id', $ids)->with([
+                'employee.center.project',
+                'center',
+                'project',
+                'weeks',
+            ]);
         }
 
         $table = (new $model)->getTable();

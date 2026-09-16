@@ -16,7 +16,10 @@ class AttendanceInfolist
                 Section::make('Attendance details')->columns(3)->schema([
                     TextEntry::make('employee.full_name')->label('Employee'),
                     TextEntry::make('attendance_date')->label('Attendance Date')->date('d M Y'),
-                    TextEntry::make('attendance_status')->label('Attendance Status')->badge(),
+                    TextEntry::make('attendance_status')
+                        ->label('Attendance Status')
+                        ->badge()
+                        ->formatStateUsing(fn ($state): string => \App\Models\Attendance::ATTENDANCE_STATUS_LABELS[(string) $state] ?? (string) $state),
                     TextEntry::make('punch_in_time')
                         ->label('Punch In Time (IST)')
                         ->formatStateUsing(fn ($record): string => $record->punchInAt()?->timezone(AttendanceCalendar::TIMEZONE)->format('h:i A') ?? '-')

@@ -103,6 +103,7 @@ class _AttendanceHistoryState extends ConsumerState<AttendanceHistory> {
               _Legend('Present', AppColors.approvedFg),
               _Legend('Half Day', AppColors.pendingFg),
               _Legend('Punched In', AppColors.info),
+              _Legend('On Leave', AppColors.info),
               _Legend('Absent', AppColors.rejectedFg),
               _Legend('Holiday', AppColors.dispatchedFg),
             ],
@@ -124,6 +125,7 @@ class _Calendar extends StatelessWidget {
   final ValueChanged<Attendance> onTap;
   Color color(String s) {
     final lower = s.toLowerCase();
+    if (lower.contains('leave')) return AppColors.info;
     if (lower.contains('holiday')) return AppColors.dispatchedFg;
     if (lower.contains('half')) return AppColors.pendingFg;
     if (lower.contains('punched')) return AppColors.info;

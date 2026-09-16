@@ -11,16 +11,24 @@ class DirectorSeeder extends Seeder
 {
     public function run(): void
     {
-        User::query()->firstOrCreate(
+        $admin = User::query()->firstOrCreate(
             ['login_id' => 'director'],
             [
-                'name' => 'Director',
+                'name' => 'Admin',
                 'email' => 'director@fieldtrack.local',
                 'password' => Hash::make('Director@123'),
-                'role' => UserRole::Director->value,
+                'role' => UserRole::Admin->value,
                 'is_active' => true,
                 'must_change_password' => app()->environment('production'),
             ],
         );
+
+        if ($admin->role !== UserRole::Admin->value) {
+            $admin->role = UserRole::Admin->value;
+            if ($admin->name === 'Director') {
+                $admin->name = 'Admin';
+            }
+            $admin->save();
+        }
     }
 }

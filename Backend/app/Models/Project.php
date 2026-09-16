@@ -22,6 +22,12 @@ class Project extends Model
         ];
     }
 
+    public function directors(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'director_project_assignments')
+            ->withTimestamps();
+    }
+
     public function projectHeads(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'project_head_assignments')

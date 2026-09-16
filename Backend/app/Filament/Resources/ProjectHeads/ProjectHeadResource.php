@@ -7,6 +7,7 @@ use App\Filament\Resources\ProjectHeads\Pages\CreateProjectHead;
 use App\Filament\Resources\ProjectHeads\Pages\EditProjectHead;
 use App\Filament\Resources\ProjectHeads\Pages\ListProjectHeads;
 use App\Models\User;
+use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -39,22 +40,64 @@ class ProjectHeadResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->isDirector() ?? false;
+        $user = auth()->user();
+
+        return (bool) ($user && app(OrganizationAccessService::class)->canManageProjectHeads($user));
     }
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->where('role', UserRole::ProjectHead->value);
+        $query = parent::getEloquentQuery()->where('role', UserRole::ProjectHead->value);
+        $user = auth()->user();
+
+        if ($user === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->isAdmin()) {
+            return $query;
+        }
+
+        $projectIds = app(OrganizationAccessService::class)->visibleProjectIds($user) ?? [];
+
+        return $query->whereHas('headedProjects', fn ($q) => $q->whereIn('projects.id', $projectIds));
     }
 
     public static function form(Schema $schema): Schema
     {
+        $access = app(OrganizationAccessService::class);
+        $user = auth()->user();
+
         return $schema->components([
             TextInput::make('name')->required()->maxLength(255),
             TextInput::make('login_id')->label('Login ID')->required()->maxLength(32)->unique(ignoreRecord: true)->regex('/^[A-Za-z0-9]+$/'),
             TextInput::make('email')->email()->required()->unique(ignoreRecord: true),
             TextInput::make('password')->password()->revealable()->dehydrated(fn ($state) => filled($state))->required(fn (string $operation): bool => $operation === 'create')->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
-            Select::make('headedProjects')->label('Assigned Project(s)')->relationship('headedProjects', 'name')->multiple()->preload()->searchable(),
+            Select::make('headedProjects')
+                ->label('Assigned Project(s)')
+                ->relationship(
+                    name: 'headedProjects',
+                    titleAttribute: 'name',
+                    modifyQueryUsing: fn ($query) => $user ? $access->projectQuery($user) : $query->whereRaw('1=0'),
+                )
+                ->multiple()
+                ->preload()
+                ->searchable()
+                ->required()
+                ->saveRelationshipsUsing(function (User $record, $state) use ($access, $user): void {
+                    $visible = $user ? $access->visibleProjectIds($user) : [];
+                    if ($visible === null) {
+                        $record->headedProjects()->sync($state ?? []);
+
+                        return;
+                    }
+
+                    $keep = $record->headedProjects()
+                        ->whereNotIn('projects.id', $visible)
+                        ->pluck('projects.id')
+                        ->all();
+                    $record->headedProjects()->sync(array_values(array_unique(array_merge($keep, $state ?? []))));
+                }),
             Toggle::make('is_active')->default(true),
             Toggle::make('must_change_password')->default(true),
         ]);

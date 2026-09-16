@@ -37,7 +37,7 @@ class CenterResource extends Resource
     {
         $user = auth()->user();
 
-        return (bool) ($user?->isDirector() || $user?->isProjectHead() || $user?->isCenterManager());
+        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isProjectHead() || $user?->isCenterManager());
     }
 
     public static function canCreate(): bool

@@ -51,12 +51,13 @@ class AttendancesTable
                 TextColumn::make('attendance_status')
                     ->label('Attendance Status')
                     ->badge()
+                    ->formatStateUsing(fn (string $state): string => Attendance::ATTENDANCE_STATUS_LABELS[$state] ?? $state)
                     ->color(fn (string $state): string => match ($state) {
                         AttendanceStatusCalculator::STATUS_PRESENT => 'success',
                         AttendanceStatusCalculator::STATUS_ABSENT => 'danger',
                         AttendanceStatusCalculator::STATUS_HALF_DAY => 'warning',
                         AttendanceStatusCalculator::STATUS_PUNCHED_IN => 'info',
-                        AttendanceStatusCalculator::STATUS_LEAVE => 'gray',
+                        AttendanceStatusCalculator::STATUS_LEAVE => 'info',
                         default => 'gray',
                     }),
                 TextColumn::make('approval_status')

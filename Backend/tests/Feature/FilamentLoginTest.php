@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\UserRole;
 use App\Filament\Auth\Login;
 use App\Models\User;
 use Livewire\Livewire;
@@ -8,8 +9,9 @@ beforeEach(function () {
     $this->seed();
 });
 
-it('lets a director sign in to the web admin', function () {
+it('lets the existing top-level login sign in as admin', function () {
     $user = User::query()->where('login_id', 'director')->firstOrFail();
+    expect($user->role)->toBe(UserRole::Admin->value);
 
     Livewire::test(Login::class)
         ->fillForm([
@@ -23,15 +25,16 @@ it('lets a director sign in to the web admin', function () {
     $this->assertAuthenticatedAs($user);
 });
 
-it('lets a director open organization and field-operation pages', function () {
-    $director = User::query()->where('login_id', 'director')->firstOrFail();
+it('lets an admin open organization, people, and field-operation pages', function () {
+    $admin = User::query()->where('login_id', 'director')->firstOrFail();
 
-    $this->actingAs($director)
+    $this->actingAs($admin)
         ->get('/admin')
         ->assertOk()
         ->assertSee('Param FieldTrack');
 
     foreach ([
+        '/admin/directors',
         '/admin/projects',
         '/admin/project-heads',
         '/admin/centers',
@@ -39,10 +42,31 @@ it('lets a director open organization and field-operation pages', function () {
         '/admin/employees',
         '/admin/attendances',
         '/admin/employee-routes',
+        '/admin/schemes',
+        '/admin/admissions',
+        '/admin/leave-requests',
         '/admin/reports',
     ] as $uri) {
-        $this->actingAs($director)->get($uri)->assertOk();
+        $this->actingAs($admin)->get($uri)->assertOk();
     }
+});
+
+it('lets a director view assigned-scope pages but not admin-only management', function () {
+    $director = User::query()->where('login_id', 'fielddirector')->firstOrFail();
+    expect($director->role)->toBe(UserRole::Director->value);
+
+    $this->actingAs($director)->get('/admin')->assertOk();
+    $this->actingAs($director)->get('/admin/projects')->assertOk();
+    $this->actingAs($director)->get('/admin/project-heads')->assertOk();
+    $this->actingAs($director)->get('/admin/centers')->assertOk();
+    $this->actingAs($director)->get('/admin/employees')->assertOk();
+    $this->actingAs($director)->get('/admin/admissions')->assertOk();
+    $this->actingAs($director)->get('/admin/leave-requests')->assertOk();
+    $this->actingAs($director)->get('/admin/attendances')->assertOk();
+    $this->actingAs($director)->get('/admin/reports')->assertOk();
+    $this->actingAs($director)->get('/admin/directors')->assertForbidden();
+    $this->actingAs($director)->get('/admin/schemes')->assertForbidden();
+    $this->actingAs($director)->get('/admin/projects/create')->assertForbidden();
 });
 
 it('blocks a project head from project-head administration', function () {
@@ -51,10 +75,11 @@ it('blocks a project head from project-head administration', function () {
     $this->actingAs($projectHead)->get('/admin')->assertOk();
     $this->actingAs($projectHead)->get('/admin/centers')->assertOk();
     $this->actingAs($projectHead)->get('/admin/project-heads')->assertForbidden();
+    $this->actingAs($projectHead)->get('/admin/directors')->assertForbidden();
 });
 
-it('lets a director open a full employee route map', function () {
-    $director = User::query()->where('login_id', 'director')->firstOrFail();
+it('lets an admin open a full employee route map', function () {
+    $admin = User::query()->where('login_id', 'director')->firstOrFail();
     $employee = \App\Models\Employee::query()->where('mobile', '9876543210')->firstOrFail();
     $attendance = \App\Models\Attendance::create([
         'employee_id' => $employee->id,
@@ -66,7 +91,7 @@ it('lets a director open a full employee route map', function () {
         'approval_status' => 'Pending',
     ]);
 
-    $this->actingAs($director)
+    $this->actingAs($admin)
         ->get('/admin/employee-routes/'.$attendance->id)
         ->assertOk()
         ->assertSee('Employee Route', false);
@@ -80,4 +105,5 @@ it('blocks a center manager from project administration', function () {
     $this->actingAs($centerManager)->get('/admin/centers')->assertOk();
     $this->actingAs($centerManager)->get('/admin/projects')->assertForbidden();
     $this->actingAs($centerManager)->get('/admin/centers/create')->assertForbidden();
+    $this->actingAs($centerManager)->get('/admin/directors')->assertForbidden();
 });

@@ -12,7 +12,9 @@ class RoutePermissions {
       return true;
     }
 
-    if (path.startsWith('/attendance')) {
+    if (path.startsWith('/attendance') ||
+        path.startsWith('/admissions') ||
+        path.startsWith('/leaves')) {
       return role.isEmployee;
     }
 
@@ -21,7 +23,7 @@ class RoutePermissions {
     }
 
     if (path.startsWith('/director')) {
-      return role.isDirector;
+      return role.isAdmin || role.isDirector;
     }
 
     return true;

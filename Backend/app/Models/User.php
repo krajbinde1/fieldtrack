@@ -60,6 +60,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->belongsTo(Employee::class);
     }
 
+    public function directedProjects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'director_project_assignments')
+            ->withTimestamps();
+    }
+
     public function headedProjects(): BelongsToMany
     {
         return $this->belongsToMany(Project::class, 'project_head_assignments')
@@ -95,9 +101,19 @@ class User extends Authenticatable implements FilamentUser
         return false;
     }
 
+    public function isAdmin(): bool
+    {
+        return $this->hasRole(UserRole::Admin);
+    }
+
     public function isDirector(): bool
     {
         return $this->hasRole(UserRole::Director);
+    }
+
+    public function isAdminOrDirector(): bool
+    {
+        return $this->isAdmin() || $this->isDirector();
     }
 
     public function isProjectHead(): bool

@@ -47,7 +47,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final role = widget.auth.userRole;
-    final prefix = role.isDirector ? '/director' : '/manager';
+    final prefix = role.isAdmin || role.isDirector ? '/director' : '/manager';
     final name = widget.auth.session?.user.loginId ?? role.label;
 
     return PgPageScaffold(
@@ -113,6 +113,14 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
                         label: 'Routes',
                         color: AppColors.secondary,
                         onTap: () => context.push('$prefix/route-tracking'),
+                      ),
+                    ),
+                    Expanded(
+                      child: PgQuickAction(
+                        icon: const Icon(Icons.event_note_rounded),
+                        label: 'Leave Requests',
+                        color: AppColors.info,
+                        onTap: () => context.push('$prefix/leaves'),
                       ),
                     ),
                   ],

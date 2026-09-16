@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Center;
 use App\Models\Employee;
 use App\Models\Project;
+use App\Models\Scheme;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -35,6 +36,19 @@ class DemoOrganizationSeeder extends Seeder
             ],
         );
         $projectHead->headedProjects()->syncWithoutDetaching([$project->id]);
+
+        $director = User::query()->updateOrCreate(
+            ['login_id' => 'fielddirector'],
+            [
+                'name' => 'Director',
+                'email' => 'fielddirector@fieldtrack.local',
+                'password' => Hash::make('Director@123'),
+                'role' => UserRole::Director->value,
+                'is_active' => true,
+                'must_change_password' => false,
+            ],
+        );
+        $director->directedProjects()->syncWithoutDetaching([$project->id]);
 
         $otherProject = Project::query()->updateOrCreate(
             ['code' => 'OTHER'],
@@ -140,6 +154,15 @@ class DemoOrganizationSeeder extends Seeder
                 'role' => UserRole::Employee->value,
                 'is_active' => true,
                 'must_change_password' => false,
+            ],
+        );
+
+        Scheme::query()->updateOrCreate(
+            ['code' => 'DEMO-SKILL'],
+            [
+                'name' => 'Demo Skill Development Scheme',
+                'description' => 'Sample scheme for local admission testing',
+                'is_active' => true,
             ],
         );
     }

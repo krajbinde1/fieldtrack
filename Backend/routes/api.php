@@ -1,13 +1,18 @@
 <?php
 
 use App\Http\Controllers\Api\AdminEmployeeRouteController;
+use App\Http\Controllers\Api\AdmissionLookupController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\Director\DirectorRouteTrackingController;
+use App\Http\Controllers\Api\EmployeeAdmissionController;
 use App\Http\Controllers\Api\EmployeeAuthController;
+use App\Http\Controllers\Api\EmployeeLeaveController;
 use App\Http\Controllers\Api\EmployeeRoutePointController;
 use App\Http\Controllers\Api\Manager\ManagerRouteTrackingController;
 use App\Http\Controllers\Api\Manager\ManagerTeamAttendanceController;
+use App\Http\Controllers\Api\SupervisorAdmissionController;
+use App\Http\Controllers\Api\SupervisorLeaveController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('login', [EmployeeAuthController::class, 'login']);
@@ -32,14 +37,28 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
         Route::get('team-attendance/{attendance}', [ManagerTeamAttendanceController::class, 'show']);
         Route::get('route-tracking', [ManagerRouteTrackingController::class, 'index']);
         Route::get('route-tracking/{attendance}', [ManagerRouteTrackingController::class, 'show']);
+        Route::get('admissions', [SupervisorAdmissionController::class, 'index']);
+        Route::get('admissions/{admission}', [SupervisorAdmissionController::class, 'show']);
+        Route::get('admissions/{admission}/documents/{document}', [SupervisorAdmissionController::class, 'downloadDocument']);
+        Route::get('leaves', [SupervisorLeaveController::class, 'index']);
+        Route::get('leaves/{leave}', [SupervisorLeaveController::class, 'show']);
+        Route::post('leaves/{leave}/approve', [SupervisorLeaveController::class, 'approve']);
+        Route::post('leaves/{leave}/reject', [SupervisorLeaveController::class, 'reject']);
+        Route::get('leaves/{leave}/document', [SupervisorLeaveController::class, 'downloadDocument']);
     });
 
-    Route::middleware('role:director')->prefix('director')->group(function () {
+    Route::middleware('role:admin,director')->prefix('director')->group(function () {
         Route::get('route-tracking', [DirectorRouteTrackingController::class, 'index']);
         Route::get('route-tracking/{attendance}', [DirectorRouteTrackingController::class, 'show']);
         Route::get('team-attendance', [ManagerTeamAttendanceController::class, 'index']);
         Route::get('team-attendance/employees/{employee}', [ManagerTeamAttendanceController::class, 'employeeHistory']);
         Route::get('team-attendance/{attendance}', [ManagerTeamAttendanceController::class, 'show']);
+        Route::get('admissions', [SupervisorAdmissionController::class, 'index']);
+        Route::get('admissions/{admission}', [SupervisorAdmissionController::class, 'show']);
+        Route::get('admissions/{admission}/documents/{document}', [SupervisorAdmissionController::class, 'downloadDocument']);
+        Route::get('leaves', [SupervisorLeaveController::class, 'index']);
+        Route::get('leaves/{leave}', [SupervisorLeaveController::class, 'show']);
+        Route::get('leaves/{leave}/document', [SupervisorLeaveController::class, 'downloadDocument']);
     });
 });
 
@@ -51,6 +70,33 @@ Route::middleware(['auth:sanctum', 'role:employee'])->prefix('attendance')->grou
     Route::get('monthly-summary', [AttendanceController::class, 'monthlySummary']);
 });
 
-Route::middleware(['auth:sanctum', 'role:director,project_head,center_manager'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'role:employee'])->prefix('admissions')->group(function () {
+    Route::get('schemes', [AdmissionLookupController::class, 'schemes']);
+    Route::get('districts', [AdmissionLookupController::class, 'districts']);
+    Route::get('districts/{district}/talukas', [AdmissionLookupController::class, 'talukas']);
+    Route::get('drafts', [EmployeeAdmissionController::class, 'drafts']);
+    Route::post('drafts', [EmployeeAdmissionController::class, 'storeDraft']);
+    Route::patch('drafts/{admission}', [EmployeeAdmissionController::class, 'updateDraft']);
+    Route::delete('drafts/{admission}', [EmployeeAdmissionController::class, 'destroyDraft']);
+    Route::get('submitted', [EmployeeAdmissionController::class, 'submitted']);
+    Route::post('{admission}/submit', [EmployeeAdmissionController::class, 'submit']);
+    Route::post('{admission}/documents', [EmployeeAdmissionController::class, 'uploadDocument']);
+    Route::delete('{admission}/documents/{document}', [EmployeeAdmissionController::class, 'removeDocument']);
+    Route::get('{admission}/documents/{document}', [EmployeeAdmissionController::class, 'downloadDocument']);
+    Route::get('{admission}', [EmployeeAdmissionController::class, 'show']);
+});
+
+Route::middleware(['auth:sanctum', 'role:employee'])->prefix('leaves')->group(function () {
+    Route::get('/', [EmployeeLeaveController::class, 'index']);
+    Route::post('/', [EmployeeLeaveController::class, 'store']);
+    Route::get('{leave}/document', [EmployeeLeaveController::class, 'downloadDocument']);
+    Route::post('{leave}/document', [EmployeeLeaveController::class, 'uploadDocument']);
+    Route::delete('{leave}/document', [EmployeeLeaveController::class, 'removeDocument']);
+    Route::get('{leave}', [EmployeeLeaveController::class, 'show']);
+    Route::patch('{leave}', [EmployeeLeaveController::class, 'update']);
+    Route::delete('{leave}', [EmployeeLeaveController::class, 'destroy']);
+});
+
+Route::middleware(['auth:sanctum', 'role:admin,director,project_head,center_manager'])->prefix('admin')->group(function () {
     Route::get('employee-routes/{attendance}', [AdminEmployeeRouteController::class, 'show']);
 });

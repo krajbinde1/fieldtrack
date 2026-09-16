@@ -104,6 +104,21 @@ class Employee extends Authenticatable
         return $this->hasMany(EmployeeRoutePoint::class);
     }
 
+    public function admissions(): HasMany
+    {
+        return $this->hasMany(Admission::class);
+    }
+
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function admissionTargets(): HasMany
+    {
+        return $this->hasMany(AdmissionTarget::class);
+    }
+
     public function displayLabel(): string
     {
         if (filled($this->employee_code)) {

@@ -42,7 +42,21 @@ class CenterManagerResource extends Resource
     {
         $user = auth()->user();
 
-        return (bool) ($user?->isDirector() || $user?->isProjectHead());
+        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isProjectHead());
+    }
+
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
+        return (bool) ($user && app(OrganizationAccessService::class)->canManageCenterManagers($user));
+    }
+
+    public static function canEdit($record): bool
+    {
+        $user = auth()->user();
+
+        return (bool) ($user && app(OrganizationAccessService::class)->canManageCenterManagers($user));
     }
 
     public static function getEloquentQuery(): Builder
@@ -54,7 +68,7 @@ class CenterManagerResource extends Resource
             return $query->whereRaw('1 = 0');
         }
 
-        if ($user->isDirector()) {
+        if ($user->isAdmin()) {
             return $query;
         }
 

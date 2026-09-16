@@ -19,7 +19,7 @@ class Attendance extends Model
         AttendanceStatusCalculator::STATUS_PRESENT => 'Present',
         AttendanceStatusCalculator::STATUS_HALF_DAY => 'Half Day',
         AttendanceStatusCalculator::STATUS_ABSENT => 'Absent',
-        AttendanceStatusCalculator::STATUS_LEAVE => 'Leave',
+        AttendanceStatusCalculator::STATUS_LEAVE => 'On Leave',
         AttendanceStatusCalculator::STATUS_WEEKLY_OFF => 'Weekly Off',
     ];
 

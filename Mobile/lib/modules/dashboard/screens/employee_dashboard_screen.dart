@@ -57,6 +57,27 @@ class EmployeeDashboardScreen extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: PgQuickAction(
+                  icon: const Icon(Icons.how_to_reg_rounded),
+                  label: 'Admission',
+                  color: AppColors.info,
+                  onTap: () => context.push('/admissions'),
+                ),
+              ),
+              Expanded(
+                child: PgQuickAction(
+                  icon: const Icon(Icons.event_note_rounded),
+                  label: 'Leave',
+                  color: AppColors.accent,
+                  onTap: () => context.push('/leaves'),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

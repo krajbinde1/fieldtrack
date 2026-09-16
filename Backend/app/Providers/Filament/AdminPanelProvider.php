@@ -44,6 +44,8 @@ class AdminPanelProvider extends PanelProvider
                 'Organization',
                 'People',
                 'Field Operations',
+                'Admissions',
+                'Leave',
                 'Reports',
             ])
             ->navigation(fn (): bool => ! request()->routeIs('filament.admin.resources.employee-routes.view'))

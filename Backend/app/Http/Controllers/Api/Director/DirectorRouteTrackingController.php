@@ -7,13 +7,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Services\EmployeeRouteAnalysisService;
+use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Director view-only route tracking for Sales Team (manager + employee login roles).
+ * Org-wide (Admin) or assigned-scope (Director) view-only route tracking.
  * Response shape mirrors Manager team-attendance for mobile reuse.
  */
 class DirectorRouteTrackingController extends Controller
@@ -25,6 +26,7 @@ class DirectorRouteTrackingController extends Controller
 
     public function __construct(
         private readonly EmployeeRouteAnalysisService $routeAnalysisService,
+        private readonly OrganizationAccessService $access,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -37,7 +39,7 @@ class DirectorRouteTrackingController extends Controller
         $date = $validated['date'] ?? AttendanceCalendar::today()->toDateString();
 
         try {
-            $employees = Employee::query()
+            $employees = $this->access->employeeQuery($request->user())
                 ->with('user')
                 ->where('status', true)
                 ->whereHas(
@@ -119,6 +121,7 @@ class DirectorRouteTrackingController extends Controller
     public function show(Request $request, Attendance $attendance): JsonResponse
     {
         $this->ensureSalesTeamAttendance($attendance);
+        $this->access->assertCanViewAttendance($request->user(), $attendance);
 
         $attendance->load('employee.user');
         $analysis = $this->routeAnalysisService->analyze($attendance);

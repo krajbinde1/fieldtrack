@@ -21,14 +21,24 @@ function seedOrg(): array
     $centerA = Center::create(['project_id' => $projectA->id, 'name' => 'Center A', 'code' => 'CA', 'is_active' => true]);
     $centerB = Center::create(['project_id' => $projectB->id, 'name' => 'Center B', 'code' => 'CB', 'is_active' => true]);
 
-    $director = User::create([
-        'name' => 'Director',
+    $admin = User::create([
+        'name' => 'Admin',
         'email' => 'dir@test.local',
         'login_id' => 'director',
+        'password' => Hash::make('Director@123'),
+        'role' => UserRole::Admin->value,
+        'is_active' => true,
+    ]);
+
+    $director = User::create([
+        'name' => 'Director',
+        'email' => 'fielddirector@test.local',
+        'login_id' => 'fielddirector',
         'password' => Hash::make('Director@123'),
         'role' => UserRole::Director->value,
         'is_active' => true,
     ]);
+    $director->directedProjects()->attach($projectA->id);
 
     $projectHead = User::create([
         'name' => 'PH',
@@ -82,7 +92,7 @@ function seedOrg(): array
         'is_active' => true,
     ]);
 
-    return compact('director', 'projectHead', 'centerManager', 'empA', 'empB', 'userA');
+    return compact('admin', 'director', 'projectHead', 'centerManager', 'empA', 'empB', 'userA');
 }
 
 it('blocks project head from another project route record', function () {
@@ -101,7 +111,7 @@ it('blocks project head from another project route record', function () {
         ->assertForbidden();
 });
 
-it('allows director to view every employee route', function () {
+it('allows admin to view every employee route', function () {
     $org = seedOrg();
     $attendance = Attendance::create([
         'employee_id' => $org['empB']->id,
@@ -111,10 +121,33 @@ it('allows director to view every employee route', function () {
         'approval_status' => 'Pending',
     ]);
 
-    Sanctum::actingAs($org['director']);
+    Sanctum::actingAs($org['admin']);
 
     $this->getJson('/api/director/route-tracking/'.$attendance->id)
         ->assertOk();
+});
+
+it('lets a director view assigned-project routes and blocks other projects', function () {
+    $org = seedOrg();
+    $own = Attendance::create([
+        'employee_id' => $org['empA']->id,
+        'attendance_date' => AttendanceCalendar::today()->toDateString(),
+        'punch_in_time' => '09:00:00',
+        'attendance_status' => 'Punched In',
+        'approval_status' => 'Pending',
+    ]);
+    $other = Attendance::create([
+        'employee_id' => $org['empB']->id,
+        'attendance_date' => AttendanceCalendar::today()->toDateString(),
+        'punch_in_time' => '09:00:00',
+        'attendance_status' => 'Punched In',
+        'approval_status' => 'Pending',
+    ]);
+
+    Sanctum::actingAs($org['director']);
+
+    $this->getJson('/api/director/route-tracking/'.$own->id)->assertOk();
+    $this->getJson('/api/director/route-tracking/'.$other->id)->assertForbidden();
 });
 
 it('prevents duplicate punch in', function () {

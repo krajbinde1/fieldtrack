@@ -51,7 +51,7 @@ final class AttendanceStatusCalculator
             self::STATUS_PRESENT => 'Present',
             self::STATUS_HALF_DAY => 'Half Day',
             self::STATUS_ABSENT => 'Absent',
-            self::STATUS_LEAVE => 'Leave',
+            self::STATUS_LEAVE => 'On Leave',
             self::STATUS_WEEKLY_OFF => 'Weekly Off',
         ];
     }

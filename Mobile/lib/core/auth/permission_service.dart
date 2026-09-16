@@ -18,5 +18,8 @@ class PermissionService {
       role.isCenterManager;
 
   bool get canViewDirectorDashboard =>
-      has('director_dashboard') || role.isDirector;
+      has('director_dashboard') ||
+      has('admin_dashboard') ||
+      role.isDirector ||
+      role.isAdmin;
 }

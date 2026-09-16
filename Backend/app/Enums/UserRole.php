@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum UserRole: string
 {
+    case Admin = 'admin';
     case Director = 'director';
     case ProjectHead = 'project_head';
     case CenterManager = 'center_manager';
@@ -12,6 +13,7 @@ enum UserRole: string
     public function label(): string
     {
         return match ($this) {
+            self::Admin => 'Admin',
             self::Director => 'Director',
             self::ProjectHead => 'Project Head',
             self::CenterManager => 'Center Manager',
@@ -50,6 +52,7 @@ enum UserRole: string
     public static function webValues(): array
     {
         return [
+            self::Admin->value,
             self::Director->value,
             self::ProjectHead->value,
             self::CenterManager->value,
@@ -72,12 +75,12 @@ enum UserRole: string
 
     public function canAccessWeb(): bool
     {
-        return in_array($this, [self::Director, self::ProjectHead, self::CenterManager], true);
+        return in_array($this, [self::Admin, self::Director, self::ProjectHead, self::CenterManager], true);
     }
 
     public function canViewAllOrganization(): bool
     {
-        return $this === self::Director;
+        return $this === self::Admin;
     }
 
     /**
@@ -89,21 +92,37 @@ enum UserRole: string
             self::Employee => [
                 'attendance',
                 'route_tracking',
+                'admissions',
+                'leaves',
+                'admission_targets',
             ],
             self::CenterManager => [
                 'center_manager_dashboard',
                 'attendance_view_center',
                 'route_tracking_view_center',
+                'leave_manage_center',
+                'admission_target_manage_center',
             ],
             self::ProjectHead => [
                 'project_head_dashboard',
                 'attendance_view_project',
                 'route_tracking_view_project',
+                'leave_view_project',
+                'admission_target_view_project',
             ],
             self::Director => [
                 'director_dashboard',
+                'attendance_view_assigned',
+                'route_tracking_view_assigned',
+                'leave_view_assigned',
+                'admission_target_view_assigned',
+            ],
+            self::Admin => [
+                'admin_dashboard',
                 'attendance_view_all',
                 'route_tracking_view_all',
+                'leave_view_all',
+                'admission_target_view_all',
             ],
         };
     }

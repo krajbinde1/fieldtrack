@@ -2,7 +2,8 @@ enum UserRole {
   employee('employee'),
   centerManager('center_manager'),
   projectHead('project_head'),
-  director('director');
+  director('director'),
+  admin('admin');
 
   const UserRole(this.value);
   final String value;
@@ -19,15 +20,17 @@ enum UserRole {
         UserRole.centerManager => 'Center Manager',
         UserRole.projectHead => 'Project Head',
         UserRole.director => 'Director',
+        UserRole.admin => 'Admin',
       };
 
   bool get isEmployee => this == UserRole.employee;
   bool get isCenterManager => this == UserRole.centerManager;
   bool get isProjectHead => this == UserRole.projectHead;
   bool get isDirector => this == UserRole.director;
+  bool get isAdmin => this == UserRole.admin;
   bool get isManager => isProjectHead || isCenterManager;
 
   bool canAccessEmployeeWorkflow() => isEmployee;
   bool canAccessManagerRoutes() => isProjectHead || isCenterManager;
-  bool canAccessDirectorRoutes() => isDirector;
+  bool canAccessDirectorRoutes() => isAdmin || isDirector;
 }

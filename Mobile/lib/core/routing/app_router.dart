@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../auth/user_role.dart';
 import 'route_permissions.dart';
+import '../../modules/admissions/screens/admission_hub_screen.dart';
+import '../../modules/admissions/screens/admission_list_screen.dart';
+import '../../modules/admissions/screens/admission_wizard_screen.dart';
 import '../../modules/attendance/models/attendance.dart';
 import '../../modules/attendance/screens/attendance_detail.dart';
 import '../../modules/attendance/screens/attendance_history.dart';
@@ -15,6 +18,12 @@ import '../../modules/auth/screens/splash_screen.dart';
 import '../../modules/dashboard/screens/role_dashboard_screen.dart';
 import '../../modules/director/screens/director_route_tracking_screen.dart';
 import '../../modules/director/screens/director_team_attendance_screen.dart';
+import '../../modules/leaves/screens/leave_detail_screen.dart';
+import '../../modules/leaves/screens/leave_form_screen.dart';
+import '../../modules/leaves/screens/leave_hub_screen.dart';
+import '../../modules/leaves/screens/leave_list_screen.dart';
+import '../../modules/leaves/screens/supervisor_leave_detail_screen.dart';
+import '../../modules/leaves/screens/supervisor_leave_list_screen.dart';
 import '../../modules/manager/screens/manager_route_tracking_screen.dart';
 import '../../modules/manager/screens/manager_team_attendance_screen.dart';
 import '../../modules/profile/screens/profile_screen.dart';
@@ -90,6 +99,52 @@ GoRouter createRouter(
           ),
         ),
         GoRoute(
+          path: '/admissions',
+          builder: (_, _) => const AdmissionHubScreen(),
+        ),
+        GoRoute(
+          path: '/admissions/new',
+          builder: (_, _) => const AdmissionWizardScreen(),
+        ),
+        GoRoute(
+          path: '/admissions/drafts',
+          builder: (_, _) => const AdmissionListScreen(drafts: true),
+        ),
+        GoRoute(
+          path: '/admissions/submitted',
+          builder: (_, _) => const AdmissionListScreen(drafts: false),
+        ),
+        GoRoute(
+          path: '/admissions/:id',
+          builder: (_, state) => AdmissionWizardScreen(
+            admissionId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: '/leaves',
+          builder: (_, _) => const LeaveHubScreen(),
+        ),
+        GoRoute(
+          path: '/leaves/apply',
+          builder: (_, _) => const LeaveFormScreen(),
+        ),
+        GoRoute(
+          path: '/leaves/mine',
+          builder: (_, _) => const LeaveListScreen(),
+        ),
+        GoRoute(
+          path: '/leaves/:id/edit',
+          builder: (_, state) => LeaveFormScreen(
+            leaveId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: '/leaves/:id',
+          builder: (_, state) => LeaveDetailScreen(
+            leaveId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
           path: '/manager/team-attendance',
           builder: (_, _) => ManagerTeamAttendanceScreen(auth: auth),
         ),
@@ -112,6 +167,21 @@ GoRouter createRouter(
           ),
         ),
         GoRoute(
+          path: '/manager/leaves',
+          builder: (_, _) => SupervisorLeaveListScreen(
+            auth: auth,
+            apiPrefix: 'manager',
+          ),
+        ),
+        GoRoute(
+          path: '/manager/leaves/:id',
+          builder: (_, state) => SupervisorLeaveDetailScreen(
+            auth: auth,
+            apiPrefix: 'manager',
+            leaveId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
           path: '/director/team-attendance',
           builder: (_, _) => DirectorTeamAttendanceScreen(auth: auth),
         ),
@@ -124,6 +194,21 @@ GoRouter createRouter(
           builder: (_, state) => DirectorRouteMapScreen(
             auth: auth,
             attendanceId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: '/director/leaves',
+          builder: (_, _) => SupervisorLeaveListScreen(
+            auth: auth,
+            apiPrefix: 'director',
+          ),
+        ),
+        GoRoute(
+          path: '/director/leaves/:id',
+          builder: (_, state) => SupervisorLeaveDetailScreen(
+            auth: auth,
+            apiPrefix: 'director',
+            leaveId: int.parse(state.pathParameters['id']!),
           ),
         ),
       ],

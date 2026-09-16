@@ -38,17 +38,17 @@ class ProjectResource extends Resource
     {
         $user = auth()->user();
 
-        return (bool) ($user?->isDirector() || $user?->isProjectHead());
+        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isProjectHead());
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->isDirector() ?? false;
+        return auth()->user()?->isAdmin() ?? false;
     }
 
     public static function canEdit($record): bool
     {
-        return auth()->user()?->isDirector() ?? false;
+        return auth()->user()?->isAdmin() ?? false;
     }
 
     public static function canDelete($record): bool
@@ -72,7 +72,7 @@ class ProjectResource extends Resource
                 ->multiple()
                 ->preload()
                 ->searchable()
-                ->visible(fn (): bool => auth()->user()?->isDirector() ?? false),
+                ->visible(fn (): bool => auth()->user()?->isAdmin() ?? false),
             Toggle::make('is_active')->default(true),
         ]);
     }
@@ -88,7 +88,7 @@ class ProjectResource extends Resource
                 IconColumn::make('is_active')->boolean()->label('Active'),
             ])
             ->recordActions([
-                EditAction::make()->visible(fn (): bool => auth()->user()?->isDirector() ?? false),
+                EditAction::make()->visible(fn (): bool => auth()->user()?->isAdmin() ?? false),
             ]);
     }
 

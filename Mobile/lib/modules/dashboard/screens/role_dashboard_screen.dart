@@ -15,7 +15,9 @@ class RoleDashboardScreen extends StatelessWidget {
       UserRole.centerManager ||
       UserRole.projectHead =>
         SupervisorDashboardScreen(auth: auth),
-      UserRole.director => SupervisorDashboardScreen(auth: auth),
+      UserRole.director ||
+      UserRole.admin =>
+        SupervisorDashboardScreen(auth: auth),
     };
   }
 }
