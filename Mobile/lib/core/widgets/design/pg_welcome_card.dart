@@ -11,6 +11,7 @@ class PgWelcomeCard extends StatelessWidget {
     this.role,
     this.padding = const EdgeInsets.all(AppSpacing.lg),
     this.avatarRadius = 32,
+    this.prominent = false,
   });
 
   final String name;
@@ -19,6 +20,7 @@ class PgWelcomeCard extends StatelessWidget {
   final String? role;
   final EdgeInsetsGeometry padding;
   final double avatarRadius;
+  final bool prominent;
 
   @override
   Widget build(BuildContext context) => PgCard(
@@ -42,9 +44,9 @@ class PgWelcomeCard extends StatelessWidget {
             child: photoUrl == null
                 ? Text(
                     name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 24,
+                      fontSize: avatarRadius * 0.72,
                       fontWeight: FontWeight.w700,
                     ),
                   )
@@ -62,11 +64,16 @@ class PgWelcomeCard extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.85),
                 ),
               ),
+              if (prominent) const SizedBox(height: 2),
               Text(
                 name,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                style: (prominent
+                        ? Theme.of(context).textTheme.headlineSmall
+                        : Theme.of(context).textTheme.titleLarge)
+                    ?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
+                  height: 1.15,
                 ),
               ),
               if (role != null) ...[
@@ -78,12 +85,12 @@ class PgWelcomeCard extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 6),
+              SizedBox(height: prominent ? 10 : 6),
               Row(
                 children: [
                   IconTheme(
                     data: IconThemeData(
-                      size: 14,
+                      size: prominent ? 16 : 14,
                       color: Colors.white.withValues(alpha: 0.8),
                     ),
                     child: const Icon(Icons.calendar_today_rounded),
@@ -94,9 +101,12 @@ class PgWelcomeCard extends StatelessWidget {
                       dateLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: (prominent
+                              ? Theme.of(context).textTheme.bodyMedium
+                              : Theme.of(context).textTheme.bodySmall)
+                          ?.copyWith(
                         color: Colors.white.withValues(alpha: 0.9),
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),

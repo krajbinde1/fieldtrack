@@ -129,86 +129,91 @@ class EmployeeDashboardView extends StatelessWidget {
     _EmployeeModule(
       icon: Icon(Icons.fingerprint_rounded),
       label: 'Attendance',
+      subtitle: 'Mark your attendance',
       color: AppColors.primary,
       path: '/attendance',
     ),
     _EmployeeModule(
       icon: Icon(Icons.history_rounded),
       label: 'History',
+      subtitle: 'View attendance history',
       color: AppColors.secondary,
       path: '/attendance/history',
     ),
     _EmployeeModule(
       icon: Icon(Icons.how_to_reg_rounded),
       label: 'Admission',
+      subtitle: 'Add new admission',
       color: AppColors.info,
       path: '/admissions',
     ),
     _EmployeeModule(
       icon: Icon(Icons.event_note_rounded),
       label: 'Leave',
+      subtitle: 'Apply and track leave',
       color: AppColors.accent,
       path: '/leaves',
     ),
     _EmployeeModule(
       icon: Icon(Icons.flag_rounded),
       label: 'My Targets',
-      color: AppColors.info,
+      subtitle: 'View targets & performance',
+      color: Color(0xFF7C3AED),
       path: '/admissions/targets',
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.screenPadding,
-        AppSpacing.sm,
-        AppSpacing.screenPadding,
-        AppSpacing.bottomNavHeight + AppSpacing.md,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PgWelcomeCard(
-            name: name,
-            dateLabel: DateFormat('EEEE, d MMM yyyy').format(DateTime.now()),
-            photoUrl: photoUrl,
-            role: role,
-            padding: const EdgeInsets.all(AppSpacing.md),
-            avatarRadius: 26,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenPadding,
+            AppSpacing.sm,
+            AppSpacing.screenPadding,
+            AppSpacing.bottomNavHeight + AppSpacing.md,
           ),
-          const SizedBox(height: AppSpacing.sm),
-          _AdmissionTargetPerformanceStrip(
-            preset: preset,
-            summary: summary ?? AdmissionTargetSummary.empty,
-            loading: loading,
-            error: error,
-            onPreset: onPreset,
-            onRetry: onRetry,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Modules',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PgWelcomeCard(
+                  name: name,
+                  dateLabel:
+                      DateFormat('EEEE, d MMM yyyy').format(DateTime.now()),
+                  photoUrl: photoUrl,
+                  role: role,
+                  prominent: true,
+                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+                  avatarRadius: 36,
                 ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Expanded(
-            child: _EmployeeModuleGrid(
-              modules: _modules,
-              onOpen: onOpen,
+                const SizedBox(height: 12),
+                _AdmissionTargetCard(
+                  preset: preset,
+                  summary: summary ?? AdmissionTargetSummary.empty,
+                  loading: loading,
+                  error: error,
+                  onPreset: onPreset,
+                  onRetry: onRetry,
+                ),
+                const SizedBox(height: 12),
+                _EmployeeModuleGrid(
+                  modules: _modules,
+                  onOpen: onOpen,
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
-class _AdmissionTargetPerformanceStrip extends StatelessWidget {
-  const _AdmissionTargetPerformanceStrip({
+class _AdmissionTargetCard extends StatelessWidget {
+  const _AdmissionTargetCard({
     required this.preset,
     required this.summary,
     required this.loading,
@@ -240,13 +245,9 @@ class _AdmissionTargetPerformanceStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 6, 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
-      ),
+    final period = labelFor(preset);
+    return PgCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -254,10 +255,10 @@ class _AdmissionTargetPerformanceStrip extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Admission Target Performance',
+                  'Admission Target ($period)',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                 ),
@@ -269,15 +270,15 @@ class _AdmissionTargetPerformanceStrip extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           if (loading)
             const SizedBox(
-              height: 36,
+              height: 52,
               child: Center(
                 child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
                 ),
               ),
             )
@@ -290,27 +291,38 @@ class _AdmissionTargetPerformanceStrip extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
-                TextButton(
-                  onPressed: onRetry,
-                  child: const Text('Retry'),
-                ),
+                TextButton(onPressed: onRetry, child: const Text('Retry')),
               ],
             )
           else ...[
-            Row(
-              children: [
-                _MetricStat(label: 'Target', value: '${summary.target}'),
-                _MetricStat(label: 'Achieved', value: '${summary.achieved}'),
-                _MetricStat(label: 'Remaining', value: '${summary.remaining}'),
-                _MetricStat(
-                  label: '%',
-                  value: _percentLabel(summary.percentage, summary.target),
-                ),
-              ],
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _MetricStat(label: 'Target', value: '${summary.target}'),
+                  const _MetricDivider(),
+                  _MetricStat(label: 'Achieved', value: '${summary.achieved}'),
+                  const _MetricDivider(),
+                  _MetricStat(label: 'Remaining', value: '${summary.remaining}'),
+                  const _MetricDivider(),
+                  _MetricStat(
+                    label: 'Achievement %',
+                    value: _percentLabel(summary.percentage, summary.target),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            _SlimProgressBar(
+            const SizedBox(height: 12),
+            _ThickProgressBar(
               percentage: summary.target > 0 ? summary.percentage : null,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Achieved ${summary.achieved} of ${summary.target}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
             ),
           ],
         ],
@@ -324,6 +336,19 @@ class _AdmissionTargetPerformanceStrip extends StatelessWidget {
       return '${percentage.toInt()}%';
     }
     return '${percentage.toStringAsFixed(1)}%';
+  }
+}
+
+class _MetricDivider extends StatelessWidget {
+  const _MetricDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      color: AppColors.border.withValues(alpha: 0.9),
+    );
   }
 }
 
@@ -352,13 +377,17 @@ class _PeriodFilterButton extends StatelessWidget {
             child: Text(filter.$1),
           ),
       ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 4, 6, 4),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _AdmissionTargetPerformanceStrip.labelFor(preset),
+              _AdmissionTargetCard.labelFor(preset),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w700,
@@ -366,8 +395,8 @@ class _PeriodFilterButton extends StatelessWidget {
             ),
             const SizedBox(width: 2),
             IconTheme(
-              data: const IconThemeData(color: AppColors.primary, size: 18),
-              child: const Icon(Icons.filter_alt),
+              data: const IconThemeData(color: AppColors.primary, size: 16),
+              child: const Icon(Icons.expand_more_rounded),
             ),
           ],
         ),
@@ -376,8 +405,8 @@ class _PeriodFilterButton extends StatelessWidget {
   }
 }
 
-class _SlimProgressBar extends StatelessWidget {
-  const _SlimProgressBar({required this.percentage});
+class _ThickProgressBar extends StatelessWidget {
+  const _ThickProgressBar({required this.percentage});
 
   final double? percentage;
 
@@ -387,7 +416,7 @@ class _SlimProgressBar extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: SizedBox(
-        height: 5,
+        height: 8,
         child: Stack(
           children: [
             Container(color: const Color(0xFFE2E8F0)),
@@ -416,27 +445,31 @@ class _MetricStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               value,
               maxLines: 1,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
-                    height: 1.1,
+                    height: 1.05,
                   ),
             ),
           ),
+          const SizedBox(height: 2),
           Text(
             label,
             textAlign: TextAlign.center,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   fontSize: 10,
-                  height: 1.1,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
                 ),
           ),
         ],
@@ -467,18 +500,24 @@ class _EmployeeModuleGrid extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final scale = (constraints.maxWidth / 360).clamp(0.86, 1.08);
+        final cardHeight = (100.0 * scale).clamp(90.0, 112.0);
+        final iconSize = (46.0 * scale).clamp(40.0, 52.0);
         final cardWidth = (constraints.maxWidth - _gap) / 2;
+
         return Column(
           children: [
             for (var i = 0; i < rows.length; i++) ...[
               if (i > 0) const SizedBox(height: _gap),
-              Expanded(
+              SizedBox(
+                height: cardHeight,
                 child: rows[i].length == 2
                     ? Row(
                         children: [
                           Expanded(
                             child: _EmployeeModuleCard(
                               module: rows[i][0],
+                              iconSize: iconSize,
                               onTap: () => onOpen(rows[i][0].path),
                             ),
                           ),
@@ -486,16 +525,19 @@ class _EmployeeModuleGrid extends StatelessWidget {
                           Expanded(
                             child: _EmployeeModuleCard(
                               module: rows[i][1],
+                              iconSize: iconSize,
                               onTap: () => onOpen(rows[i][1].path),
                             ),
                           ),
                         ],
                       )
                     : Align(
+                        alignment: Alignment.centerLeft,
                         child: SizedBox(
                           width: cardWidth,
                           child: _EmployeeModuleCard(
                             module: rows[i][0],
+                            iconSize: iconSize,
                             onTap: () => onOpen(rows[i][0].path),
                           ),
                         ),
@@ -510,45 +552,104 @@ class _EmployeeModuleGrid extends StatelessWidget {
 }
 
 class _EmployeeModuleCard extends StatelessWidget {
-  const _EmployeeModuleCard({required this.module, required this.onTap});
+  const _EmployeeModuleCard({
+    required this.module,
+    required this.iconSize,
+    required this.onTap,
+  });
 
   final _EmployeeModule module;
+  final double iconSize;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return PgCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      onTap: onTap,
-      child: Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: module.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: IconTheme(
-                  data: IconThemeData(color: module.color, size: 30),
-                  child: Center(child: module.icon),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                module.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+    final tint = Color.alphaBlend(
+      module.color.withValues(alpha: 0.12),
+      Colors.white,
+    );
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: tint,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: module.color.withValues(alpha: 0.08)),
+            boxShadow: [
+              BoxShadow(
+                color: module.color.withValues(alpha: 0.10),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+            child: Row(
+              children: [
+                Container(
+                  width: iconSize,
+                  height: iconSize,
+                  decoration: BoxDecoration(
+                    color: module.color,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: module.color.withValues(alpha: 0.28),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: IconTheme(
+                    data: IconThemeData(
+                      color: Colors.white,
+                      size: iconSize * 0.5,
+                    ),
+                    child: Center(child: module.icon),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        module.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              height: 1.1,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        module.subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontSize: 11,
+                              height: 1.2,
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconTheme(
+                  data: const IconThemeData(
+                    color: AppColors.textMuted,
+                    size: 18,
+                  ),
+                  child: const Icon(Icons.chevron_right_rounded),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -560,12 +661,15 @@ class _EmployeeModule {
   const _EmployeeModule({
     required this.icon,
     required this.label,
+    required this.subtitle,
     required this.color,
     required this.path,
   });
 
   final Widget icon;
   final String label;
+  final String subtitle;
   final Color color;
   final String path;
 }
+
