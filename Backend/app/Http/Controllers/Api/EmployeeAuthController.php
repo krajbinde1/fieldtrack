@@ -23,7 +23,7 @@ class EmployeeAuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
-            'login_id' => ['required', 'string', 'min:4', 'max:32', 'regex:/^[A-Za-z0-9]+$/'],
+            'login_id' => ['required', 'string', 'max:32'],
             'password' => ['required', 'string'],
             'device_id' => ['nullable', 'string', 'max:64'],
         ]);

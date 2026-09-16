@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Filament\Resources\ProjectHeads\Pages\CreateProjectHead;
 use App\Filament\Resources\ProjectHeads\Pages\EditProjectHead;
 use App\Filament\Resources\ProjectHeads\Pages\ListProjectHeads;
+use App\Filament\Support\LoginIdInput;
 use App\Models\User;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
@@ -70,7 +71,8 @@ class ProjectHeadResource extends Resource
 
         return $schema->components([
             TextInput::make('name')->required()->maxLength(255),
-            TextInput::make('login_id')->label('Login ID')->required()->maxLength(32)->unique(ignoreRecord: true)->regex('/^[A-Za-z0-9]+$/'),
+            LoginIdInput::mobileFallback(),
+            LoginIdInput::make(),
             TextInput::make('email')->email()->required()->unique(ignoreRecord: true),
             TextInput::make('password')->password()->revealable()->dehydrated(fn ($state) => filled($state))->required(fn (string $operation): bool => $operation === 'create')->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
             Select::make('headedProjects')

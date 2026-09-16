@@ -2,11 +2,11 @@
 
 namespace App\Filament\Resources\Employees;
 
-use App\Enums\UserRole;
 use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\Employees\Pages\CreateEmployee;
 use App\Filament\Resources\Employees\Pages\EditEmployee;
 use App\Filament\Resources\Employees\Pages\ListEmployees;
+use App\Filament\Support\LoginIdInput;
 use App\Models\Employee;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
@@ -74,6 +74,7 @@ class EmployeeResource extends Resource
                 ->searchable(),
             TextInput::make('full_name')->required()->maxLength(255),
             TextInput::make('mobile')->required()->length(10)->regex('/^[6-9][0-9]{9}$/')->unique(ignoreRecord: true),
+            LoginIdInput::make()->dehydrated(false),
             TextInput::make('email')->email()->nullable(),
             TextInput::make('designation')->default('Employee')->required(),
             TextInput::make('department')->default('Field'),

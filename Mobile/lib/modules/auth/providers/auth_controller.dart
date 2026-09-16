@@ -237,9 +237,11 @@ class AuthController extends ChangeNotifier {
 
 class LoginValidators {
   static String? loginId(String? value) {
-    if (value == null || value.isEmpty) return 'Login ID is required.';
-    if (!RegExp(r'^[A-Za-z0-9]{4,32}$').hasMatch(value)) {
-      return 'Enter a valid login ID.';
+    if (value == null || value.trim().isEmpty) {
+      return 'Login ID is required.';
+    }
+    if (value.trim().length > 32) {
+      return 'Login ID must be 32 characters or fewer.';
     }
     return null;
   }

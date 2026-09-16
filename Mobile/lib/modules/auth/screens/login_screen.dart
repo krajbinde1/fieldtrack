@@ -175,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Use your registered mobile number to continue.',
+                              'Use your Login ID to continue.',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -187,9 +187,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               keyboardType: TextInputType.text,
                               textInputAction: TextInputAction.next,
                               inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                  RegExp(r'[A-Za-z0-9]'),
-                                ),
                                 LengthLimitingTextInputFormatter(32),
                               ],
                               onChanged: (_) {

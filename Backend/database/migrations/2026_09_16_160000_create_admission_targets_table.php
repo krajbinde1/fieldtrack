@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('admission_targets')) {
+            return;
+        }
+
         Schema::create('admission_targets', function (Blueprint $table) {
             $table->id();
             $table->foreignId('employee_id')->constrained('employees')->restrictOnDelete();
@@ -21,7 +25,10 @@ return new class extends Migration
             $table->unsignedInteger('target_count');
             $table->timestamps();
 
-            $table->index(['employee_id', 'target_type', 'period_start', 'period_end']);
+            $table->index(
+                ['employee_id', 'target_type', 'period_start', 'period_end'],
+                'admission_targets_period_idx',
+            );
             $table->index(['center_id', 'project_id']);
             $table->index('parent_id');
         });
