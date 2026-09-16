@@ -29,12 +29,14 @@ class DirectorRouteTrackingScreen extends StatefulWidget {
     this.title = 'Route Tracking',
     this.detailPathPrefix = '/director/route-tracking',
     this.listLoader,
+    this.centerId,
   });
 
   final AuthController auth;
   final String title;
   final String detailPathPrefix;
   final RouteTrackingListLoader? listLoader;
+  final int? centerId;
 
   @override
   State<DirectorRouteTrackingScreen> createState() =>
@@ -63,7 +65,10 @@ class _DirectorRouteTrackingScreenState
     if (loader != null) {
       return loader(date: _dateParam);
     }
-    return _directorApi.listRouteTracking(date: _dateParam);
+    return _directorApi.listRouteTracking(
+      date: _dateParam,
+      centerId: widget.centerId,
+    );
   }
 
   Future<void> _reload() async {

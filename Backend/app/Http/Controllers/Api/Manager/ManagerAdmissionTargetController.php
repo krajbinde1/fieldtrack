@@ -18,6 +18,7 @@ class ManagerAdmissionTargetController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->access->requestedCenterId($request);
         $items = $this->targets->listAssigned($request->user(), $request->only([
             'scheme_id',
             'project_id',

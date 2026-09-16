@@ -12,6 +12,7 @@ import '../../../core/design/app_spacing.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
 import '../../../core/widgets/design/pg_welcome_card.dart';
+import '../../../core/routing/center_scope.dart';
 import '../../attendance/models/attendance.dart';
 import '../../attendance/models/attendance_format.dart';
 import '../../attendance/providers/attendance_provider.dart';
@@ -126,6 +127,11 @@ class SupervisorDashboardView extends StatelessWidget {
     required this.onOpen,
     this.pulse,
     this.ownAttendance,
+    this.centerId,
+    this.centerName,
+    this.centerManagerName,
+    this.schemeName,
+    this.directorCenterView = false,
   });
 
   final String name;
@@ -133,10 +139,19 @@ class SupervisorDashboardView extends StatelessWidget {
   final Map<String, dynamic> data;
   final TeamAttendancePulse? pulse;
   final Attendance? ownAttendance;
+  final int? centerId;
+  final String? centerName;
+  final String? centerManagerName;
+  final String? schemeName;
+  final bool directorCenterView;
   final ValueChanged<String> onOpen;
 
   String get _prefix =>
       role.isAdmin || role.isDirector ? '/director' : '/manager';
+
+  bool get _centerScopedDirector => directorCenterView && centerId != null;
+
+  String _path(String path) => withCenterId(path, centerId);
 
   int _count(String key) {
     final value = data[key];
@@ -147,13 +162,24 @@ class SupervisorDashboardView extends StatelessWidget {
 
   List<_DashboardTile> get _summary {
     return [
+      if ((role.isDirector || role.isAdmin) && !_centerScopedDirector)
+        _DashboardTile(
+          icon: const Icon(Icons.apartment_rounded),
+          label: 'Total Centers',
+          value: '${_count('active_centers') == 0 && _count('centers') > 0 ? _count('centers') : _count('active_centers')}',
+          path: '/director/centers',
+          color: const Color(0xFF0369A1),
+          background: const Color(0xFFE0F2FE),
+        ),
       _DashboardTile(
         icon: const Icon(Icons.groups_rounded),
         label: 'Employees',
         value: '${_count('employees')}',
-        path: role.isCenterManager || role.isProjectHead
-            ? '/manager/employees'
-            : '$_prefix/team-attendance',
+        path: _centerScopedDirector
+            ? _path('/director/employees')
+            : (role.isCenterManager || role.isProjectHead
+                ? '/manager/employees'
+                : '$_prefix/team-attendance'),
         color: const Color(0xFF2563EB),
         background: const Color(0xFFE8F1FF),
       ),
@@ -161,7 +187,7 @@ class SupervisorDashboardView extends StatelessWidget {
         icon: const Icon(Icons.fingerprint_rounded),
         label: 'Punched In',
         value: '${_count('punched_in_today')}',
-        path: '$_prefix/team-attendance?status=punched_in',
+        path: _path('$_prefix/team-attendance?status=punched_in'),
         color: const Color(0xFF0F766E),
         background: const Color(0xFFE6F7F1),
       ),
@@ -169,7 +195,7 @@ class SupervisorDashboardView extends StatelessWidget {
         icon: const Icon(Icons.route_rounded),
         label: 'Active Routes',
         value: '${_count('active_routes')}',
-        path: '$_prefix/route-tracking',
+        path: _path('$_prefix/route-tracking'),
         color: const Color(0xFF7C3AED),
         background: const Color(0xFFF0E9FF),
       ),
@@ -177,7 +203,7 @@ class SupervisorDashboardView extends StatelessWidget {
         icon: const Icon(Icons.event_note_rounded),
         label: 'Pending Leave',
         value: '${_count('pending_leaves')}',
-        path: '$_prefix/leaves?status=pending',
+        path: _path('$_prefix/leaves?status=pending'),
         color: const Color(0xFFEA580C),
         background: const Color(0xFFFFF6E5),
       ),
@@ -185,9 +211,11 @@ class SupervisorDashboardView extends StatelessWidget {
         icon: const Icon(Icons.flag_rounded),
         label: 'Targets',
         value: '${_count('admission_targets')}',
-        path: role.isCenterManager || role.isProjectHead
-            ? '/manager/admission-targets'
-            : '$_prefix/admissions',
+        path: _centerScopedDirector
+            ? _path('/director/admission-targets')
+            : (role.isCenterManager || role.isProjectHead
+                ? '/manager/admission-targets'
+                : '$_prefix/admissions'),
         color: const Color(0xFFDB2777),
         background: const Color(0xFFFDE8F0),
       ),
@@ -199,6 +227,15 @@ class SupervisorDashboardView extends StatelessWidget {
           path: '/attendance',
           color: const Color(0xFF0D9488),
           background: const Color(0xFFD1FAE5),
+        ),
+      if (_centerScopedDirector)
+        _DashboardTile(
+          icon: const Icon(Icons.how_to_reg_rounded),
+          label: 'Admissions',
+          value: '${_count('admissions')}',
+          path: _path('/director/admissions'),
+          color: const Color(0xFF0EA5E9),
+          background: const Color(0xFFE0F4FF),
         ),
     ];
   }
@@ -212,38 +249,46 @@ class SupervisorDashboardView extends StatelessWidget {
 
   List<_DashboardTile> get _modules {
     return [
-      if (role.isCenterManager)
-        const _DashboardTile(
-          icon: Icon(Icons.groups_rounded),
+      if (role.isCenterManager || _centerScopedDirector)
+        _DashboardTile(
+          icon: const Icon(Icons.groups_rounded),
           label: 'Users / Employees',
-          subtitle: 'Staff in assigned center(s)',
-          path: '/manager/employees',
-          color: Color(0xFF2563EB),
-          background: Color(0xFFE8F1FF),
+          subtitle: _centerScopedDirector
+              ? 'Staff in this center'
+              : 'Staff in assigned center(s)',
+          path: _centerScopedDirector
+              ? _path('/director/employees')
+              : '/manager/employees',
+          color: const Color(0xFF2563EB),
+          background: const Color(0xFFE8F1FF),
         ),
       _DashboardTile(
         icon: const Icon(Icons.how_to_reg_rounded),
         label: 'Admissions',
         subtitle: 'Review field admissions',
-        path: '$_prefix/admissions',
+        path: _path('$_prefix/admissions'),
         color: const Color(0xFF0EA5E9),
         background: const Color(0xFFE0F4FF),
       ),
-      if (role.isCenterManager)
-        const _DashboardTile(
-          icon: Icon(Icons.flag_rounded),
+      if (role.isCenterManager || _centerScopedDirector)
+        _DashboardTile(
+          icon: const Icon(Icons.flag_rounded),
           label: 'Admission Targets',
-          subtitle: 'Set employee/Mobilizer targets',
-          path: '/manager/admission-targets',
-          color: Color(0xFFDB2777),
-          background: Color(0xFFFDE8F0),
+          subtitle: _centerScopedDirector
+              ? 'Targets for this center'
+              : 'Set employee/Mobilizer targets',
+          path: _centerScopedDirector
+              ? _path('/director/admission-targets')
+              : '/manager/admission-targets',
+          color: const Color(0xFFDB2777),
+          background: const Color(0xFFFDE8F0),
         ),
       if (!role.isCenterManager)
         _DashboardTile(
           icon: const Icon(Icons.event_available_rounded),
           label: 'Attendance',
           subtitle: 'Daily team attendance',
-          path: '$_prefix/team-attendance',
+          path: _path('$_prefix/team-attendance'),
           color: const Color(0xFF0F766E),
           background: const Color(0xFFE6F7F1),
         ),
@@ -251,7 +296,7 @@ class SupervisorDashboardView extends StatelessWidget {
         icon: const Icon(Icons.route_rounded),
         label: 'Employee Routes',
         subtitle: 'Live field routes',
-        path: '$_prefix/route-tracking',
+        path: _path('$_prefix/route-tracking'),
         color: const Color(0xFF7C3AED),
         background: const Color(0xFFF0E9FF),
       ),
@@ -259,18 +304,22 @@ class SupervisorDashboardView extends StatelessWidget {
         icon: const Icon(Icons.event_note_rounded),
         label: 'Leave Requests',
         subtitle: 'Approve team leave',
-        path: '$_prefix/leaves',
+        path: _path('$_prefix/leaves'),
         color: const Color(0xFFEA580C),
         background: const Color(0xFFFFF6E5),
       ),
-      if (role.isCenterManager || role.isProjectHead)
-        const _DashboardTile(
-          icon: Icon(Icons.analytics_rounded),
+      if (role.isCenterManager || role.isProjectHead || _centerScopedDirector)
+        _DashboardTile(
+          icon: const Icon(Icons.analytics_rounded),
           label: 'Reports',
-          subtitle: 'Assigned-center reports',
-          path: '/manager/reports',
-          color: Color(0xFF4F46E5),
-          background: Color(0xFFEEF2FF),
+          subtitle: _centerScopedDirector
+              ? 'Reports for this center'
+              : 'Assigned-center reports',
+          path: _centerScopedDirector
+              ? _path('/director/reports')
+              : '/manager/reports',
+          color: const Color(0xFF4F46E5),
+          background: const Color(0xFFEEF2FF),
         ),
     ];
   }
@@ -281,21 +330,30 @@ class SupervisorDashboardView extends StatelessWidget {
       color: const Color(0xFFFAFBFC),
       child: ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.screenPadding,
         AppSpacing.sm,
         AppSpacing.screenPadding,
-        AppSpacing.bottomNavHeight + AppSpacing.md,
+        _centerScopedDirector
+            ? AppSpacing.xl
+            : AppSpacing.bottomNavHeight + AppSpacing.md,
       ),
       children: [
-        PgWelcomeCard(
-          name: name,
-          dateLabel: DateFormat('EEEE, d MMM yyyy').format(DateTime.now()),
-          role: role.label,
-          prominent: true,
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
-          avatarRadius: 36,
-        ),
+        if (_centerScopedDirector)
+          _SelectedCenterHeader(
+            centerName: centerName ?? 'Center',
+            schemeName: schemeName,
+            managerName: centerManagerName,
+          )
+        else
+          PgWelcomeCard(
+            name: name,
+            dateLabel: DateFormat('EEEE, d MMM yyyy').format(DateTime.now()),
+            role: role.label,
+            prominent: true,
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+            avatarRadius: 36,
+          ),
         const SizedBox(height: 12),
         _AttendanceStatusCard(
           pulse: role.isCenterManager
@@ -305,7 +363,9 @@ class SupervisorDashboardView extends StatelessWidget {
           punchedIn: _count('punched_in_today'),
           punchedOut: _count('punched_out_today'),
           onDetails: () => onOpen(
-            role.isCenterManager ? '/attendance' : '$_prefix/team-attendance',
+            role.isCenterManager
+                ? '/attendance'
+                : _path('$_prefix/team-attendance'),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -330,6 +390,112 @@ class _DashboardSnapshot {
 
   final Map<String, dynamic> data;
   final TeamAttendancePulse? pulse;
+}
+
+class _SelectedCenterHeader extends StatelessWidget {
+  const _SelectedCenterHeader({
+    required this.centerName,
+    this.schemeName,
+    this.managerName,
+  });
+
+  final String centerName;
+  final String? schemeName;
+  final String? managerName;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = schemeName?.trim() ?? '';
+    final manager = managerName?.trim() ?? '';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x140F766E),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Selected Center',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            centerName,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
+                ),
+          ),
+          if (scheme.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              scheme,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.badge_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Center Manager',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      Text(
+                        manager.isEmpty ? 'Not assigned' : manager,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class TeamAttendancePulse {

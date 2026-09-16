@@ -34,14 +34,17 @@ class DirectorRouteTrackingController extends Controller
         $validated = $request->validate([
             'date' => ['nullable', 'date'],
             'search' => ['nullable', 'string', 'max:100'],
+            'center_id' => ['nullable', 'integer'],
         ]);
 
         $date = $validated['date'] ?? AttendanceCalendar::today()->toDateString();
+        $centerId = $this->access->requestedCenterId($request);
 
         try {
             $employees = $this->access->employeeQuery($request->user())
                 ->with('user')
                 ->where('status', true)
+                ->when($centerId !== null, fn ($q) => $q->where('center_id', $centerId))
                 ->whereHas(
                     'user',
                     fn ($q) => $q->whereIn('role', self::FIELD_ROLES),

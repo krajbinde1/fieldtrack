@@ -81,7 +81,10 @@ class SupervisorAdmissionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Admission summary loaded.',
-            'data' => $this->access->admissionStatusCounts($request->user()),
+            'data' => $this->access->admissionStatusCounts(
+                $request->user(),
+                $this->access->requestedCenterId($request),
+            ),
         ]);
     }
 

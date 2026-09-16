@@ -17,11 +17,13 @@ class SupervisorLeaveListScreen extends StatefulWidget {
     required this.auth,
     required this.apiPrefix,
     this.statusFilter,
+    this.centerId,
   });
 
   final AuthController auth;
   final String apiPrefix;
   final String? statusFilter;
+  final int? centerId;
 
   @override
   State<SupervisorLeaveListScreen> createState() =>
@@ -38,7 +40,11 @@ class _SupervisorLeaveListScreenState extends State<SupervisorLeaveListScreen> {
   }
 
   Future<List<LeaveRecord>> _load() async {
-    return (await LeaveApi.create()).supervisorList(widget.apiPrefix);
+    return (await LeaveApi.create()).supervisorList(
+      widget.apiPrefix,
+      centerId: widget.centerId,
+      status: widget.statusFilter,
+    );
   }
 
   Future<void> _refresh() async {

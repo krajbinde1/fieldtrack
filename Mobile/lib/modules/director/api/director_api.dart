@@ -17,9 +17,40 @@ class DirectorApi {
   DirectorApi(this._dio);
   final Dio _dio;
 
+  Future<List<Map<String, dynamic>>> listCenters({String? search}) async {
+    try {
+      final response = await _dio.get(
+        '/director/centers',
+        queryParameters: {
+          if (search != null && search.isNotEmpty) 'search': search,
+        },
+      );
+      final rows = (response.data as Map)['data'];
+      if (rows is! List) return const [];
+      return rows
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> getCenter(int centerId) async {
+    try {
+      final response = await _dio.get('/director/centers/$centerId');
+      return Map<String, dynamic>.from(
+        (response.data as Map)['data'] as Map? ?? const {},
+      );
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
   Future<DirectorRouteTrackingListResult> listRouteTracking({
     String? date,
     String? search,
+    int? centerId,
   }) async {
     try {
       final response = await _dio.get(
@@ -27,6 +58,7 @@ class DirectorApi {
         queryParameters: {
           'date': ?date,
           if (search != null && search.isNotEmpty) 'search': search,
+          'center_id': ?centerId,
         },
       );
       final raw = response.data;

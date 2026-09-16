@@ -18,11 +18,13 @@ class SupervisorAdmissionListScreen extends StatefulWidget {
     required this.auth,
     required this.apiPrefix,
     this.initialStatus = 'submitted',
+    this.centerId,
   });
 
   final AuthController auth;
   final String apiPrefix;
   final String initialStatus;
+  final int? centerId;
 
   @override
   State<SupervisorAdmissionListScreen> createState() =>
@@ -68,10 +70,14 @@ class _SupervisorAdmissionListScreenState
 
   Future<({Map<String, int> counts, List<AdmissionRecord> items})> _load() async {
     _api ??= await AdmissionApi.create();
-    final counts = await _api!.supervisorSummary(widget.apiPrefix);
+    final counts = await _api!.supervisorSummary(
+      widget.apiPrefix,
+      centerId: widget.centerId,
+    );
     final items = await _api!.supervisorList(
       widget.apiPrefix,
       status: _status.isEmpty ? null : _status,
+      centerId: widget.centerId,
     );
     return (counts: counts, items: items);
   }

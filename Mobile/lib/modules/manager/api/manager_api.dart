@@ -52,19 +52,22 @@ class ManagerEmployeeAttendanceHistoryResult {
 }
 
 class ManagerApi {
-  ManagerApi(this._dio);
+  ManagerApi(this._dio, {this.prefix = 'manager'});
   final Dio _dio;
+  final String prefix;
 
   Future<ManagerTeamAttendanceListResult> listTeamAttendance({
     String? date,
     String? search,
+    int? centerId,
   }) async {
     try {
       final response = await _dio.get(
-        '/manager/team-attendance',
+        '/$prefix/team-attendance',
         queryParameters: {
           'date': ?date,
           if (search != null && search.isNotEmpty) 'search': search,
+          'center_id': ?centerId,
         },
       );
       final body = response.data as Map;
@@ -81,7 +84,7 @@ class ManagerApi {
 
   Future<Map<String, dynamic>> getTeamAttendance(int attendanceId) async {
     try {
-      final response = await _dio.get('/manager/team-attendance/$attendanceId');
+      final response = await _dio.get('/$prefix/team-attendance/$attendanceId');
       return Map<String, dynamic>.from(
         (response.data as Map)['data'] as Map,
       );
@@ -93,13 +96,15 @@ class ManagerApi {
   Future<ManagerRouteTrackingListResult> listRouteTracking({
     String? date,
     String? search,
+    int? centerId,
   }) async {
     try {
       final response = await _dio.get(
-        '/manager/route-tracking',
+        '/$prefix/route-tracking',
         queryParameters: {
           'date': ?date,
           if (search != null && search.isNotEmpty) 'search': search,
+          'center_id': ?centerId,
         },
       );
       final raw = response.data;
@@ -128,7 +133,7 @@ class ManagerApi {
 
   Future<Map<String, dynamic>> getRouteTracking(int attendanceId) async {
     try {
-      final response = await _dio.get('/manager/route-tracking/$attendanceId');
+      final response = await _dio.get('/$prefix/route-tracking/$attendanceId');
       final root = response.data;
       if (root is! Map) {
         throw StateError('Invalid route detail response');
@@ -151,7 +156,7 @@ class ManagerApi {
   }) async {
     try {
       final response = await _dio.get(
-        '/manager/team-attendance/employees/$employeeId',
+        '/$prefix/team-attendance/employees/$employeeId',
         queryParameters: {
           'month': ?month,
           'date_from': ?dateFrom,
@@ -165,12 +170,16 @@ class ManagerApi {
     }
   }
 
-  Future<List<Map<String, dynamic>>> listEmployees({String? search}) async {
+  Future<List<Map<String, dynamic>>> listEmployees({
+    String? search,
+    int? centerId,
+  }) async {
     try {
       final response = await _dio.get(
-        '/manager/employees',
+        '/$prefix/employees',
         queryParameters: {
           if (search != null && search.isNotEmpty) 'search': search,
+          'center_id': ?centerId,
         },
       );
       final rows = (response.data as Map)['data'];
@@ -186,7 +195,7 @@ class ManagerApi {
 
   Future<Map<String, dynamic>> employeesMeta() async {
     try {
-      final response = await _dio.get('/manager/employees');
+      final response = await _dio.get('/$prefix/employees');
       final body = response.data as Map;
       return Map<String, dynamic>.from(body['meta'] as Map? ?? const {});
     } on DioException catch (error) {
@@ -224,9 +233,14 @@ class ManagerApi {
     }
   }
 
-  Future<List<Map<String, dynamic>>> listAdmissionTargets() async {
+  Future<List<Map<String, dynamic>>> listAdmissionTargets({int? centerId}) async {
     try {
-      final response = await _dio.get('/manager/admission-targets');
+      final response = await _dio.get(
+        '/$prefix/admission-targets',
+        queryParameters: {
+          'center_id': ?centerId,
+        },
+      );
       final rows = (response.data as Map)['data'];
       if (rows is! List) return const [];
       return rows

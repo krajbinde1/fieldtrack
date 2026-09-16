@@ -23,10 +23,14 @@ class ManagerTeamAttendanceScreen extends StatefulWidget {
     super.key,
     required this.auth,
     this.statusFilter,
+    this.centerId,
+    this.apiPrefix = 'manager',
   });
 
   final AuthController auth;
   final String? statusFilter;
+  final int? centerId;
+  final String apiPrefix;
 
   @override
   State<ManagerTeamAttendanceScreen> createState() =>
@@ -45,6 +49,7 @@ class _ManagerTeamAttendanceScreenState
     super.initState();
     _api = ManagerApi(
       ApiClient(SessionStore(), onUnauthorized: widget.auth.sessionExpired).dio,
+      prefix: widget.apiPrefix,
     );
     _future = _load();
   }
@@ -60,6 +65,7 @@ class _ManagerTeamAttendanceScreenState
   Future<ManagerTeamAttendanceListResult> _load() => _api.listTeamAttendance(
         date: _dateParam,
         search: _searchController.text.trim(),
+        centerId: widget.centerId,
       );
 
   Future<void> _reload() async {
@@ -313,12 +319,12 @@ class _ManagerTeamAttendanceScreenState
                             : () {
                                 if (attendanceId > 0) {
                                   context.push(
-                                    '/manager/team-attendance/$attendanceId',
+                                    '/${widget.apiPrefix}/team-attendance/$attendanceId',
                                   );
                                   return;
                                 }
                                 context.push(
-                                  '/manager/team-attendance/employees/$employeeId'
+                                  '/${widget.apiPrefix}/team-attendance/employees/$employeeId'
                                   '?date=$_dateParam',
                                 );
                               },
@@ -1010,10 +1016,12 @@ class ManagerTeamAttendanceDetailScreen extends StatefulWidget {
     super.key,
     required this.auth,
     required this.attendanceId,
+    this.apiPrefix = 'manager',
   });
 
   final AuthController auth;
   final int attendanceId;
+  final String apiPrefix;
 
   @override
   State<ManagerTeamAttendanceDetailScreen> createState() =>
@@ -1026,6 +1034,7 @@ class _ManagerTeamAttendanceDetailScreenState
 
   ManagerApi get _api => ManagerApi(
     ApiClient(SessionStore(), onUnauthorized: widget.auth.sessionExpired).dio,
+    prefix: widget.apiPrefix,
   );
 
   @override
@@ -1182,7 +1191,7 @@ class _ManagerTeamAttendanceDetailScreenState
               if (hasRoute)
                 FilledButton.icon(
                   onPressed: () => context.push(
-                    '/manager/team-attendance/${widget.attendanceId}/route',
+                    '/${widget.apiPrefix}/route-tracking/${widget.attendanceId}',
                   ),
                   icon: const Icon(Icons.map_outlined),
                   label: const Text('View Route'),

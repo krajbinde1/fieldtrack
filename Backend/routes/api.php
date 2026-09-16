@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AdmissionLookupController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\Director\DirectorCenterController;
 use App\Http\Controllers\Api\Director\DirectorRouteTrackingController;
 use App\Http\Controllers\Api\EmployeeAdmissionController;
 use App\Http\Controllers\Api\EmployeeAdmissionTargetController;
@@ -76,6 +77,13 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
     });
 
     Route::middleware('role:admin,director')->prefix('director')->group(function () {
+        Route::get('centers', [DirectorCenterController::class, 'index']);
+        Route::get('centers/{center}', [DirectorCenterController::class, 'show'])
+            ->whereNumber('center');
+        Route::get('employees', [ManagerEmployeeController::class, 'index']);
+        Route::get('admission-targets', [ManagerAdmissionTargetController::class, 'index']);
+        Route::get('admission-targets/{admissionTarget}', [ManagerAdmissionTargetController::class, 'show'])
+            ->whereNumber('admissionTarget');
         Route::get('route-tracking', [DirectorRouteTrackingController::class, 'index']);
         Route::get('route-tracking/{attendance}', [DirectorRouteTrackingController::class, 'show']);
         Route::get('team-attendance', [ManagerTeamAttendanceController::class, 'index']);

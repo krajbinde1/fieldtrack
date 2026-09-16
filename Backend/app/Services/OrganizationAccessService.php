@@ -13,6 +13,7 @@ use App\Models\LeaveRequest;
 use App\Models\Scheme;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 final class OrganizationAccessService
 {
@@ -137,6 +138,40 @@ final class OrganizationAccessService
         return $query->whereIn('id', $ids);
     }
 
+    public function assertCanViewCenter(User $user, int $centerId): Center
+    {
+        $center = Center::query()->findOrFail($centerId);
+
+        if ($this->hasOrganizationWideAccess($user)) {
+            return $center;
+        }
+
+        $ids = $this->visibleCenterIds($user);
+        if ($ids === null) {
+            return $center;
+        }
+
+        abort_unless(
+            in_array($centerId, $ids, true),
+            403,
+            'You are not authorized to view this center.',
+        );
+
+        return $center;
+    }
+
+    public function requestedCenterId(Request $request): ?int
+    {
+        if (! $request->filled('center_id')) {
+            return null;
+        }
+
+        $centerId = $request->integer('center_id');
+        $this->assertCanViewCenter($request->user(), $centerId);
+
+        return $centerId;
+    }
+
     public function employeeQuery(User $user): Builder
     {
         $query = Employee::query();
@@ -182,9 +217,12 @@ final class OrganizationAccessService
     /**
      * @return array{submitted: int, confirmed: int, draft: int, reverted: int, rejected: int, total: int}
      */
-    public function admissionStatusCounts(User $user): array
+    public function admissionStatusCounts(User $user, ?int $centerId = null): array
     {
         $query = $this->admissionQuery($user);
+        if ($centerId !== null) {
+            $query->where('center_id', $centerId);
+        }
         $counts = (clone $query)
             ->toBase()
             ->selectRaw('status, COUNT(*) as total')

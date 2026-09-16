@@ -12,9 +12,16 @@ import '../../auth/providers/auth_controller.dart';
 import '../api/manager_api.dart';
 
 class ManagerEmployeesScreen extends StatefulWidget {
-  const ManagerEmployeesScreen({super.key, required this.auth});
+  const ManagerEmployeesScreen({
+    super.key,
+    required this.auth,
+    this.centerId,
+    this.apiPrefix = 'manager',
+  });
 
   final AuthController auth;
+  final int? centerId;
+  final String apiPrefix;
 
   @override
   State<ManagerEmployeesScreen> createState() => _ManagerEmployeesScreenState();
@@ -29,12 +36,13 @@ class _ManagerEmployeesScreenState extends State<ManagerEmployeesScreen> {
     super.initState();
     _api = ManagerApi(
       ApiClient(SessionStore(), onUnauthorized: widget.auth.sessionExpired).dio,
+      prefix: widget.apiPrefix,
     );
-    _future = _api.listEmployees();
+    _future = _api.listEmployees(centerId: widget.centerId);
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _api.listEmployees());
+    setState(() => _future = _api.listEmployees(centerId: widget.centerId));
     await _future;
   }
 

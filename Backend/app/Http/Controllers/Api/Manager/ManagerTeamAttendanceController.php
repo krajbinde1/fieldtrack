@@ -23,9 +23,11 @@ class ManagerTeamAttendanceController extends Controller
         $validated = $request->validate([
             'date' => ['nullable', 'date'],
             'search' => ['nullable', 'string', 'max:100'],
+            'center_id' => ['nullable', 'integer'],
         ]);
 
         $reportIds = $this->access->visibleEmployeeIds($request->user());
+        $centerId = $this->access->requestedCenterId($request);
         $date = $validated['date'] ?? AttendanceCalendar::today()->toDateString();
 
         if ($reportIds === []) {
@@ -39,6 +41,7 @@ class ManagerTeamAttendanceController extends Controller
             ? Employee::query()
             : Employee::query()->whereIn('id', $reportIds))
             ->where('status', true)
+            ->when($centerId !== null, fn ($q) => $q->where('center_id', $centerId))
             ->when(filled($validated['search'] ?? null), function ($q) use ($validated): void {
                 $term = '%'.$validated['search'].'%';
                 $q->where(function ($inner) use ($term): void {

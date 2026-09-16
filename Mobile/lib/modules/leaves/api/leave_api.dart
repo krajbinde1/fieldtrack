@@ -107,8 +107,18 @@ class LeaveApi {
     }
   }
 
-  Future<List<LeaveRecord>> supervisorList(String prefix) async {
-    final data = await _get('/$prefix/leaves');
+  Future<List<LeaveRecord>> supervisorList(
+    String prefix, {
+    int? centerId,
+    String? status,
+  }) async {
+    final data = await _get(
+      '/$prefix/leaves',
+      query: {
+        'center_id': ?centerId,
+        if (status != null && status.isNotEmpty) 'status': status,
+      },
+    );
     return _list(data);
   }
 
@@ -172,9 +182,9 @@ class LeaveApi {
         .toList();
   }
 
-  Future<dynamic> _get(String path) async {
+  Future<dynamic> _get(String path, {Map<String, dynamic>? query}) async {
     try {
-      final response = await _dio.get(path);
+      final response = await _dio.get(path, queryParameters: query);
       return response.data['data'];
     } on DioException catch (error) {
       throw _error(error);

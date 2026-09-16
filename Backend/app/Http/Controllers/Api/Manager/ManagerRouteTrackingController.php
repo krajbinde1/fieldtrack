@@ -29,10 +29,12 @@ class ManagerRouteTrackingController extends Controller
         $validated = $request->validate([
             'date' => ['nullable', 'date'],
             'search' => ['nullable', 'string', 'max:100'],
+            'center_id' => ['nullable', 'integer'],
         ]);
 
         $date = $validated['date'] ?? AttendanceCalendar::today()->toDateString();
         $reportIds = $this->access->visibleEmployeeIds($request->user());
+        $centerId = $this->access->requestedCenterId($request);
 
         if ($reportIds === []) {
             return response()->json([
@@ -50,6 +52,7 @@ class ManagerRouteTrackingController extends Controller
                 : Employee::query()->whereIn('id', $reportIds))
                 ->with('user')
                 ->where('status', true)
+                ->when($centerId !== null, fn ($q) => $q->where('center_id', $centerId))
                 ->when(filled($validated['search'] ?? null), function ($q) use ($validated): void {
                     $term = '%'.$validated['search'].'%';
                     $q->where(function ($inner) use ($term): void {

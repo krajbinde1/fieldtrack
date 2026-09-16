@@ -115,16 +115,23 @@ class AdmissionApi {
   Future<List<AdmissionRecord>> supervisorList(
     String prefix, {
     String? status,
+    int? centerId,
   }) =>
       _list(
         '/$prefix/admissions',
         query: {
           if (status != null && status.isNotEmpty) 'status': status,
+          'center_id': ?centerId,
         },
       );
 
-  Future<Map<String, int>> supervisorSummary(String prefix) async {
-    final data = await _get('/$prefix/admissions/summary');
+  Future<Map<String, int>> supervisorSummary(String prefix, {int? centerId}) async {
+    final data = await _get(
+      '/$prefix/admissions/summary',
+      query: {
+        'center_id': ?centerId,
+      },
+    );
     return _statusCounts(_map(data));
   }
 

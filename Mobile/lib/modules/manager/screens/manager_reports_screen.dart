@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/design/app_spacing.dart';
+import '../../../core/routing/center_scope.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/widgets/design/pg_empty_state.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
@@ -10,9 +11,16 @@ import '../../../core/widgets/role_shell_widgets.dart';
 import '../../auth/providers/auth_controller.dart';
 
 class ManagerReportsScreen extends StatefulWidget {
-  const ManagerReportsScreen({super.key, required this.auth});
+  const ManagerReportsScreen({
+    super.key,
+    required this.auth,
+    this.centerId,
+    this.pathPrefix = '/manager',
+  });
 
   final AuthController auth;
+  final int? centerId;
+  final String pathPrefix;
 
   @override
   State<ManagerReportsScreen> createState() => _ManagerReportsScreenState();
@@ -33,7 +41,12 @@ class _ManagerReportsScreenState extends State<ManagerReportsScreen> {
         SessionStore(),
         onUnauthorized: widget.auth.sessionExpired,
       ).dio;
-      final response = await dio.get('/dashboard');
+      final response = await dio.get(
+        '/dashboard',
+        queryParameters: {
+          if (widget.centerId != null) 'center_id': widget.centerId,
+        },
+      );
       final body = response.data;
       if (body is Map && body['data'] is Map) {
         return Map<String, dynamic>.from(body['data'] as Map);
@@ -43,6 +56,11 @@ class _ManagerReportsScreenState extends State<ManagerReportsScreen> {
   }
 
   String _value(Map<String, dynamic> data, String key) => '${data[key] ?? 0}';
+
+  String _link(String path) => withCenterId(
+        '${widget.pathPrefix}$path',
+        widget.centerId,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -73,31 +91,31 @@ class _ManagerReportsScreenState extends State<ManagerReportsScreen> {
                       label: 'Employees',
                       value: _value(data, 'employees'),
                       icon: const Icon(Icons.groups_rounded),
-                      onTap: () => context.push('/manager/employees'),
+                      onTap: () => context.push(_link('/employees')),
                     ),
                     DashboardMetricCard(
                       label: 'Punched In',
                       value: _value(data, 'punched_in_today'),
                       icon: const Icon(Icons.fingerprint_rounded),
-                      onTap: () => context.push('/manager/team-attendance'),
+                      onTap: () => context.push(_link('/team-attendance')),
                     ),
                     DashboardMetricCard(
                       label: 'Active Routes',
                       value: _value(data, 'active_routes'),
                       icon: const Icon(Icons.route_rounded),
-                      onTap: () => context.push('/manager/route-tracking'),
+                      onTap: () => context.push(_link('/route-tracking')),
                     ),
                     DashboardMetricCard(
                       label: 'Pending Leave',
                       value: _value(data, 'pending_leaves'),
                       icon: const Icon(Icons.event_note_rounded),
-                      onTap: () => context.push('/manager/leaves'),
+                      onTap: () => context.push(_link('/leaves')),
                     ),
                     DashboardMetricCard(
                       label: 'Targets',
                       value: _value(data, 'admission_targets'),
                       icon: const Icon(Icons.flag_rounded),
-                      onTap: () => context.push('/manager/admission-targets'),
+                      onTap: () => context.push(_link('/admission-targets')),
                     ),
                   ],
                 ),
@@ -106,21 +124,21 @@ class _ManagerReportsScreenState extends State<ManagerReportsScreen> {
                   icon: const Icon(Icons.event_available_rounded),
                   label: 'Attendance report',
                   subtitle: 'Live punch status for assigned centers',
-                  onTap: () => context.push('/manager/team-attendance'),
+                  onTap: () => context.push(_link('/team-attendance')),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 ModuleTile(
                   icon: const Icon(Icons.route_rounded),
                   label: 'Route report',
                   subtitle: 'Field routes for assigned staff',
-                  onTap: () => context.push('/manager/route-tracking'),
+                  onTap: () => context.push(_link('/route-tracking')),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 ModuleTile(
                   icon: const Icon(Icons.event_note_rounded),
                   label: 'Leave report',
                   subtitle: 'Pending and reviewed leave',
-                  onTap: () => context.push('/manager/leaves'),
+                  onTap: () => context.push(_link('/leaves')),
                 ),
               ],
             );

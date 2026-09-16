@@ -25,6 +25,9 @@ class ManagerEmployeeController extends Controller
         $user = $request->user();
         $employees = $this->access->employeeQuery($user)
             ->with(['center:id,name', 'user:id,employee_id,login_id'])
+            ->when($this->access->requestedCenterId($request), function ($query, int $centerId): void {
+                $query->where('center_id', $centerId);
+            })
             ->when($request->filled('search'), function ($query) use ($request): void {
                 $term = '%'.$request->string('search').'%';
                 $query->where(function ($inner) use ($term): void {
