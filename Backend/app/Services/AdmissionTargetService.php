@@ -167,9 +167,7 @@ final class AdmissionTargetService
         $target = $this->targetForPeriod($employee->id, $preset, $start, $end);
         $monthly = $this->monthlyCovering($employee->id, $start, $end);
         $weekly = $this->weeklyCovering($employee->id, $start, $end);
-        $achieved = $this->achievedCount($employee->id, $start, $end);
-        $remaining = max(0, $target - $achieved);
-        $percentage = $target > 0 ? round(($achieved / $target) * 100, 1) : ($achieved > 0 ? 100.0 : 0.0);
+        $progress = $this->progress($target, $this->achievedCount($employee->id, $start, $end));
 
         return [
             'employee_id' => $employee->id,
@@ -186,14 +184,71 @@ final class AdmissionTargetService
                 'from' => $start->toDateString(),
                 'to' => $end->toDateString(),
             ],
-            'target' => $target,
+            'target' => $progress['target'],
             'monthly_target' => $monthly,
             'weekly_target' => $weekly,
+            'achieved' => $progress['achieved'],
+            'remaining' => $progress['remaining'],
+            'percentage' => $progress['percentage'],
+            'progress' => min(100, $progress['percentage']),
+        ];
+    }
+
+    /**
+     * @return array{target: int, achieved: int, remaining: int, percentage: float}
+     */
+    public function progress(int $target, int $achieved): array
+    {
+        $remaining = max(0, $target - $achieved);
+        $percentage = $target > 0
+            ? round(($achieved / $target) * 100, 1)
+            : ($achieved > 0 ? 100.0 : 0.0);
+
+        return [
+            'target' => $target,
             'achieved' => $achieved,
             'remaining' => $remaining,
             'percentage' => $percentage,
-            'progress' => min(100, $percentage),
         ];
+    }
+
+    /**
+     * @return array{target: int, achieved: int, remaining: int, percentage: float}
+     */
+    public function metricsForTarget(AdmissionTarget $target): array
+    {
+        $start = Carbon::parse($target->period_start, AttendanceCalendar::TIMEZONE)->startOfDay();
+        $end = Carbon::parse($target->period_end, AttendanceCalendar::TIMEZONE)->startOfDay();
+
+        return $this->progress(
+            (int) $target->target_count,
+            $this->achievedCount((int) $target->employee_id, $start, $end),
+        );
+    }
+
+    /**
+     * Assigned-center (or org-wide) totals for a dashboard card.
+     *
+     * @return array{target: int, achieved: int, remaining: int, percentage: float, period: array{preset: string, from: string, to: string}}
+     */
+    public function teamPerformance(User $viewer, string $preset, ?string $from = null, ?string $to = null): array
+    {
+        $rows = $this->performance($viewer, $preset, $from, $to);
+        [$start, $end] = AdmissionTargetPeriod::resolve($preset, $from, $to);
+
+        return array_merge(
+            $this->progress(
+                (int) array_sum(array_column($rows, 'target')),
+                (int) array_sum(array_column($rows, 'achieved')),
+            ),
+            [
+                'period' => [
+                    'preset' => $preset,
+                    'from' => $start->toDateString(),
+                    'to' => $end->toDateString(),
+                ],
+            ],
+        );
     }
 
     public function achievedCount(int $employeeId, Carbon $start, Carbon $end): int

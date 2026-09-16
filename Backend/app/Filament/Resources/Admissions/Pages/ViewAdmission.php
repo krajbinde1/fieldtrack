@@ -2,12 +2,12 @@
 
 namespace App\Filament\Resources\Admissions\Pages;
 
-use App\Enums\AdmissionDocumentType;
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Models\AdmissionDocument;
-use Filament\Actions\Action;
+use App\Services\OrganizationAccessService;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ViewAdmission extends ViewRecord
 {
@@ -15,30 +15,44 @@ class ViewAdmission extends ViewRecord
 
     protected function getHeaderActions(): array
     {
+        return [];
+    }
+
+    public function previewAdmissionDocument(int $document): StreamedResponse
+    {
+        return $this->streamAdmissionDocument($document, asDownload: false);
+    }
+
+    public function downloadAdmissionDocument(int $document): StreamedResponse
+    {
+        return $this->streamAdmissionDocument($document, asDownload: true);
+    }
+
+    private function streamAdmissionDocument(int $documentId, bool $asDownload): StreamedResponse
+    {
         $this->record->loadMissing('documents');
+        $document = $this->record->documents->firstWhere('id', $documentId);
+        abort_unless($document instanceof AdmissionDocument, 404);
 
-        $downloads = $this->record->documents
-            ->map(function (AdmissionDocument $document) {
-                $label = $document->typeEnum()?->label() ?? AdmissionDocumentType::tryFrom($document->document_type)?->label() ?? 'Document';
+        app(OrganizationAccessService::class)
+            ->assertCanViewAdmission(auth()->user(), $this->record);
 
-                return Action::make('download_'.$document->id)
-                    ->label('Download '.$label)
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->action(function () use ($document) {
-                        abort_unless(
-                            Storage::disk($document->disk ?: 'local')->exists($document->path),
-                            404,
-                            'Document file is missing.',
-                        );
+        $disk = $document->disk ?: 'local';
+        abort_unless(
+            Storage::disk($disk)->exists($document->path),
+            404,
+            'Document file is missing.',
+        );
 
-                        return Storage::disk($document->disk ?: 'local')->download(
-                            $document->path,
-                            $document->original_name,
-                        );
-                    });
-            })
-            ->all();
+        $filename = $document->original_name ?: 'document';
+        $headers = [
+            'Content-Type' => $document->mime_type ?: 'application/octet-stream',
+        ];
 
-        return $downloads;
+        if ($asDownload) {
+            return Storage::disk($disk)->download($document->path, $filename, $headers);
+        }
+
+        return Storage::disk($disk)->response($document->path, $filename, $headers);
     }
 }

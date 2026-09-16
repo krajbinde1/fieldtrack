@@ -1,98 +1,26 @@
 <?php
 
+use App\Enums\AdmissionTargetType;
 use App\Enums\UserRole;
+use App\Filament\Resources\Centers\Pages\ListCenters;
+use App\Models\Admission;
+use App\Models\AdmissionTarget;
 use App\Models\Attendance;
 use App\Models\Center;
 use App\Models\Employee;
-use App\Models\Scheme;
+use App\Models\EmployeeRoutePoint;
 use App\Models\User;
+use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
+use Livewire\Livewire;
 
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
-
-function seedOrg(): array
-{
-    $projectA = Scheme::create(['name' => 'Project A', 'code' => 'PA', 'is_active' => true]);
-    $projectB = Scheme::create(['name' => 'Project B', 'code' => 'PB', 'is_active' => true]);
-    $centerA = Center::create(['scheme_id' => $projectA->id, 'name' => 'Center A', 'code' => 'CA', 'is_active' => true]);
-    $centerB = Center::create(['scheme_id' => $projectB->id, 'name' => 'Center B', 'code' => 'CB', 'is_active' => true]);
-
-    $admin = User::create([
-        'name' => 'Admin',
-        'email' => 'dir@test.local',
-        'login_id' => 'director',
-        'password' => Hash::make('Director@123'),
-        'role' => UserRole::Admin->value,
-        'is_active' => true,
-    ]);
-
-    $director = User::create([
-        'name' => 'Director',
-        'email' => 'fielddirector@test.local',
-        'login_id' => 'fielddirector',
-        'password' => Hash::make('Director@123'),
-        'role' => UserRole::Director->value,
-        'is_active' => true,
-    ]);
-
-    $projectHead = User::create([
-        'name' => 'PH',
-        'email' => 'ph@test.local',
-        'login_id' => 'projecthead',
-        'password' => Hash::make('ProjectHead@123'),
-        'role' => UserRole::ProjectHead->value,
-        'is_active' => true,
-    ]);
-    $projectHead->headedCenters()->attach($centerA->id);
-
-    $centerManager = User::create([
-        'name' => 'CM',
-        'email' => 'cm@test.local',
-        'login_id' => 'centermgr',
-        'password' => Hash::make('CenterMgr@123'),
-        'role' => UserRole::CenterManager->value,
-        'is_active' => true,
-    ]);
-    $centerManager->managedCenters()->attach($centerA->id);
-
-    $empA = Employee::create([
-        'center_id' => $centerA->id,
-        'full_name' => 'Emp A',
-        'mobile' => '9000000001',
-        'status' => true,
-    ]);
-    $userA = User::create([
-        'employee_id' => $empA->id,
-        'name' => 'Emp A',
-        'email' => 'empa@test.local',
-        'login_id' => '9000000001',
-        'password' => Hash::make('Employee@123'),
-        'role' => UserRole::Employee->value,
-        'is_active' => true,
-    ]);
-
-    $empB = Employee::create([
-        'center_id' => $centerB->id,
-        'full_name' => 'Emp B',
-        'mobile' => '9000000002',
-        'status' => true,
-    ]);
-    User::create([
-        'employee_id' => $empB->id,
-        'name' => 'Emp B',
-        'email' => 'empb@test.local',
-        'login_id' => '9000000002',
-        'password' => Hash::make('Employee@123'),
-        'role' => UserRole::Employee->value,
-        'is_active' => true,
-    ]);
-
-    return compact('admin', 'director', 'projectHead', 'centerManager', 'empA', 'empB', 'userA', 'centerA', 'centerB', 'projectA', 'projectB');
-}
+uses(RefreshDatabase::class);
 
 it('blocks project head from another project route record', function () {
     $org = seedOrg();
@@ -287,7 +215,7 @@ it('saves route points once for the same local uuid', function () {
         ->assertCreated()
         ->assertJsonPath('skipped', 1);
 
-    expect(\App\Models\EmployeeRoutePoint::query()->count())->toBe(1);
+    expect(EmployeeRoutePoint::query()->count())->toBe(1);
 });
 
 it('keeps an open punch after a new mobile login', function () {
@@ -342,7 +270,7 @@ it('scopes project head access to assigned centers and not every center in the p
         'is_active' => true,
     ]);
 
-    $access = app(\App\Services\OrganizationAccessService::class);
+    $access = app(OrganizationAccessService::class);
     $ph = $org['projectHead'];
 
     expect($access->visibleCenterIds($ph))->toBe([(int) $org['centerA']->id])
@@ -391,14 +319,14 @@ it('scopes project head access to assigned centers and not every center in the p
     $this->getJson('/api/manager/leaves/'.$ownLeave)->assertOk();
     $this->getJson('/api/manager/leaves/'.$hiddenLeave)->assertForbidden();
 
-    $ownAdmission = \App\Models\Admission::create([
+    $ownAdmission = Admission::create([
         'scheme_id' => $org['projectA']->id,
         'center_id' => $org['centerA']->id,
         'employee_id' => $org['empA']->id,
         'first_name' => 'Own',
         'last_name' => 'Center',
     ]);
-    $hiddenAdmission = \App\Models\Admission::create([
+    $hiddenAdmission = Admission::create([
         'scheme_id' => $org['projectA']->id,
         'center_id' => $sameProjectOther->id,
         'employee_id' => $empSameProject->id,
@@ -410,20 +338,20 @@ it('scopes project head access to assigned centers and not every center in the p
     $this->getJson('/api/manager/admissions/'.$ownAdmission->id)->assertOk();
     $this->getJson('/api/manager/admissions/'.$hiddenAdmission->id)->assertForbidden();
 
-    $ownTarget = \App\Models\AdmissionTarget::create([
+    $ownTarget = AdmissionTarget::create([
         'employee_id' => $org['empA']->id,
         'center_id' => $org['centerA']->id,
         'scheme_id' => $org['projectA']->id,
-        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'target_type' => AdmissionTargetType::Weekly,
         'period_start' => '2026-09-14',
         'period_end' => '2026-09-20',
         'target_count' => 5,
     ]);
-    $hiddenTarget = \App\Models\AdmissionTarget::create([
+    $hiddenTarget = AdmissionTarget::create([
         'employee_id' => $empSameProject->id,
         'center_id' => $sameProjectOther->id,
         'scheme_id' => $org['projectA']->id,
-        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'target_type' => AdmissionTargetType::Weekly,
         'period_start' => '2026-09-14',
         'period_end' => '2026-09-20',
         'target_count' => 5,
@@ -434,8 +362,8 @@ it('scopes project head access to assigned centers and not every center in the p
         ->and($access->admissionTargetQuery($ph)->pluck('id')->all())->toContain($ownTarget->id)
         ->and($access->admissionTargetQuery($ph)->pluck('id')->all())->not->toContain($hiddenTarget->id);
 
-    \Livewire\Livewire::actingAs($ph)
-        ->test(\App\Filament\Resources\Centers\Pages\ListCenters::class)
+    Livewire::actingAs($ph)
+        ->test(ListCenters::class)
         ->assertCanSeeTableRecords([$org['centerA']])
         ->assertCanNotSeeTableRecords([$sameProjectOther, $org['centerB']]);
 });
@@ -444,7 +372,7 @@ it('lets a project head access centers from different projects when those center
     $org = seedOrg();
     $org['projectHead']->headedCenters()->sync([$org['centerA']->id, $org['centerB']->id]);
 
-    $access = app(\App\Services\OrganizationAccessService::class);
+    $access = app(OrganizationAccessService::class);
     $ids = $access->visibleCenterIds($org['projectHead']);
 
     expect($ids)->toContain((int) $org['centerA']->id)
@@ -455,7 +383,7 @@ it('lets a project head access centers from different projects when those center
 
 it('gives a director organization-wide access without project or center assignment', function () {
     $org = seedOrg();
-    $access = app(\App\Services\OrganizationAccessService::class);
+    $access = app(OrganizationAccessService::class);
 
     expect($org['director']->directedProjects()->count())->toBe(0)
         ->and($access->visibleProjectIds($org['director']))->toBeNull()
@@ -468,7 +396,7 @@ it('gives a director organization-wide access without project or center assignme
 });
 
 it('registers the Center Manager mobile module API routes', function () {
-    $uris = collect(Illuminate\Support\Facades\Route::getRoutes())
+    $uris = collect(Route::getRoutes())
         ->map(fn ($route) => $route->uri())
         ->all();
 
@@ -510,20 +438,20 @@ it('lets a center manager login and load a center-scoped mobile dashboard', func
     expect($ids)->toContain($org['empA']->id)
         ->and($ids)->not->toContain($org['empB']->id);
 
-    $ownTarget = \App\Models\AdmissionTarget::create([
+    $ownTarget = AdmissionTarget::create([
         'employee_id' => $org['empA']->id,
         'center_id' => $org['centerA']->id,
         'scheme_id' => $org['projectA']->id,
-        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'target_type' => AdmissionTargetType::Weekly,
         'period_start' => '2026-09-14',
         'period_end' => '2026-09-20',
         'target_count' => 4,
     ]);
-    $hiddenTarget = \App\Models\AdmissionTarget::create([
+    $hiddenTarget = AdmissionTarget::create([
         'employee_id' => $org['empB']->id,
         'center_id' => $org['centerB']->id,
         'scheme_id' => $org['projectB']->id,
-        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'target_type' => AdmissionTargetType::Weekly,
         'period_start' => '2026-09-14',
         'period_end' => '2026-09-20',
         'target_count' => 9,
@@ -537,14 +465,14 @@ it('lets a center manager login and load a center-scoped mobile dashboard', func
     $this->getJson('/api/manager/admission-targets/'.$ownTarget->id)->assertOk();
     $this->getJson('/api/manager/admission-targets/'.$hiddenTarget->id)->assertForbidden();
 
-    $ownAdmission = \App\Models\Admission::create([
+    $ownAdmission = Admission::create([
         'scheme_id' => $org['projectA']->id,
         'center_id' => $org['centerA']->id,
         'employee_id' => $org['empA']->id,
         'first_name' => 'Own',
         'last_name' => 'Admission',
     ]);
-    $hiddenAdmission = \App\Models\Admission::create([
+    $hiddenAdmission = Admission::create([
         'scheme_id' => $org['projectB']->id,
         'center_id' => $org['centerB']->id,
         'employee_id' => $org['empB']->id,

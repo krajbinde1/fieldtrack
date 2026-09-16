@@ -841,4 +841,35 @@
         }
     }
 
+    .admission-view-infolist,
+    .fi-resource-admissions.fi-resource-view-record .fi-sc,
+    .fi-resource-admissions.fi-resource-view-record .fi-infolist,
+    .fi-resource-admissions.fi-resource-view-record .fi-page-content {
+        gap: 0.5rem;
+        row-gap: 0.5rem;
+    }
+
+    .admission-view-infolist .fi-section,
+    .admission-view-infolist .fi-sc-section,
+    .fi-resource-admissions.fi-resource-view-record .fi-section,
+    .fi-resource-admissions.fi-resource-view-record .fi-sc-section {
+        height: auto;
+        min-height: 0;
+        align-self: start;
+    }
+
+    .admission-view-infolist .fi-section-content,
+    .admission-view-infolist .fi-sc-section-content,
+    .fi-resource-admissions.fi-resource-view-record .fi-section-content,
+    .fi-resource-admissions.fi-resource-view-record .fi-sc-section-content {
+        padding: 0.7rem 0.85rem;
+    }
+
+    .admission-view-infolist .fi-in-repeatable,
+    .admission-view-infolist .fi-in-table-repeatable,
+    .fi-resource-admissions.fi-resource-view-record .fi-in-repeatable,
+    .fi-resource-admissions.fi-resource-view-record .fi-in-table-repeatable {
+        min-height: 0;
+    }
+
 </style>

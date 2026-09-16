@@ -58,7 +58,7 @@ class AdmissionTarget extends Model
 
     public function weeks(): HasMany
     {
-        return $this->hasMany(self::class, 'parent_id');
+        return $this->hasMany(self::class, 'parent_id')->orderBy('period_start');
     }
 
     public function isMonthly(): bool
