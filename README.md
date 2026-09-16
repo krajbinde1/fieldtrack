@@ -50,12 +50,13 @@ Production seeding creates **only** the Director account. Change that password i
 
 ## Local setup (Mobile)
 
-Default API URL is `https://fieldtrack.paramgold.in/api`. For the Android emulator:
+Default API URL is `https://fieldtrack.paramsocialfoundation.org/api`.
 
 ```bash
 cd Mobile
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
+flutter analyze
+flutter build apk --release
 ```
 
 ## Live hosting requirements
@@ -67,7 +68,7 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
 - **Permissions:** `Backend/storage` and `Backend/bootstrap/cache` must be writable
 - **Storage link:** `php artisan storage:link` so punch photos are public at `/storage/...`
 - **Queue / scheduler:** not required. Route points are saved by the mobile app; `QUEUE_CONNECTION=sync` is enough.
-- **Mobile API URL:** `https://fieldtrack.paramgold.in/api` (compiled into the APK)
+- **Mobile API URL:** `https://fieldtrack.paramsocialfoundation.org/api` (compiled into the APK)
 
 ## Production server commands
 

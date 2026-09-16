@@ -1,11 +1,8 @@
-/// Live FieldTrack API. Rebuild the APK after changing this value.
-/// Local emulator override:
-/// flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
-const String productionApiBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'https://fieldtrack.paramgold.in/api',
-);
+/// Production API base URL used by all builds (debug and release).
+const String productionApiBaseUrl =
+    'https://fieldtrack.paramsocialfoundation.org/api';
 
 class ApiConfig {
+  /// Always the live production API — no local/LAN/debug host switching.
   static String get baseUrl => productionApiBaseUrl;
 }
