@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import '../../../core/design/app_colors.dart';
 import '../../../core/design/app_spacing.dart';
 import '../../../core/widgets/design/pg_card.dart';
-import '../../../core/widgets/design/pg_progress_bar.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
 import '../../../core/widgets/design/pg_welcome_card.dart';
 import '../../admissions/api/admission_api.dart';
@@ -161,66 +160,55 @@ class EmployeeDashboardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.screenPadding,
         AppSpacing.sm,
         AppSpacing.screenPadding,
-        AppSpacing.bottomNavHeight + AppSpacing.xl,
+        AppSpacing.bottomNavHeight + AppSpacing.md,
       ),
-      children: [
-        PgWelcomeCard(
-          name: name,
-          dateLabel: DateFormat('EEEE, d MMM yyyy').format(DateTime.now()),
-          photoUrl: photoUrl,
-          role: role,
-          padding: const EdgeInsets.all(AppSpacing.md),
-          avatarRadius: 26,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _AdmissionTargetPerformanceCard(
-          preset: preset,
-          summary: summary ?? AdmissionTargetSummary.empty,
-          loading: loading,
-          error: error,
-          onPreset: onPreset,
-          onRetry: onRetry,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Text(
-          'Modules',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            const gap = 10.0;
-            final width = (constraints.maxWidth - gap) / 2;
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: [
-                for (final module in _modules)
-                  SizedBox(
-                    width: width,
-                    child: _EmployeeModuleCard(
-                      module: module,
-                      onTap: () => onOpen(module.path),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PgWelcomeCard(
+            name: name,
+            dateLabel: DateFormat('EEEE, d MMM yyyy').format(DateTime.now()),
+            photoUrl: photoUrl,
+            role: role,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            avatarRadius: 26,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _AdmissionTargetPerformanceStrip(
+            preset: preset,
+            summary: summary ?? AdmissionTargetSummary.empty,
+            loading: loading,
+            error: error,
+            onPreset: onPreset,
+            onRetry: onRetry,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Modules',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Expanded(
+            child: _EmployeeModuleGrid(
+              modules: _modules,
+              onOpen: onOpen,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _AdmissionTargetPerformanceCard extends StatelessWidget {
-  const _AdmissionTargetPerformanceCard({
+class _AdmissionTargetPerformanceStrip extends StatelessWidget {
+  const _AdmissionTargetPerformanceStrip({
     required this.preset,
     required this.summary,
     required this.loading,
@@ -243,82 +231,86 @@ class _AdmissionTargetPerformanceCard extends StatelessWidget {
     ('Last Month', 'last_month'),
   ];
 
+  static String labelFor(String preset) {
+    for (final filter in _filters) {
+      if (filter.$2 == preset) return filter.$1;
+    }
+    return 'This Week';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return PgCard(
-      padding: const EdgeInsets.all(AppSpacing.md),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Admission Target Performance',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          Row(
             children: [
-              for (final filter in _filters)
-                _PeriodChip(
-                  label: filter.$1,
-                  selected: preset == filter.$2,
-                  onTap: () => onPreset(filter.$2),
+              Expanded(
+                child: Text(
+                  'Admission Target Performance',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                 ),
+              ),
+              _PeriodFilterButton(
+                preset: preset,
+                filters: _filters,
+                onPreset: onPreset,
+              ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 6),
           if (loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
+            const SizedBox(
+              height: 36,
               child: Center(
                 child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
             )
           else if (error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Unable to load target performance.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Unable to load target performance.',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  TextButton(onPressed: onRetry, child: const Text('Retry')),
-                ],
-              ),
+                ),
+                TextButton(
+                  onPressed: onRetry,
+                  child: const Text('Retry'),
+                ),
+              ],
             )
           else ...[
             Row(
               children: [
-                _MetricStat(label: 'Current Target', value: '${summary.target}'),
+                _MetricStat(label: 'Target', value: '${summary.target}'),
                 _MetricStat(label: 'Achieved', value: '${summary.achieved}'),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
                 _MetricStat(label: 'Remaining', value: '${summary.remaining}'),
                 _MetricStat(
-                  label: 'Achievement %',
+                  label: '%',
                   value: _percentLabel(summary.percentage, summary.target),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
-            PgProgressBar(
-              label: 'Progress',
+            const SizedBox(height: 8),
+            _SlimProgressBar(
               percentage: summary.target > 0 ? summary.percentage : null,
-              currentLabel: '${summary.achieved} achieved',
-              targetLabel: '${summary.target}',
             ),
           ],
         ],
@@ -335,36 +327,79 @@ class _AdmissionTargetPerformanceCard extends StatelessWidget {
   }
 }
 
-class _PeriodChip extends StatelessWidget {
-  const _PeriodChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
+class _PeriodFilterButton extends StatelessWidget {
+  const _PeriodFilterButton({
+    required this.preset,
+    required this.filters,
+    required this.onPreset,
   });
 
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  final String preset;
+  final List<(String, String)> filters;
+  final ValueChanged<String> onPreset;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected
-          ? AppColors.primary
-          : AppColors.primary.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: selected ? Colors.white : AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                ),
+    return PopupMenuButton<String>(
+      tooltip: 'Period',
+      padding: EdgeInsets.zero,
+      initialValue: preset,
+      onSelected: onPreset,
+      itemBuilder: (context) => [
+        for (final filter in filters)
+          PopupMenuItem<String>(
+            value: filter.$2,
+            child: Text(filter.$1),
           ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _AdmissionTargetPerformanceStrip.labelFor(preset),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(width: 2),
+            IconTheme(
+              data: const IconThemeData(color: AppColors.primary, size: 18),
+              child: const Icon(Icons.filter_alt),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SlimProgressBar extends StatelessWidget {
+  const _SlimProgressBar({required this.percentage});
+
+  final double? percentage;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = percentage == null ? 0.0 : (percentage! / 100).clamp(0.0, 1.0);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: SizedBox(
+        height: 5,
+        child: Stack(
+          children: [
+            Container(color: const Color(0xFFE2E8F0)),
+            FractionallySizedBox(
+              widthFactor: value,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: AppColors.tealGradient),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -387,13 +422,13 @@ class _MetricStat extends StatelessWidget {
             child: Text(
               value,
               maxLines: 1,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
+                    height: 1.1,
                   ),
             ),
           ),
-          const SizedBox(height: 2),
           Text(
             label,
             textAlign: TextAlign.center,
@@ -401,11 +436,75 @@ class _MetricStat extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   fontSize: 10,
-                  height: 1.15,
+                  height: 1.1,
                 ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EmployeeModuleGrid extends StatelessWidget {
+  const _EmployeeModuleGrid({
+    required this.modules,
+    required this.onOpen,
+  });
+
+  final List<_EmployeeModule> modules;
+  final ValueChanged<String> onOpen;
+
+  static const _gap = 12.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <List<_EmployeeModule>>[];
+    for (var i = 0; i < modules.length; i += 2) {
+      rows.add(
+        modules.sublist(i, i + 2 > modules.length ? modules.length : i + 2),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - _gap) / 2;
+        return Column(
+          children: [
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const SizedBox(height: _gap),
+              Expanded(
+                child: rows[i].length == 2
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: _EmployeeModuleCard(
+                              module: rows[i][0],
+                              onTap: () => onOpen(rows[i][0].path),
+                            ),
+                          ),
+                          const SizedBox(width: _gap),
+                          Expanded(
+                            child: _EmployeeModuleCard(
+                              module: rows[i][1],
+                              onTap: () => onOpen(rows[i][1].path),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Align(
+                        child: SizedBox(
+                          width: cardWidth,
+                          child: _EmployeeModuleCard(
+                            module: rows[i][0],
+                            onTap: () => onOpen(rows[i][0].path),
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -419,34 +518,39 @@ class _EmployeeModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PgCard(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: module.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: IconTheme(
-              data: IconThemeData(color: module.color, size: 18),
-              child: Center(child: module.icon),
-            ),
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: module.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: IconTheme(
+                  data: IconThemeData(color: module.color, size: 30),
+                  child: Center(child: module.icon),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                module.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              module.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

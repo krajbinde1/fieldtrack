@@ -1,6 +1,7 @@
 import 'package:fieldtrack/core/auth/user_role.dart';
 import 'package:fieldtrack/core/design/app_theme.dart';
 import 'package:fieldtrack/core/routing/route_permissions.dart';
+import 'package:fieldtrack/core/widgets/design/pg_card.dart';
 import 'package:fieldtrack/modules/admissions/models/admission_target.dart';
 import 'package:fieldtrack/modules/dashboard/screens/employee_dashboard_screen.dart';
 import 'package:flutter/material.dart';
@@ -52,18 +53,31 @@ void main() {
     expect(find.text('Welcome back,'), findsOneWidget);
     expect(find.text('Emp A'), findsOneWidget);
     expect(find.text('Admission Target Performance'), findsOneWidget);
-    expect(find.text('Current Target'), findsOneWidget);
+    expect(find.text('Target'), findsOneWidget);
     expect(find.text('Achieved'), findsOneWidget);
     expect(find.text('Remaining'), findsOneWidget);
-    expect(find.text('Achievement %'), findsOneWidget);
+    expect(find.text('%'), findsOneWidget);
     expect(find.text('This Week'), findsOneWidget);
-    expect(find.text('Last Week'), findsOneWidget);
-    expect(find.text('This Month'), findsOneWidget);
-    expect(find.text('Last Month'), findsOneWidget);
+    expect(find.text('Last Week'), findsNothing);
+    expect(find.text('Last Month'), findsNothing);
+    expect(find.byIcon(Icons.filter_alt), findsOneWidget);
     expect(find.text('Attendance'), findsOneWidget);
     expect(find.text('History'), findsOneWidget);
     expect(find.text('Admission'), findsOneWidget);
     expect(find.text('Leave'), findsOneWidget);
     expect(find.text('My Targets'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.filter_alt));
+    await tester.pumpAndSettle();
+    expect(find.text('Last Week'), findsOneWidget);
+    expect(find.text('This Month'), findsOneWidget);
+    expect(find.text('Last Month'), findsOneWidget);
+
+    final moduleCards = tester.widgetList(find.byType(PgCard)).skip(1).toList();
+    expect(moduleCards, hasLength(5));
+    final firstSize = tester.getSize(find.byWidget(moduleCards.first));
+    final lastSize = tester.getSize(find.byWidget(moduleCards.last));
+    expect(firstSize.width, moreOrLessEquals(lastSize.width, epsilon: 2));
+    expect(firstSize.height, moreOrLessEquals(lastSize.height, epsilon: 2));
   });
 }
