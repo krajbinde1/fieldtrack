@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Admissions\Pages;
 
 use App\Enums\AdmissionDocumentType;
 use App\Filament\Resources\Admissions\AdmissionResource;
-use App\Filament\Resources\Admissions\AdmissionReviewActions;
 use App\Models\AdmissionDocument;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ViewRecord;
@@ -40,9 +39,6 @@ class ViewAdmission extends ViewRecord
             })
             ->all();
 
-        return [
-            ...AdmissionReviewActions::make(),
-            ...$downloads,
-        ];
+        return $downloads;
     }
 }
