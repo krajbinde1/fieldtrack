@@ -92,7 +92,7 @@ class AdmissionsTable
                     }),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()->modal(false),
             ]);
     }
 }

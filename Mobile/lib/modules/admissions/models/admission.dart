@@ -90,6 +90,9 @@ class AdmissionRecord {
     this.confirmedAt,
     this.confirmedBy,
     this.reviewedByUserId,
+    this.canConfirm = false,
+    this.canRevert = false,
+    this.canReject = false,
   });
 
   final int id;
@@ -123,12 +126,19 @@ class AdmissionRecord {
   final String? confirmedAt;
   final int? confirmedBy;
   final int? reviewedByUserId;
+  final bool canConfirm;
+  final bool canRevert;
+  final bool canReject;
 
-  bool get isDraft => status == 'draft';
-  bool get isSubmitted => status == 'submitted';
-  bool get isConfirmed => status == 'confirmed';
-  bool get isReverted => status == 'reverted';
-  bool get isRejected => status == 'rejected';
+  bool get isDraft => _statusKey == 'draft';
+  bool get isSubmitted => _statusKey == 'submitted' || _labelKey == 'submitted';
+  bool get isConfirmed => _statusKey == 'confirmed';
+  bool get isReverted => _statusKey == 'reverted';
+  bool get isRejected => _statusKey == 'rejected';
+  bool get canReview => canConfirm || canRevert || canReject || isSubmitted;
+
+  String get _statusKey => status.trim().toLowerCase();
+  String get _labelKey => statusLabel.trim().toLowerCase();
 
   PgStatusTone get statusTone {
     if (isConfirmed) return PgStatusTone.approved;
@@ -167,7 +177,7 @@ class AdmissionRecord {
     final employee = json['employee'];
     final documents = json['documents'];
 
-    final status = json['status']?.toString() ?? 'draft';
+    final status = _normalizeAdmissionStatus(json['status']);
     final editable = json.containsKey('editable')
         ? json['editable'] == true
         : status == 'draft' || status == 'reverted';
@@ -213,6 +223,9 @@ class AdmissionRecord {
       confirmedAt: json['confirmed_at']?.toString(),
       confirmedBy: _asNullableInt(json['confirmed_by']),
       reviewedByUserId: _asNullableInt(json['reviewed_by_user_id']),
+      canConfirm: json['can_confirm'] == true,
+      canRevert: json['can_revert'] == true,
+      canReject: json['can_reject'] == true,
     );
   }
 }
@@ -288,4 +301,10 @@ int? _asNullableInt(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse('$value');
+}
+
+String _normalizeAdmissionStatus(Object? value) {
+  final raw = value?.toString().trim().toLowerCase();
+  if (raw == null || raw.isEmpty) return 'draft';
+  return raw;
 }

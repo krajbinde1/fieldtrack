@@ -438,6 +438,13 @@ it('keeps drafts out of review and scopes manager admissions to assigned centers
         ->and(collect($submitted)->pluck('id'))->not->toContain($draftId)
         ->and(collect($submitted)->pluck('status')->unique()->all())->toBe(['submitted']);
 
+    $this->getJson('/api/manager/admissions/'.$submittedId)
+        ->assertOk()
+        ->assertJsonPath('data.status', 'submitted')
+        ->assertJsonPath('data.can_confirm', true)
+        ->assertJsonPath('data.can_revert', true)
+        ->assertJsonPath('data.can_reject', true);
+
     $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
     $hiddenId = $this->actingAs($otherUser, 'sanctum')
         ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'Hidden']))

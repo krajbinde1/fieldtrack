@@ -66,7 +66,7 @@ class SupervisorAdmissionController extends Controller
         $items = $query->latest('updated_at')
             ->limit(200)
             ->get()
-            ->map(fn (Admission $admission) => $admission->toApiArray())
+            ->map(fn (Admission $admission) => $admission->toApiArray($request->user()))
             ->values();
 
         return response()->json([
@@ -94,7 +94,7 @@ class SupervisorAdmissionController extends Controller
             'message' => 'Admission loaded.',
             'data' => $admission->fresh([
                 'scheme', 'center', 'employee', 'district', 'taluka', 'documents',
-            ])->toApiArray(),
+            ])->toApiArray($request->user()),
         ]);
     }
 
@@ -106,7 +106,7 @@ class SupervisorAdmissionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Admission confirmed.',
-            'data' => $admission->toApiArray(),
+            'data' => $admission->toApiArray($request->user()),
         ]);
     }
 
@@ -121,7 +121,7 @@ class SupervisorAdmissionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Admission reverted.',
-            'data' => $admission->toApiArray(),
+            'data' => $admission->toApiArray($request->user()),
         ]);
     }
 
@@ -136,7 +136,7 @@ class SupervisorAdmissionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Admission rejected.',
-            'data' => $admission->toApiArray(),
+            'data' => $admission->toApiArray($request->user()),
         ]);
     }
 

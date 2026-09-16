@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AdmissionDocumentType;
 use App\Enums\AdmissionStatus;
 use App\Support\AdmissionLookups;
+use App\Services\OrganizationAccessService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -191,7 +192,7 @@ class Admission extends Model
     /**
      * @return array<string, mixed>
      */
-    public function toApiArray(): array
+    public function toApiArray(?User $viewer = null): array
     {
         $this->loadMissing([
             'scheme:id,name,code,is_active',
@@ -201,6 +202,9 @@ class Admission extends Model
             'taluka:id,name,code,district_id',
             'documents',
         ]);
+
+        $canReview = $viewer instanceof User
+            && app(OrganizationAccessService::class)->canReviewAdmission($viewer, $this);
 
         return [
             'id' => $this->id,
@@ -263,6 +267,9 @@ class Admission extends Model
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'editable' => $this->isEditable(),
+            'can_confirm' => $canReview,
+            'can_revert' => $canReview,
+            'can_reject' => $canReview,
         ];
     }
 

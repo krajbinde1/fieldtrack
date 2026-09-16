@@ -4,8 +4,11 @@ namespace App\Filament\Resources\Admissions\Schemas;
 
 use App\Enums\AdmissionDocumentType;
 use App\Enums\AdmissionStatus;
+use App\Filament\Resources\Admissions\AdmissionReviewActions;
+use App\Models\Admission;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -14,6 +17,11 @@ class AdmissionInfolist
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
+            Section::make('Review')
+                ->visible(fn (?Admission $record): bool => AdmissionReviewActions::canReview($record))
+                ->schema([
+                    Actions::make(AdmissionReviewActions::make('infolist_'))->fullWidth(),
+                ]),
             Section::make('Applicant')->columns(3)->schema([
                 TextEntry::make('full_name')->label('Full Name'),
                 TextEntry::make('gender'),

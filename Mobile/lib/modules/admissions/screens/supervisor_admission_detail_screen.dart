@@ -293,7 +293,7 @@ class _SupervisorAdmissionDetailScreenState
                     ],
                   ),
                 ),
-                if (_canAct && item.isSubmitted) ...[
+                if (_canAct && item.canReview) ...[
                   const SizedBox(height: AppSpacing.lg),
                   FilledButton(
                     onPressed: _busy ? null : () => _confirm(item),
