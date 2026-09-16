@@ -424,7 +424,14 @@ it('keeps drafts out of review and scopes manager admissions to assigned centers
     $summary = $this->getJson('/api/manager/admissions/summary')->assertOk()->json('data');
     expect($summary['draft'])->toBeGreaterThanOrEqual(1)
         ->and($summary['submitted'])->toBeGreaterThanOrEqual(1)
-        ->and($summary)->toHaveKeys(['submitted', 'confirmed', 'draft', 'reverted', 'rejected']);
+        ->and($summary)->toHaveKeys(['submitted', 'confirmed', 'draft', 'reverted', 'rejected', 'total'])
+        ->and($summary['total'])->toBe(
+            (int) $summary['submitted']
+            + (int) $summary['confirmed']
+            + (int) $summary['draft']
+            + (int) $summary['reverted']
+            + (int) $summary['rejected']
+        );
 
     $dashboard = $this->getJson('/api/dashboard')->assertOk()->json('data');
     expect($dashboard['admission_counts']['submitted'])->toBe($summary['submitted'])
@@ -453,6 +460,47 @@ it('keeps drafts out of review and scopes manager admissions to assigned centers
     Sanctum::actingAs($ctx['centerManager']);
     $this->getJson('/api/manager/admissions/'.$hiddenId)->assertForbidden();
     $this->postJson('/api/manager/admissions/'.$hiddenId.'/confirm')->assertForbidden();
+});
+
+it('exposes only the signed-in employee admission counts', function () {
+    Storage::fake('local');
+    $ctx = seedAdmissionsContext();
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'Mine']));
+    $submittedId = submitCompleteAdmission($ctx, ['first_name' => 'Ready']);
+
+    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $this->actingAs($otherUser, 'sanctum')
+        ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'Other']));
+
+    $summary = $this->actingAs($ctx['userA'], 'sanctum')
+        ->getJson('/api/admissions/summary')
+        ->assertOk()
+        ->json('data');
+
+    expect($summary['draft'])->toBe(1)
+        ->and($summary['submitted'])->toBe(1)
+        ->and($summary['confirmed'])->toBe(0)
+        ->and($summary['reverted'])->toBe(0)
+        ->and($summary['rejected'])->toBe(0)
+        ->and($summary['total'])->toBe(2);
+
+    Sanctum::actingAs($ctx['centerManager']);
+    $this->postJson('/api/manager/admissions/'.$submittedId.'/confirm')->assertOk();
+
+    $after = $this->actingAs($ctx['userA'], 'sanctum')
+        ->getJson('/api/admissions/summary')
+        ->assertOk()
+        ->json('data');
+
+    expect($after['submitted'])->toBe(0)
+        ->and($after['confirmed'])->toBe(1)
+        ->and($after['draft'])->toBe(1)
+        ->and($after['total'])->toBe(2);
+
+    $this->actingAs($ctx['centerManager'], 'sanctum')
+        ->getJson('/api/admissions/summary')
+        ->assertForbidden();
 });
 
 it('counts only confirmed admissions toward employee target achievement', function () {

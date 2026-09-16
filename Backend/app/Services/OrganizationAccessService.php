@@ -177,22 +177,30 @@ final class OrganizationAccessService
     }
 
     /**
-     * @return array{submitted: int, confirmed: int, draft: int, reverted: int, rejected: int}
+     * @return array{submitted: int, confirmed: int, draft: int, reverted: int, rejected: int, total: int}
      */
     public function admissionStatusCounts(User $user): array
     {
-        $counts = $this->admissionQuery($user)
+        $query = $this->admissionQuery($user);
+        $counts = (clone $query)
             ->toBase()
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
 
+        $submitted = (int) ($counts[AdmissionStatus::Submitted->value] ?? 0);
+        $confirmed = (int) ($counts[AdmissionStatus::Confirmed->value] ?? 0);
+        $draft = (int) ($counts[AdmissionStatus::Draft->value] ?? 0);
+        $reverted = (int) ($counts[AdmissionStatus::Reverted->value] ?? 0);
+        $rejected = (int) ($counts[AdmissionStatus::Rejected->value] ?? 0);
+
         return [
-            'submitted' => (int) ($counts[AdmissionStatus::Submitted->value] ?? 0),
-            'confirmed' => (int) ($counts[AdmissionStatus::Confirmed->value] ?? 0),
-            'draft' => (int) ($counts[AdmissionStatus::Draft->value] ?? 0),
-            'reverted' => (int) ($counts[AdmissionStatus::Reverted->value] ?? 0),
-            'rejected' => (int) ($counts[AdmissionStatus::Rejected->value] ?? 0),
+            'submitted' => $submitted,
+            'confirmed' => $confirmed,
+            'draft' => $draft,
+            'reverted' => $reverted,
+            'rejected' => $rejected,
+            'total' => (int) $query->count(),
         ];
     }
 

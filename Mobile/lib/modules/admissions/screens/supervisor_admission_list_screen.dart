@@ -31,12 +31,13 @@ class SupervisorAdmissionListScreen extends StatefulWidget {
 
 class _SupervisorAdmissionListScreenState
     extends State<SupervisorAdmissionListScreen> {
-  static const _filters = <(String, String)>[
-    ('Submitted', 'submitted'),
-    ('Confirmed', 'confirmed'),
-    ('Draft', 'draft'),
-    ('Reverted', 'reverted'),
-    ('Rejected', 'rejected'),
+  static const _filters = <(String, String, Color)>[
+    ('Submitted', 'submitted', AppColors.info),
+    ('Confirmed', 'confirmed', AppColors.success),
+    ('Draft', 'draft', AppColors.warning),
+    ('Reverted', 'reverted', AppColors.accent),
+    ('Rejected', 'rejected', AppColors.error),
+    ('Total', '', AppColors.primary),
   ];
 
   AdmissionApi? _api;
@@ -46,14 +47,32 @@ class _SupervisorAdmissionListScreenState
   @override
   void initState() {
     super.initState();
-    _status = widget.initialStatus;
+    _status = _normalize(widget.initialStatus);
     _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant SupervisorAdmissionListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = _normalize(widget.initialStatus);
+    if (oldWidget.initialStatus != widget.initialStatus && next != _status) {
+      _status = next;
+      _future = _load();
+    }
+  }
+
+  String _normalize(String status) {
+    if (status == 'total' || status == 'all') return '';
+    return status;
   }
 
   Future<({Map<String, int> counts, List<AdmissionRecord> items})> _load() async {
     _api ??= await AdmissionApi.create();
     final counts = await _api!.supervisorSummary(widget.apiPrefix);
-    final items = await _api!.supervisorList(widget.apiPrefix, status: _status);
+    final items = await _api!.supervisorList(
+      widget.apiPrefix,
+      status: _status.isEmpty ? null : _status,
+    );
     return (counts: counts, items: items);
   }
 
@@ -63,9 +82,10 @@ class _SupervisorAdmissionListScreenState
   }
 
   void _select(String status) {
-    if (_status == status) return;
+    final next = _normalize(status);
+    if (_status == next) return;
     setState(() {
-      _status = status;
+      _status = next;
       _future = _load();
     });
   }
@@ -87,66 +107,16 @@ class _SupervisorAdmissionListScreenState
               'draft': 0,
               'reverted': 0,
               'rejected': 0,
+              'total': 0,
             };
             return ListView(
               padding: const EdgeInsets.all(AppSpacing.screenPadding),
               children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _SummaryChip(
-                      label: 'Total Submitted',
-                      value: '${counts['submitted'] ?? 0}',
-                      selected: _status == 'submitted',
-                      color: AppColors.info,
-                      onTap: () => _select('submitted'),
-                    ),
-                    _SummaryChip(
-                      label: 'Confirmed',
-                      value: '${counts['confirmed'] ?? 0}',
-                      selected: _status == 'confirmed',
-                      color: AppColors.success,
-                      onTap: () => _select('confirmed'),
-                    ),
-                    _SummaryChip(
-                      label: 'Draft',
-                      value: '${counts['draft'] ?? 0}',
-                      selected: _status == 'draft',
-                      color: AppColors.warning,
-                      onTap: () => _select('draft'),
-                    ),
-                    _SummaryChip(
-                      label: 'Reverted',
-                      value: '${counts['reverted'] ?? 0}',
-                      selected: _status == 'reverted',
-                      color: AppColors.accent,
-                      onTap: () => _select('reverted'),
-                    ),
-                    _SummaryChip(
-                      label: 'Rejected',
-                      value: '${counts['rejected'] ?? 0}',
-                      selected: _status == 'rejected',
-                      color: AppColors.error,
-                      onTap: () => _select('rejected'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final filter in _filters) ...[
-                        ChoiceChip(
-                          label: Text(filter.$1),
-                          selected: _status == filter.$2,
-                          onSelected: (_) => _select(filter.$2),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    ],
-                  ),
+                _StatusCountGrid(
+                  counts: counts,
+                  selected: _status,
+                  filters: _filters,
+                  onSelect: _select,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 if (snapshot.connectionState != ConnectionState.done)
@@ -159,12 +129,14 @@ class _SupervisorAdmissionListScreenState
                     message: '${snapshot.error}',
                     onRetry: _refresh,
                   )
-                else if ((snapshot.data?.items ?? const <AdmissionRecord>[]).isEmpty)
+                else if ((snapshot.data?.items ?? const <AdmissionRecord>[])
+                    .isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 32),
                     child: PgEmptyState(
                       icon: Icon(Icons.how_to_reg_rounded),
-                      message: 'No admissions in this filter for your assigned center(s).',
+                      message:
+                          'No admissions in this filter for your assigned center(s).',
                     ),
                   )
                 else
@@ -185,7 +157,9 @@ class _SupervisorAdmissionListScreenState
                                     item.displayName.isEmpty
                                         ? 'Admission #${item.id}'
                                         : item.displayName,
-                                    style: Theme.of(context).textTheme.titleMedium,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium,
                                   ),
                                 ),
                                 PgStatusBadge(
@@ -200,7 +174,9 @@ class _SupervisorAdmissionListScreenState
                                 item.employeeName,
                                 item.centerName,
                                 item.schemeName ?? item.projectName,
-                              ].where((part) => (part ?? '').trim().isNotEmpty).join(' · '),
+                              ]
+                                  .where((part) => (part ?? '').trim().isNotEmpty)
+                                  .join(' · '),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                             if ((item.reviewReason ?? '').trim().isNotEmpty)
@@ -237,8 +213,52 @@ class _SupervisorAdmissionListScreenState
   }
 }
 
-class _SummaryChip extends StatelessWidget {
-  const _SummaryChip({
+class _StatusCountGrid extends StatelessWidget {
+  const _StatusCountGrid({
+    required this.counts,
+    required this.selected,
+    required this.filters,
+    required this.onSelect,
+  });
+
+  final Map<String, int> counts;
+  final String selected;
+  final List<(String, String, Color)> filters;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 420 ? 3 : 2;
+        final gap = 8.0;
+        final width =
+            (constraints.maxWidth - gap * (columns - 1)) / columns;
+
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final filter in filters)
+              SizedBox(
+                width: width,
+                child: _StatusCountCard(
+                  label: filter.$1,
+                  value: '${counts[filter.$2.isEmpty ? 'total' : filter.$2] ?? 0}',
+                  selected: selected == filter.$2,
+                  color: filter.$3,
+                  onTap: () => onSelect(filter.$2),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StatusCountCard extends StatelessWidget {
+  const _StatusCountCard({
     required this.label,
     required this.value,
     required this.selected,
@@ -255,37 +275,49 @@ class _SummaryChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? color.withValues(alpha: 0.16) : color.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(14),
+      color: selected ? color.withValues(alpha: 0.16) : Colors.white,
+      elevation: 0,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          width: 104,
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected ? color : color.withValues(alpha: 0.18),
+              color: selected ? color : AppColors.border.withValues(alpha: 0.8),
+              width: selected ? 1.4 : 1,
             ),
+            boxShadow: const [
+              BoxShadow(
+                color: AppColors.shadow,
+                blurRadius: 12,
+                offset: Offset(0, 3),
+              ),
+            ],
           ),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
+                      height: 1.1,
                       color: color,
                     ),
               ),
+              const SizedBox(height: 4),
               Text(
                 label,
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      height: 1.15,
+                      color: AppColors.textSecondary,
                     ),
               ),
             ],

@@ -10,35 +10,110 @@ import '../../../core/widgets/design/pg_scaffold.dart';
 import '../../../core/widgets/design/pg_status_badge.dart';
 import '../api/admission_api.dart';
 import '../models/admission.dart';
+import '../widgets/admission_status_count_cards.dart';
 
 class AdmissionListScreen extends StatefulWidget {
-  const AdmissionListScreen({super.key, required this.drafts});
+  const AdmissionListScreen({super.key, this.initialStatus = ''});
 
-  final bool drafts;
+  final String initialStatus;
 
   @override
   State<AdmissionListScreen> createState() => _AdmissionListScreenState();
 }
 
 class _AdmissionListScreenState extends State<AdmissionListScreen> {
+  static const _filters = <(String, String, Color)>[
+    ('Total', '', AppColors.primary),
+    ('Draft', 'draft', AppColors.warning),
+    ('Submitted', 'submitted', AppColors.info),
+    ('Confirmed', 'confirmed', AppColors.success),
+    ('Reverted', 'reverted', AppColors.accent),
+    ('Rejected', 'rejected', AppColors.error),
+  ];
+
   AdmissionApi? _api;
-  late Future<List<AdmissionRecord>> _future;
+  late String _status;
+  late Future<({Map<String, int> counts, List<AdmissionRecord> items})> _future;
 
   @override
   void initState() {
     super.initState();
+    _status = _normalize(widget.initialStatus);
     _future = _load();
   }
 
-  Future<List<AdmissionRecord>> _load() async {
+  @override
+  void didUpdateWidget(covariant AdmissionListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = _normalize(widget.initialStatus);
+    if (oldWidget.initialStatus != widget.initialStatus && next != _status) {
+      _status = next;
+      _future = _load();
+    }
+  }
+
+  String _normalize(String status) {
+    if (status == 'total' || status == 'all' || status == 'drafts') {
+      return status == 'drafts' ? 'draft' : '';
+    }
+    return status;
+  }
+
+  Future<({Map<String, int> counts, List<AdmissionRecord> items})> _load()
+      async {
     _api ??= await AdmissionApi.create();
-    return widget.drafts ? _api!.drafts() : _api!.submitted();
+    final counts = await _api!.mySummary();
+    final items = await _itemsFor(_status);
+    return (counts: counts, items: items);
+  }
+
+  Future<List<AdmissionRecord>> _itemsFor(String status) async {
+    Future<List<AdmissionRecord>> drafts() => _api!.drafts();
+    Future<List<AdmissionRecord>> submitted() => _api!.submitted();
+
+    switch (status) {
+      case 'draft':
+        return (await drafts()).where((item) => item.isDraft).toList();
+      case 'reverted':
+        return (await drafts()).where((item) => item.isReverted).toList();
+      case 'submitted':
+        return (await submitted()).where((item) => item.isSubmitted).toList();
+      case 'confirmed':
+        return (await submitted()).where((item) => item.isConfirmed).toList();
+      case 'rejected':
+        return (await submitted()).where((item) => item.isRejected).toList();
+      default:
+        final all = <AdmissionRecord>[
+          ...await drafts(),
+          ...await submitted(),
+        ];
+        all.sort((a, b) => (b.updatedAt ?? '').compareTo(a.updatedAt ?? ''));
+        return all;
+    }
   }
 
   Future<void> _refresh() async {
     setState(() => _future = _load());
     await _future;
   }
+
+  void _select(String status) {
+    final next = _normalize(status);
+    if (_status == next) return;
+    setState(() {
+      _status = next;
+      _future = _load();
+    });
+  }
+
+  String get _title => switch (_status) {
+        'draft' => 'Draft Admissions',
+        'submitted' => 'Submitted Admissions',
+        'confirmed' => 'Confirmed Admissions',
+        'reverted' => 'Reverted Admissions',
+        'rejected' => 'Rejected Admissions',
+        _ => 'My Admissions',
+      };
 
   Future<void> _delete(AdmissionRecord record) async {
     final confirmed = await showDialog<bool>(
@@ -79,108 +154,136 @@ class _AdmissionListScreenState extends State<AdmissionListScreen> {
   @override
   Widget build(BuildContext context) {
     return PgPageScaffold(
-      title: widget.drafts ? 'Draft Admissions' : 'Submitted Admissions',
+      title: _title,
       showBack: true,
       body: RefreshIndicator(
         onRefresh: _refresh,
-        child: FutureBuilder<List<AdmissionRecord>>(
+        child: FutureBuilder(
           future: _future,
           builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const PgLoadingState();
-            }
-            if (snapshot.hasError) {
-              return PgErrorState(
-                message: '${snapshot.error}',
-                onRetry: _refresh,
-              );
-            }
-            final items = snapshot.data ?? const <AdmissionRecord>[];
-            if (items.isEmpty) {
-              return ListView(
-                children: [
-                  const SizedBox(height: 80),
-                  PgEmptyState(
-                    icon: Icon(
-                      widget.drafts
-                          ? Icons.drafts_outlined
-                          : Icons.task_alt_rounded,
-                    ),
-                    message: widget.drafts
-                        ? 'No draft admissions yet.'
-                        : 'No submitted admissions yet.',
-                    actionLabel: 'New Admission',
-                    onAction: () => context.push('/admissions/new'),
-                  ),
-                ],
-              );
-            }
-            return ListView.separated(
+            final counts = snapshot.data?.counts ?? const {
+              'total': 0,
+              'draft': 0,
+              'submitted': 0,
+              'confirmed': 0,
+              'reverted': 0,
+              'rejected': 0,
+            };
+            return ListView(
               padding: const EdgeInsets.all(AppSpacing.screenPadding),
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return PgCard(
-                  onTap: () => context.push('/admissions/${item.id}'),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.displayName.isEmpty
-                                  ? 'Untitled admission'
-                                  : item.displayName,
-                              style: Theme.of(context).textTheme.titleMedium,
+              children: [
+                AdmissionStatusCountCards(
+                  counts: counts,
+                  selected: _status,
+                  filters: _filters,
+                  onSelect: _select,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (snapshot.connectionState != ConnectionState.done)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 48),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (snapshot.hasError)
+                  PgErrorState(
+                    message: '${snapshot.error}',
+                    onRetry: _refresh,
+                  )
+                else if ((snapshot.data?.items ?? const <AdmissionRecord>[])
+                    .isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 32),
+                    child: PgEmptyState(
+                      icon: Icon(
+                        _status == 'draft'
+                            ? Icons.drafts_outlined
+                            : Icons.task_alt_rounded,
+                      ),
+                      message: 'No admissions in this filter.',
+                      actionLabel: 'New Admission',
+                      onAction: () async {
+                        await context.push('/admissions/new');
+                        if (mounted) await _refresh();
+                      },
+                    ),
+                  )
+                else
+                  ...[
+                    for (final item in snapshot.data!.items) ...[
+                      PgCard(
+                        onTap: () async {
+                          await context.push('/admissions/${item.id}');
+                          if (mounted) await _refresh();
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.displayName.isEmpty
+                                        ? 'Untitled admission'
+                                        : item.displayName,
+                                    style:
+                                        Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                ),
+                                PgStatusBadge(
+                                  label: item.statusLabel,
+                                  tone: item.statusTone,
+                                ),
+                              ],
                             ),
-                          ),
-                          PgStatusBadge(
-                            label: item.statusLabel,
-                            tone: item.statusTone,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.schemeName ?? 'Scheme not selected',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      if ((item.reviewReason ?? '').trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          item.isRejected
-                              ? 'Rejected: ${item.reviewReason}'
-                              : 'Reverted: ${item.reviewReason}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: item.isRejected
-                                    ? AppColors.error
-                                    : AppColors.warning,
+                            const SizedBox(height: 6),
+                            Text(
+                              item.schemeName ?? 'Scheme not selected',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            if ((item.reviewReason ?? '').trim().isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                item.isRejected
+                                    ? 'Rejected: ${item.reviewReason}'
+                                    : 'Reverted: ${item.reviewReason}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: item.isRejected
+                                          ? AppColors.error
+                                          : AppColors.warning,
+                                    ),
                               ),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Text(
-                            _dateLabel(item),
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(color: AppColors.textMuted),
-                          ),
-                          const Spacer(),
-                          if (widget.drafts && item.isDraft)
-                            IconButton(
-                              onPressed: () => _delete(item),
-                              icon: const Icon(Icons.delete_outline_rounded),
-                              color: AppColors.error,
+                            ],
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Text(
+                                  _dateLabel(item),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(color: AppColors.textMuted),
+                                ),
+                                const Spacer(),
+                                if (item.isDraft)
+                                  IconButton(
+                                    onPressed: () => _delete(item),
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                    ),
+                                    color: AppColors.error,
+                                  ),
+                              ],
                             ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(height: AppSpacing.md),
                     ],
-                  ),
-                );
-              },
+                  ],
+              ],
             );
           },
         ),

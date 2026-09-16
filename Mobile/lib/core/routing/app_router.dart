@@ -124,12 +124,19 @@ GoRouter createRouter(
           builder: (_, _) => const AdmissionWizardScreen(),
         ),
         GoRoute(
+          path: '/admissions/list',
+          builder: (_, state) => AdmissionListScreen(
+            initialStatus: state.uri.queryParameters['status'] ?? '',
+          ),
+        ),
+        GoRoute(
           path: '/admissions/drafts',
-          builder: (_, _) => const AdmissionListScreen(drafts: true),
+          builder: (_, _) => const AdmissionListScreen(initialStatus: 'draft'),
         ),
         GoRoute(
           path: '/admissions/submitted',
-          builder: (_, _) => const AdmissionListScreen(drafts: false),
+          builder: (_, _) =>
+              const AdmissionListScreen(initialStatus: 'submitted'),
         ),
         GoRoute(
           path: '/admissions/targets',

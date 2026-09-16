@@ -50,6 +50,14 @@ class EmployeeAdmissionController extends Controller
         return $this->ok('Submitted admissions loaded.', $items);
     }
 
+    public function summary(Request $request): JsonResponse
+    {
+        return $this->ok(
+            'Admission summary loaded.',
+            $this->access->admissionStatusCounts($request->user()),
+        );
+    }
+
     public function show(Request $request, Admission $admission): JsonResponse
     {
         $this->assertOwn($request, $admission);

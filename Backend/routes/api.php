@@ -106,6 +106,7 @@ Route::middleware(['auth:sanctum', 'role:employee'])->prefix('admissions')->grou
     Route::patch('drafts/{admission}', [EmployeeAdmissionController::class, 'updateDraft']);
     Route::delete('drafts/{admission}', [EmployeeAdmissionController::class, 'destroyDraft']);
     Route::get('submitted', [EmployeeAdmissionController::class, 'submitted']);
+    Route::get('summary', [EmployeeAdmissionController::class, 'summary']);
     Route::get('targets/summary', [EmployeeAdmissionTargetController::class, 'summary']);
     Route::get('targets', [EmployeeAdmissionTargetController::class, 'index']);
     Route::post('{admission}/submit', [EmployeeAdmissionController::class, 'submit']);

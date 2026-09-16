@@ -80,6 +80,11 @@ class AdmissionApi {
 
   Future<List<AdmissionRecord>> submitted() => _list('/admissions/submitted');
 
+  Future<Map<String, int>> mySummary() async {
+    final data = await _get('/admissions/summary');
+    return _statusCounts(_map(data));
+  }
+
   Future<AdmissionTargetSummary> targetSummary({
     String preset = 'this_week',
   }) async {
@@ -120,21 +125,7 @@ class AdmissionApi {
 
   Future<Map<String, int>> supervisorSummary(String prefix) async {
     final data = await _get('/$prefix/admissions/summary');
-    final map = _map(data);
-    int count(String key) {
-      final value = map[key];
-      if (value is int) return value;
-      if (value is num) return value.toInt();
-      return int.tryParse('$value') ?? 0;
-    }
-
-    return {
-      'submitted': count('submitted'),
-      'confirmed': count('confirmed'),
-      'draft': count('draft'),
-      'reverted': count('reverted'),
-      'rejected': count('rejected'),
-    };
+    return _statusCounts(_map(data));
   }
 
   Future<AdmissionRecord> supervisorShow(String prefix, int id) async {
@@ -294,6 +285,30 @@ class AdmissionApi {
     if (data is Map<String, dynamic>) return data;
     if (data is Map) return Map<String, dynamic>.from(data);
     return <String, dynamic>{};
+  }
+
+  Map<String, int> _statusCounts(Map<String, dynamic> map) {
+    int count(String key) {
+      final value = map[key];
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse('$value') ?? 0;
+    }
+
+    return {
+      'submitted': count('submitted'),
+      'confirmed': count('confirmed'),
+      'draft': count('draft'),
+      'reverted': count('reverted'),
+      'rejected': count('rejected'),
+      'total': map.containsKey('total')
+          ? count('total')
+          : count('submitted') +
+              count('confirmed') +
+              count('draft') +
+              count('reverted') +
+              count('rejected'),
+    };
   }
 
   AdmissionApiException _error(DioException error) {
