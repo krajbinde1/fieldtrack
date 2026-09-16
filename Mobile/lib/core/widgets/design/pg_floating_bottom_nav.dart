@@ -41,13 +41,12 @@ class PgFloatingBottomNav extends StatelessWidget {
       child: Container(
         height: AppSpacing.bottomNavHeight,
         decoration: BoxDecoration(
-          color: Theme.of(context).cardTheme.color,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
           boxShadow: const [
             BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 24,
+              color: Color(0x140F172A),
+              blurRadius: 20,
               offset: Offset(0, 8),
             ),
           ],
@@ -94,7 +93,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.primary : AppColors.textMuted;
+    final color = selected ? AppColors.primary : const Color(0xFF94A3B8);
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -102,12 +101,10 @@ class _NavItem extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
           decoration: BoxDecoration(
-            color: selected
-                ? AppColors.primary.withValues(alpha: 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
+            color: selected ? const Color(0xFFD1FAE5) : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

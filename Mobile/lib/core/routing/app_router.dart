@@ -177,7 +177,10 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/manager/team-attendance',
-          builder: (_, _) => ManagerTeamAttendanceScreen(auth: auth),
+          builder: (_, state) => ManagerTeamAttendanceScreen(
+            auth: auth,
+            statusFilter: state.uri.queryParameters['status'],
+          ),
         ),
         GoRoute(
           path: '/manager/team-attendance/:id',
@@ -235,9 +238,10 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/manager/leaves',
-          builder: (_, _) => SupervisorLeaveListScreen(
+          builder: (_, state) => SupervisorLeaveListScreen(
             auth: auth,
             apiPrefix: 'manager',
+            statusFilter: state.uri.queryParameters['status'],
           ),
         ),
         GoRoute(

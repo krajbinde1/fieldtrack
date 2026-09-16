@@ -138,13 +138,15 @@ class SupervisorDashboardView extends StatelessWidget {
             ? '/manager/employees'
             : '$_prefix/team-attendance',
         color: const Color(0xFF2563EB),
+        background: const Color(0xFFE8F1FF),
       ),
       _DashboardTile(
         icon: const Icon(Icons.fingerprint_rounded),
         label: 'Punched In',
         value: '${_count('punched_in_today')}',
-        path: '$_prefix/team-attendance',
+        path: '$_prefix/team-attendance?status=punched_in',
         color: const Color(0xFF0F766E),
+        background: const Color(0xFFE6F7F1),
       ),
       _DashboardTile(
         icon: const Icon(Icons.route_rounded),
@@ -152,13 +154,15 @@ class SupervisorDashboardView extends StatelessWidget {
         value: '${_count('active_routes')}',
         path: '$_prefix/route-tracking',
         color: const Color(0xFF7C3AED),
+        background: const Color(0xFFF0E9FF),
       ),
       _DashboardTile(
         icon: const Icon(Icons.event_note_rounded),
         label: 'Pending Leave',
         value: '${_count('pending_leaves')}',
-        path: '$_prefix/leaves',
-        color: const Color(0xFFD97706),
+        path: '$_prefix/leaves?status=pending',
+        color: const Color(0xFFEA580C),
+        background: const Color(0xFFFFF6E5),
       ),
       _DashboardTile(
         icon: const Icon(Icons.flag_rounded),
@@ -168,6 +172,7 @@ class SupervisorDashboardView extends StatelessWidget {
             ? '/manager/admission-targets'
             : '$_prefix/admissions',
         color: const Color(0xFFDB2777),
+        background: const Color(0xFFFDE8F0),
       ),
     ];
   }
@@ -181,6 +186,7 @@ class SupervisorDashboardView extends StatelessWidget {
         subtitle: 'Assign weekly or monthly targets',
         path: '/manager/admission-targets/create',
         color: Color(0xFF7C3AED),
+        background: Color(0xFFF0E9FF),
       ),
       _DashboardTile(
         icon: Icon(Icons.person_add_alt_1_rounded),
@@ -188,6 +194,7 @@ class SupervisorDashboardView extends StatelessWidget {
         subtitle: 'Create staff in your center(s)',
         path: '/manager/employees/create',
         color: Color(0xFF2563EB),
+        background: Color(0xFFE8F1FF),
       ),
     ];
   }
@@ -201,6 +208,7 @@ class SupervisorDashboardView extends StatelessWidget {
           subtitle: 'Staff in assigned center(s)',
           path: '/manager/employees',
           color: Color(0xFF2563EB),
+          background: Color(0xFFE8F1FF),
         ),
       _DashboardTile(
         icon: const Icon(Icons.how_to_reg_rounded),
@@ -208,6 +216,7 @@ class SupervisorDashboardView extends StatelessWidget {
         subtitle: 'Review field admissions',
         path: '$_prefix/admissions',
         color: const Color(0xFF0EA5E9),
+        background: const Color(0xFFE0F4FF),
       ),
       _DashboardTile(
         icon: const Icon(Icons.event_available_rounded),
@@ -215,6 +224,7 @@ class SupervisorDashboardView extends StatelessWidget {
         subtitle: 'Daily team attendance',
         path: '$_prefix/team-attendance',
         color: const Color(0xFF0F766E),
+        background: const Color(0xFFE6F7F1),
       ),
       _DashboardTile(
         icon: const Icon(Icons.route_rounded),
@@ -222,13 +232,15 @@ class SupervisorDashboardView extends StatelessWidget {
         subtitle: 'Live field routes',
         path: '$_prefix/route-tracking',
         color: const Color(0xFF7C3AED),
+        background: const Color(0xFFF0E9FF),
       ),
       _DashboardTile(
         icon: const Icon(Icons.event_note_rounded),
         label: 'Leave Requests',
         subtitle: 'Approve team leave',
         path: '$_prefix/leaves',
-        color: const Color(0xFFD97706),
+        color: const Color(0xFFEA580C),
+        background: const Color(0xFFFFF6E5),
       ),
       if (role.isCenterManager || role.isProjectHead)
         const _DashboardTile(
@@ -237,13 +249,16 @@ class SupervisorDashboardView extends StatelessWidget {
           subtitle: 'Assigned-center reports',
           path: '/manager/reports',
           color: Color(0xFF4F46E5),
+          background: Color(0xFFEEF2FF),
         ),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return ColoredBox(
+      color: const Color(0xFFFAFBFC),
+      child: ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.screenPadding,
@@ -290,6 +305,7 @@ class SupervisorDashboardView extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         _ModuleGrid(tiles: _modules, onOpen: onOpen),
       ],
+    ),
     );
   }
 }
@@ -410,34 +426,34 @@ class _AttendanceStatusCard extends StatelessWidget {
 
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(22),
       child: InkWell(
         onTap: onDetails,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
             boxShadow: const [
               BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 16,
-                offset: Offset(0, 4),
+                color: Color(0x0F0F172A),
+                blurRadius: 18,
+                offset: Offset(0, 6),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
             child: Column(
               children: [
                 Row(
                   children: [
                     Container(
-                      width: 42,
-                      height: 42,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(icon, color: color, size: 22),
                     ),
@@ -455,6 +471,8 @@ class _AttendanceStatusCard extends StatelessWidget {
                           ),
                           Text(
                             status,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -468,22 +486,25 @@ class _AttendanceStatusCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     _MetaChip(
                       label: 'Punch In',
                       value: pulse?.punchInTime ?? '—',
+                      background: const Color(0xFFE8F1FF),
                     ),
                     const SizedBox(width: 8),
                     _MetaChip(
                       label: 'Punch Out',
                       value: pulse?.punchOutTime ?? '—',
+                      background: const Color(0xFFFDE8EF),
                     ),
                     const SizedBox(width: 8),
                     _MetaChip(
                       label: 'Duration',
                       value: pulse?.workingDuration ?? '—',
+                      background: const Color(0xFFEDE9FE),
                     ),
                   ],
                 ),
@@ -497,19 +518,24 @@ class _AttendanceStatusCard extends StatelessWidget {
 }
 
 class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.label, required this.value});
+  const _MetaChip({
+    required this.label,
+    required this.value,
+    required this.background,
+  });
 
   final String label;
   final String value;
+  final Color background;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(12),
+          color: background,
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,17 +544,18 @@ class _MetaChip extends StatelessWidget {
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     fontSize: 10,
-                    color: AppColors.textMuted,
+                    color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
                   ),
             ),
           ],
@@ -554,7 +581,7 @@ class _SummaryGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 1.55,
+        childAspectRatio: 1.42,
       ),
       itemBuilder: (context, index) {
         final tile = tiles[index];
@@ -573,49 +600,61 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
-            boxShadow: const [
+            color: tile.background ?? Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 12,
-                offset: Offset(0, 4),
+                color: (tile.color).withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: tile.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: IconTheme(
-                    data: IconThemeData(color: tile.color, size: 20),
-                    child: Center(child: tile.icon),
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: tile.color,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconTheme(
+                        data: const IconThemeData(color: Colors.white, size: 20),
+                        child: Center(child: tile.icon),
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: tile.color.withValues(alpha: 0.7),
+                    ),
+                  ],
                 ),
                 const Spacer(),
                 Text(
                   tile.value ?? '0',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         height: 1,
+                        color: AppColors.textPrimary,
                       ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   tile.label,
                   maxLines: 1,
@@ -709,25 +748,22 @@ class _ModuleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tint = Color.alphaBlend(
-      tile.color.withValues(alpha: 0.12),
-      Colors.white,
-    );
+    final tint = tile.background ??
+        Color.alphaBlend(tile.color.withValues(alpha: 0.12), Colors.white);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
         child: Ink(
           decoration: BoxDecoration(
             color: tint,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: tile.color.withValues(alpha: 0.08)),
+            borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                color: tile.color.withValues(alpha: 0.10),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: tile.color.withValues(alpha: 0.08),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
@@ -740,14 +776,7 @@ class _ModuleCard extends StatelessWidget {
                   height: 44,
                   decoration: BoxDecoration(
                     color: tile.color,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: tile.color.withValues(alpha: 0.28),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: IconTheme(
                     data: const IconThemeData(color: Colors.white, size: 22),
@@ -803,6 +832,7 @@ class _DashboardTile {
     required this.color,
     this.value,
     this.subtitle,
+    this.background,
   });
 
   final Widget icon;
@@ -811,4 +841,5 @@ class _DashboardTile {
   final String? subtitle;
   final String path;
   final Color color;
+  final Color? background;
 }

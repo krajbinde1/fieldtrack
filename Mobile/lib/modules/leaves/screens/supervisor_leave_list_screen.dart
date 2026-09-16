@@ -16,10 +16,12 @@ class SupervisorLeaveListScreen extends StatefulWidget {
     super.key,
     required this.auth,
     required this.apiPrefix,
+    this.statusFilter,
   });
 
   final AuthController auth;
   final String apiPrefix;
+  final String? statusFilter;
 
   @override
   State<SupervisorLeaveListScreen> createState() =>
@@ -60,14 +62,20 @@ class _SupervisorLeaveListScreenState extends State<SupervisorLeaveListScreen> {
             if (snapshot.hasError) {
               return PgErrorState(message: '${snapshot.error}', onRetry: _refresh);
             }
-            final items = snapshot.data ?? const <LeaveRecord>[];
+            final items = (snapshot.data ?? const <LeaveRecord>[])
+                .where((item) => widget.statusFilter == 'pending'
+                    ? item.isPending
+                    : true)
+                .toList();
             if (items.isEmpty) {
               return ListView(
-                children: const [
-                  SizedBox(height: 80),
+                children: [
+                  const SizedBox(height: 80),
                   PgEmptyState(
-                    icon: Icon(Icons.event_available_outlined),
-                    message: 'No leave requests in your scope.',
+                    icon: const Icon(Icons.event_available_outlined),
+                    message: widget.statusFilter == 'pending'
+                        ? 'No pending leave requests in your scope.'
+                        : 'No leave requests in your scope.',
                   ),
                 ],
               );

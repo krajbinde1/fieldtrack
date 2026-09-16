@@ -19,9 +19,14 @@ import '../../auth/providers/auth_controller.dart';
 import '../api/manager_api.dart';
 
 class ManagerTeamAttendanceScreen extends StatefulWidget {
-  const ManagerTeamAttendanceScreen({super.key, required this.auth});
+  const ManagerTeamAttendanceScreen({
+    super.key,
+    required this.auth,
+    this.statusFilter,
+  });
 
   final AuthController auth;
+  final String? statusFilter;
 
   @override
   State<ManagerTeamAttendanceScreen> createState() =>
@@ -152,7 +157,16 @@ class _ManagerTeamAttendanceScreenState
           future: _future,
           builder: (context, snapshot) {
             final result = snapshot.data;
-            final rows = result?.rows ?? const <Map<String, dynamic>>[];
+            final allRows = result?.rows ?? const <Map<String, dynamic>>[];
+            final rows = widget.statusFilter == 'punched_in'
+                ? allRows
+                    .where((row) {
+                      final hasAttendance = row['has_attendance'] == true;
+                      final punchOut = '${row['punch_out_time'] ?? ''}'.trim();
+                      return hasAttendance && punchOut.isEmpty;
+                    })
+                    .toList()
+                : allRows;
 
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -255,9 +269,11 @@ class _ManagerTeamAttendanceScreenState
                   )
                 else ...[
                   if (rows.isEmpty)
-                    const PgEmptyState(
-                      message: 'No attendance recorded for this date.',
-                      icon: Icon(Icons.groups_outlined),
+                    PgEmptyState(
+                      message: widget.statusFilter == 'punched_in'
+                          ? 'No employees are currently punched in.'
+                          : 'No attendance recorded for this date.',
+                      icon: const Icon(Icons.groups_outlined),
                     )
                   else
                     ...rows.map((row) {

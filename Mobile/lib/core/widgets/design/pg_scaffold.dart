@@ -25,6 +25,7 @@ class PgEmployeeShell extends StatelessWidget {
     final showNav = tab != null && auth.authenticated;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFFAFBFC),
       body: child,
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: showNav

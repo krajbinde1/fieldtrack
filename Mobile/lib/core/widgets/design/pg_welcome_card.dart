@@ -67,6 +67,8 @@ class PgWelcomeCard extends StatelessWidget {
               if (prominent) const SizedBox(height: 2),
               Text(
                 name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: (prominent
                         ? Theme.of(context).textTheme.headlineSmall
                         : Theme.of(context).textTheme.titleLarge)
@@ -80,6 +82,8 @@ class PgWelcomeCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   role!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Colors.white.withValues(alpha: 0.75),
                   ),
