@@ -2,10 +2,13 @@
 
 namespace App\Filament\Resources\Attendances\Schemas;
 
+use App\Models\Attendance;
 use App\Support\AttendanceCalendar;
+use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Storage;
 
 class AttendanceInfolist
 {
@@ -37,12 +40,54 @@ class AttendanceInfolist
                     TextEntry::make('remarks')->placeholder('-')->columnSpanFull(),
                 ]),
                 Section::make('Locations')->columns(2)->schema([
-                    TextEntry::make('punch_in_location')->placeholder('-'),
-                    TextEntry::make('punch_out_location')->placeholder('-'),
-                    TextEntry::make('punch_in_latitude')->numeric()->placeholder('-'),
-                    TextEntry::make('punch_in_longitude')->numeric()->placeholder('-'),
-                    TextEntry::make('punch_out_latitude')->numeric()->placeholder('-'),
-                    TextEntry::make('punch_out_longitude')->numeric()->placeholder('-'),
+                    TextEntry::make('punch_in_location')
+                        ->label('Punch in location')
+                        ->placeholder('-')
+                        ->url(fn (Attendance $record): ?string => $record->punchInMapsUrl())
+                        ->openUrlInNewTab(),
+                    TextEntry::make('punch_out_location')
+                        ->label('Punch out location')
+                        ->placeholder('-')
+                        ->url(fn (Attendance $record): ?string => $record->punchOutMapsUrl())
+                        ->openUrlInNewTab(),
+                    TextEntry::make('punch_in_latitude')
+                        ->numeric()
+                        ->placeholder('-')
+                        ->url(fn (Attendance $record): ?string => $record->punchInMapsUrl())
+                        ->openUrlInNewTab(),
+                    TextEntry::make('punch_in_longitude')
+                        ->numeric()
+                        ->placeholder('-')
+                        ->url(fn (Attendance $record): ?string => $record->punchInMapsUrl())
+                        ->openUrlInNewTab(),
+                    TextEntry::make('punch_out_latitude')
+                        ->numeric()
+                        ->placeholder('-')
+                        ->url(fn (Attendance $record): ?string => $record->punchOutMapsUrl())
+                        ->openUrlInNewTab(),
+                    TextEntry::make('punch_out_longitude')
+                        ->numeric()
+                        ->placeholder('-')
+                        ->url(fn (Attendance $record): ?string => $record->punchOutMapsUrl())
+                        ->openUrlInNewTab(),
+                ]),
+                Section::make('Punch photos')->columns(2)->schema([
+                    ImageEntry::make('punch_in_photo')
+                        ->label('Punch In Photo')
+                        ->disk('public')
+                        ->visibility('public')
+                        ->imageHeight(240)
+                        ->url(fn (?string $state): ?string => filled($state) ? Storage::disk('public')->url($state) : null)
+                        ->openUrlInNewTab()
+                        ->placeholder('No photo'),
+                    ImageEntry::make('punch_out_photo')
+                        ->label('Punch Out Photo')
+                        ->disk('public')
+                        ->visibility('public')
+                        ->imageHeight(240)
+                        ->url(fn (?string $state): ?string => filled($state) ? Storage::disk('public')->url($state) : null)
+                        ->openUrlInNewTab()
+                        ->placeholder('No photo'),
                 ]),
             ]);
     }

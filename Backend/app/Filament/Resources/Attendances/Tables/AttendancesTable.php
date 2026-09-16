@@ -9,12 +9,14 @@ use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Support\AttendanceCalendar;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Storage;
 
 class AttendancesTable
 {
@@ -45,6 +47,36 @@ class AttendancesTable
                     ->label('Punch Out Time (IST)')
                     ->formatStateUsing(fn (Attendance $record): string => $record->punchOutAt()?->timezone(AttendanceCalendar::TIMEZONE)->format('h:i A') ?? '-')
                     ->placeholder('-'),
+                ImageColumn::make('punch_in_photo')
+                    ->label('Punch In Photo')
+                    ->disk('public')
+                    ->visibility('public')
+                    ->square()
+                    ->imageHeight(48)
+                    ->url(fn (?string $state): ?string => filled($state) ? Storage::disk('public')->url($state) : null)
+                    ->openUrlInNewTab()
+                    ->toggleable(),
+                ImageColumn::make('punch_out_photo')
+                    ->label('Punch Out Photo')
+                    ->disk('public')
+                    ->visibility('public')
+                    ->square()
+                    ->imageHeight(48)
+                    ->url(fn (?string $state): ?string => filled($state) ? Storage::disk('public')->url($state) : null)
+                    ->openUrlInNewTab()
+                    ->toggleable(),
+                TextColumn::make('punch_in_location')
+                    ->label('Punch in location')
+                    ->placeholder('-')
+                    ->url(fn (Attendance $record): ?string => $record->punchInMapsUrl())
+                    ->openUrlInNewTab()
+                    ->toggleable(),
+                TextColumn::make('punch_out_location')
+                    ->label('Punch out location')
+                    ->placeholder('-')
+                    ->url(fn (Attendance $record): ?string => $record->punchOutMapsUrl())
+                    ->openUrlInNewTab()
+                    ->toggleable(),
                 TextColumn::make('working_hours')
                     ->label('Working Hours')
                     ->state(fn (Attendance $record): string => $calculator->formatWorkingHoursLabel($record)),

@@ -59,7 +59,8 @@ class _PunchOutScreenState extends ConsumerState<PunchOutScreen> {
     title: 'Punch Out',
     icon: const Icon(Icons.logout_rounded),
     message:
-        'We will capture your location and selfie again, then calculate your working hours.',
+        'A new live camera selfie is required to punch out. Gallery photos are not allowed. '
+        'Location is captured with the photo and stamped on it (IST).',
     busy: busy,
     onPressed: submit,
   );

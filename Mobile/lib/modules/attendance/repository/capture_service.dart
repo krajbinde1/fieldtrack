@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart' as ph;
 import '../api/attendance_api_service.dart';
 import '../models/attendance_format.dart';
 import '../models/punch_capture.dart';
+import 'geotag_stamp.dart';
 
 class CaptureService {
   Future<PunchCapture> capture() async {
@@ -51,6 +52,11 @@ class CaptureService {
         'Unable to determine the address. Please try again outdoors.',
       );
     }
+    if (address.trim().isEmpty) {
+      address =
+          '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+    }
+    // Camera capture only — never ImageSource.gallery / file picker.
     final image = await ImagePicker().pickImage(
       source: ImageSource.camera,
       preferredCameraDevice: CameraDevice.front,
@@ -59,15 +65,32 @@ class CaptureService {
     );
     if (image == null) {
       throw const AttendanceApiException(
-        'A selfie is required to record attendance.',
+        'A live camera photo is required to Punch In/Out.',
       );
     }
+
+    final capturedAt = AttendanceFormat.istNow();
+    String photoPath;
+    try {
+      photoPath = await GeotagStamp.burnIntoPhoto(
+        photoPath: image.path,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        capturedAtIst: capturedAt,
+        address: address,
+      );
+    } catch (_) {
+      throw const AttendanceApiException(
+        'Unable to geotag the photo. Please try again.',
+      );
+    }
+
     return PunchCapture(
       latitude: position.latitude,
       longitude: position.longitude,
       address: address,
-      photoPath: image.path,
-      capturedAt: AttendanceFormat.istNow(),
+      photoPath: photoPath,
+      capturedAt: capturedAt,
     );
   }
 }

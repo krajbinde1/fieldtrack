@@ -68,7 +68,9 @@ class _PunchInScreenState extends ConsumerState<PunchInScreen> {
   Widget build(BuildContext context) => PunchScreen(
     title: 'Punch In',
     icon: const Icon(Icons.fingerprint_rounded),
-    message: 'Your current GPS location and a live selfie are required.',
+    message:
+        'A live camera selfie is required. Gallery photos are not allowed. '
+        'Your GPS location is captured with the photo and stamped on it (IST).',
     busy: busy,
     onPressed: submit,
   );

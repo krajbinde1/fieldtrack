@@ -84,6 +84,7 @@ const List<Widget> kRetainedMaterialIconWidgets = [
   Icon(Icons.history),
   Icon(Icons.add_circle_outline),
   Icon(Icons.check_circle_outline),
+  Icon(Icons.check_circle_rounded),
   Icon(Icons.picture_as_pdf_outlined),
   Icon(Icons.expand_more_rounded),
   Icon(Icons.share_outlined),

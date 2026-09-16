@@ -88,7 +88,7 @@ class _EmployeeDashboardScreenState
           role: widget.auth.userRole.label,
           photoUrl: widget.auth.session?.employee.profilePhotoUrl,
           locationName: widget.auth.session?.employee.baseLocation,
-          attendance: today.valueOrNull,
+          attendance: today.value,
           attendanceLoading: today.isLoading && !today.hasValue,
           preset: _preset,
           summary: _summary,
@@ -229,6 +229,320 @@ class EmployeeDashboardView extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _PunchStatusCard extends StatelessWidget {
+  const _PunchStatusCard({
+    required this.attendance,
+    required this.loading,
+    required this.onPunchIn,
+    required this.onPunchOut,
+    this.locationName,
+  });
+
+  final Attendance? attendance;
+  final bool loading;
+  final String? locationName;
+  final VoidCallback onPunchIn;
+  final VoidCallback onPunchOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final record = attendance;
+    final punchedOut = record != null && record.punchOut != null;
+    final punchedIn = record != null && record.canPunchOut;
+    final showLoadingAction = loading && record == null;
+
+    final Color iconColor;
+    final Color iconBg;
+    final Widget statusIcon;
+    final Widget copy;
+    if (punchedOut) {
+      iconColor = AppColors.approvedFg;
+      iconBg = AppColors.approvedBg;
+      statusIcon = const Icon(Icons.verified_rounded);
+      copy = _PunchedOutCopy(attendance: record);
+    } else if (punchedIn) {
+      iconColor = AppColors.success;
+      iconBg = AppColors.success.withValues(alpha: 0.12);
+      statusIcon = const Icon(Icons.check_circle_rounded);
+      copy = _PunchedInCopy(
+        attendance: record,
+        locationName: locationName,
+      );
+    } else {
+      iconColor = AppColors.primary;
+      iconBg = AppColors.primary.withValues(alpha: 0.10);
+      statusIcon = const Icon(Icons.fingerprint_rounded);
+      copy = Text(
+        'Not Punched In',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              height: 1.15,
+            ),
+      );
+    }
+
+    return PgCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: iconBg,
+              shape: BoxShape.circle,
+            ),
+            child: IconTheme(
+              data: IconThemeData(color: iconColor, size: 22),
+              child: statusIcon,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: copy),
+          if (showLoadingAction) ...[
+            const SizedBox(width: 8),
+            const SizedBox(
+              width: 36,
+              height: 36,
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                ),
+              ),
+            ),
+          ] else if (!punchedOut) ...[
+            const SizedBox(width: 8),
+            punchedIn
+                ? _PunchActionButton(
+                    label: 'Punch Out',
+                    tonal: true,
+                    onPressed: onPunchOut,
+                  )
+                : _PunchActionButton(
+                    label: 'Punch In',
+                    onPressed: onPunchIn,
+                  ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PunchedInCopy extends StatelessWidget {
+  const _PunchedInCopy({
+    required this.attendance,
+    this.locationName,
+  });
+
+  final Attendance attendance;
+  final String? locationName;
+
+  @override
+  Widget build(BuildContext context) {
+    final address = attendance.inAddress?.trim();
+    final location = (address != null && address.isNotEmpty)
+        ? address
+        : locationName?.trim();
+    final timeLabel = AttendanceFormat.time(attendance.punchIn);
+    final metaStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontSize: 11,
+          height: 1.2,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'You are',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontSize: 11,
+                height: 1.1,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+        ),
+        Text(
+          'Punched In',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                height: 1.15,
+              ),
+        ),
+        const SizedBox(height: 2),
+        Row(
+          children: [
+            IconTheme(
+              data: const IconThemeData(
+                color: AppColors.textMuted,
+                size: 13,
+              ),
+              child: const Icon(Icons.schedule_rounded),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                timeLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: metaStyle,
+              ),
+            ),
+          ],
+        ),
+        if (location != null && location.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              IconTheme(
+                data: const IconThemeData(
+                  color: AppColors.textMuted,
+                  size: 13,
+                ),
+                child: const Icon(Icons.location_on_outlined),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  location,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: metaStyle,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PunchedOutCopy extends StatelessWidget {
+  const _PunchedOutCopy({required this.attendance});
+
+  final Attendance attendance;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = _workingDuration(attendance);
+    final metaStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontSize: 11,
+          height: 1.2,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Punched Out',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                height: 1.15,
+              ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'In ${AttendanceFormat.time(attendance.punchIn)}  ·  Out ${AttendanceFormat.time(attendance.punchOut)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: metaStyle,
+        ),
+        if (duration != null) ...[
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              IconTheme(
+                data: const IconThemeData(
+                  color: AppColors.textMuted,
+                  size: 13,
+                ),
+                child: const Icon(Icons.schedule_rounded),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  duration,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: metaStyle,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  static String? _workingDuration(Attendance record) {
+    final hours = record.workingHours?.trim();
+    if (hours != null && hours.isNotEmpty) return hours;
+    final punchIn = record.punchIn;
+    final punchOut = record.punchOut;
+    if (punchIn == null || punchOut == null) return null;
+    final minutes = punchOut.difference(punchIn).inMinutes;
+    final safe = minutes < 0 ? 0 : minutes;
+    return '${safe ~/ 60}h ${(safe % 60).toString().padLeft(2, '0')}m';
+  }
+}
+
+class _PunchActionButton extends StatelessWidget {
+  const _PunchActionButton({
+    required this.label,
+    required this.onPressed,
+    this.tonal = false,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool tonal;
+
+  static final ButtonStyle _style = FilledButton.styleFrom(
+    visualDensity: VisualDensity.compact,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    minimumSize: const Size(0, 36),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+    ),
+    textStyle: const TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    if (tonal) {
+      return FilledButton.tonal(
+        onPressed: onPressed,
+        style: _style,
+        child: Text(label),
+      );
+    }
+    return FilledButton(
+      onPressed: onPressed,
+      style: _style,
+      child: Text(label),
     );
   }
 }

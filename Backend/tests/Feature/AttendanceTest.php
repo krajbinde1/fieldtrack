@@ -1,12 +1,17 @@
 <?php
 
+use App\Enums\UserRole;
 use App\Models\Attendance;
 use App\Models\Employee;
+use App\Models\User;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Support\AttendanceCalendar;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -229,3 +234,97 @@ it('preserves Leave status and does not overwrite it from punches', function () 
 
     expect($attendance->fresh()->attendance_status)->toBe('Leave');
 });
+
+function makeAttendanceApiUser(): array
+{
+    $employee = makeAttendanceEmployee();
+    $user = User::create([
+        'employee_id' => $employee->id,
+        'name' => $employee->full_name,
+        'email' => 'att'.$employee->id.'@test.local',
+        'login_id' => $employee->mobile,
+        'password' => Hash::make('Employee@123'),
+        'role' => UserRole::Employee->value,
+        'is_active' => true,
+    ]);
+
+    return [$user, $employee];
+}
+
+it('requires a photo for punch in and punch out', function () {
+    Storage::fake('public');
+    [$user, $employee] = makeAttendanceApiUser();
+
+    $this->actingAs($user, 'sanctum')
+        ->post('/api/attendance/punch-in', [
+            'latitude' => 18.52,
+            'longitude' => 73.85,
+            'location_address' => 'Pune',
+        ], ['Accept' => 'application/json'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['photo']);
+
+    expect(Attendance::query()->where('employee_id', $employee->id)->exists())->toBeFalse();
+
+    $this->actingAs($user, 'sanctum')
+        ->post('/api/attendance/punch-in', [
+            'latitude' => 18.52,
+            'longitude' => 73.85,
+            'location_address' => 'Pune',
+            'photo' => UploadedFile::fake()->image('in.jpg'),
+        ], ['Accept' => 'application/json'])
+        ->assertCreated();
+
+    $this->actingAs($user, 'sanctum')
+        ->post('/api/attendance/punch-out', [
+            'latitude' => 18.53,
+            'longitude' => 73.86,
+            'location_address' => 'Pune Out',
+        ], ['Accept' => 'application/json'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['photo']);
+
+    $attendance = Attendance::query()->where('employee_id', $employee->id)->first();
+    expect($attendance->punch_out_time)->toBeNull()
+        ->and($attendance->punch_out_photo)->toBeNull();
+});
+
+it('stores punch in and punch out photos separately and returns public urls', function () {
+    Storage::fake('public');
+    [$user, $employee] = makeAttendanceApiUser();
+
+    $inResponse = $this->actingAs($user, 'sanctum')
+        ->post('/api/attendance/punch-in', [
+            'latitude' => 18.5201234,
+            'longitude' => 73.8509876,
+            'location_address' => 'Pune In',
+            'photo' => UploadedFile::fake()->image('in.jpg'),
+        ], ['Accept' => 'application/json'])
+        ->assertCreated();
+
+    expect($inResponse->json('data.in_photo'))->toContain('/storage/')
+        ->and($inResponse->json('data.out_photo'))->toBeNull();
+
+    $outResponse = $this->actingAs($user, 'sanctum')
+        ->post('/api/attendance/punch-out', [
+            'latitude' => 18.5301111,
+            'longitude' => 73.8602222,
+            'location_address' => 'Pune Out',
+            'photo' => UploadedFile::fake()->image('out.jpg'),
+        ], ['Accept' => 'application/json'])
+        ->assertOk();
+
+    $attendance = Attendance::query()->where('employee_id', $employee->id)->first();
+    expect($attendance->punch_in_photo)->not->toBeNull()
+        ->and($attendance->punch_out_photo)->not->toBeNull()
+        ->and($attendance->punch_in_photo)->not->toBe($attendance->punch_out_photo)
+        ->and($outResponse->json('data.in_photo'))->toContain('/storage/')
+        ->and($outResponse->json('data.out_photo'))->toContain('/storage/')
+        ->and($outResponse->json('data.in_photo'))->not->toBe($outResponse->json('data.out_photo'))
+        ->and($attendance->punchInMapsUrl())->toBe('https://www.google.com/maps?q='.$attendance->punch_in_latitude.','.$attendance->punch_in_longitude)
+        ->and($attendance->punchOutMapsUrl())->toBe('https://www.google.com/maps?q='.$attendance->punch_out_latitude.','.$attendance->punch_out_longitude);
+
+    Storage::disk('public')->assertExists($attendance->punch_in_photo);
+    Storage::disk('public')->assertExists($attendance->punch_out_photo);
+});
+

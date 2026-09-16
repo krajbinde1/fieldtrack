@@ -274,4 +274,23 @@ class Attendance extends Model
             AttendanceCalendar::TIMEZONE,
         );
     }
+
+    public function punchInMapsUrl(): ?string
+    {
+        return self::googleMapsUrl($this->punch_in_latitude, $this->punch_in_longitude);
+    }
+
+    public function punchOutMapsUrl(): ?string
+    {
+        return self::googleMapsUrl($this->punch_out_latitude, $this->punch_out_longitude);
+    }
+
+    public static function googleMapsUrl(mixed $latitude, mixed $longitude): ?string
+    {
+        if ($latitude === null || $longitude === null || $latitude === '' || $longitude === '') {
+            return null;
+        }
+
+        return 'https://www.google.com/maps?q='.$latitude.','.$longitude;
+    }
 }
