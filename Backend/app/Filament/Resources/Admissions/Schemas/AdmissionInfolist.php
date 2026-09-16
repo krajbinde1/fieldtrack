@@ -30,6 +30,7 @@ class AdmissionInfolist
                 TextEntry::make('employee.full_name')->label('Employee'),
                 TextEntry::make('submitted_at')->dateTime('d M Y h:i A')->placeholder('-'),
                 TextEntry::make('confirmed_at')->dateTime('d M Y h:i A')->placeholder('-'),
+                TextEntry::make('reviewedBy.name')->label('Reviewed / confirmed by')->placeholder('-'),
                 TextEntry::make('review_reason')->placeholder('-')->columnSpanFull(),
                 TextEntry::make('created_at')->dateTime('d M Y h:i A'),
             ]),

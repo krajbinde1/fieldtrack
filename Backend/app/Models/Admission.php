@@ -257,6 +257,7 @@ class Admission extends Model
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'review_reason' => $this->review_reason,
             'reviewed_by_user_id' => $this->reviewed_by_user_id,
+            'confirmed_by' => $this->isConfirmed() ? $this->reviewed_by_user_id : null,
             'reviewed_at' => $this->reviewed_at?->toIso8601String(),
             'confirmed_at' => $this->confirmed_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),

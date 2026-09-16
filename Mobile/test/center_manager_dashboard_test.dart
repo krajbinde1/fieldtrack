@@ -45,6 +45,13 @@ void main() {
               'punched_in_today': 1,
               'active_routes': 1,
               'admissions': 2,
+              'admission_counts': {
+                'submitted': 2,
+                'confirmed': 1,
+                'draft': 0,
+                'reverted': 0,
+                'rejected': 0,
+              },
               'pending_leaves': 0,
               'admission_targets': 4,
             },
@@ -57,10 +64,15 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Center Manager'), findsWidgets);
     expect(find.text('Employees'), findsOneWidget);
-    expect(find.text('Users / Employees'), findsOneWidget);
     expect(find.text('Admissions'), findsWidgets);
+    expect(find.text('Submitted'), findsOneWidget);
+    expect(find.text('Confirmed'), findsOneWidget);
+    expect(find.text('Draft'), findsOneWidget);
+    expect(find.text('Reverted'), findsOneWidget);
+    expect(find.text('Rejected'), findsOneWidget);
 
     for (final label in [
+      'Users / Employees',
       'Admission Targets',
       'Leave Requests',
       'Attendance',

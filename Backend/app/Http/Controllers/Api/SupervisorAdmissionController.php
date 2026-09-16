@@ -25,7 +25,10 @@ class SupervisorAdmissionController extends Controller
             ->with(['scheme', 'center', 'employee', 'district', 'taluka', 'documents']);
 
         if ($request->filled('status')) {
-            $query->where('status', $request->string('status'));
+            $status = AdmissionStatus::tryFrom((string) $request->input('status'));
+            if ($status !== null) {
+                $query->where('status', $status);
+            }
         }
         if ($request->filled('scheme_id')) {
             $query->where('scheme_id', $request->integer('scheme_id'));
@@ -75,22 +78,10 @@ class SupervisorAdmissionController extends Controller
 
     public function summary(Request $request): JsonResponse
     {
-        $counts = $this->access->admissionQuery($request->user())
-            ->toBase()
-            ->selectRaw('status, COUNT(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
-
         return response()->json([
             'success' => true,
             'message' => 'Admission summary loaded.',
-            'data' => [
-                'submitted' => (int) ($counts[AdmissionStatus::Submitted->value] ?? 0),
-                'confirmed' => (int) ($counts[AdmissionStatus::Confirmed->value] ?? 0),
-                'draft' => (int) ($counts[AdmissionStatus::Draft->value] ?? 0),
-                'reverted' => (int) ($counts[AdmissionStatus::Reverted->value] ?? 0),
-                'rejected' => (int) ($counts[AdmissionStatus::Rejected->value] ?? 0),
-            ],
+            'data' => $this->access->admissionStatusCounts($request->user()),
         ]);
     }
 

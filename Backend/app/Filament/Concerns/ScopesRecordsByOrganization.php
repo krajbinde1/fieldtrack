@@ -29,7 +29,8 @@ trait ScopesRecordsByOrganization
         $ids = match ($model) {
             Scheme::class => $access->visibleSchemeIds($user),
             Center::class => $access->visibleCenterIds($user),
-            Employee::class, Attendance::class, Admission::class, LeaveRequest::class, AdmissionTarget::class => $access->visibleEmployeeIds($user),
+            Admission::class => $access->visibleCenterIds($user),
+            Employee::class, Attendance::class, LeaveRequest::class, AdmissionTarget::class => $access->visibleEmployeeIds($user),
             default => null,
         };
 
@@ -42,11 +43,12 @@ trait ScopesRecordsByOrganization
         }
 
         if ($model === Admission::class) {
-            return $query->whereIn('employee_id', $ids)->with([
+            return $query->whereIn('center_id', $ids)->with([
                 'scheme',
                 'employee.center.scheme',
                 'district',
                 'taluka',
+                'reviewedBy',
             ]);
         }
 

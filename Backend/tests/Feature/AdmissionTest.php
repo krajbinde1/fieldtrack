@@ -192,6 +192,9 @@ it('submits a complete admission and rejects a second submit', function () {
         ->assertOk()
         ->assertJsonPath('data.status', 'submitted');
 
+    $submitted = Admission::query()->findOrFail($id);
+    expect($submitted->submitted_at)->not->toBeNull();
+
     $second = $this->actingAs($ctx['userA'], 'sanctum')
         ->postJson('/api/admissions/'.$id.'/submit')
         ->assertStatus(422);
@@ -341,9 +344,13 @@ it('lets the assigned center manager confirm a submitted admission', function ()
     Sanctum::actingAs($ctx['centerManager']);
     $this->postJson('/api/manager/admissions/'.$id.'/confirm')
         ->assertOk()
-        ->assertJsonPath('data.status', 'confirmed');
+        ->assertJsonPath('data.status', 'confirmed')
+        ->assertJsonPath('data.confirmed_by', $ctx['centerManager']->id)
+        ->assertJsonPath('data.reviewed_by_user_id', $ctx['centerManager']->id);
 
-    expect(Admission::query()->find($id)->confirmed_at)->not->toBeNull();
+    $confirmed = Admission::query()->find($id);
+    expect($confirmed->confirmed_at)->not->toBeNull()
+        ->and($confirmed->reviewed_by_user_id)->toBe($ctx['centerManager']->id);
 });
 
 it('requires a reason to revert and lets the employee edit and resubmit', function () {
@@ -366,7 +373,7 @@ it('requires a reason to revert and lets the employee edit and resubmit', functi
     $this->actingAs($ctx['userA'], 'sanctum')
         ->getJson('/api/admissions/drafts')
         ->assertOk()
-        ->assertJsonFragment(['id' => $id, 'status' => 'reverted']);
+        ->assertJsonFragment(['id' => $id, 'status' => 'reverted', 'review_reason' => 'Village name is incomplete.']);
 
     $this->actingAs($ctx['userA'], 'sanctum')
         ->patchJson('/api/admissions/drafts/'.$id, ['village' => 'Kharadi'])
@@ -416,7 +423,13 @@ it('keeps drafts out of review and scopes manager admissions to assigned centers
 
     $summary = $this->getJson('/api/manager/admissions/summary')->assertOk()->json('data');
     expect($summary['draft'])->toBeGreaterThanOrEqual(1)
-        ->and($summary['submitted'])->toBeGreaterThanOrEqual(1);
+        ->and($summary['submitted'])->toBeGreaterThanOrEqual(1)
+        ->and($summary)->toHaveKeys(['submitted', 'confirmed', 'draft', 'reverted', 'rejected']);
+
+    $dashboard = $this->getJson('/api/dashboard')->assertOk()->json('data');
+    expect($dashboard['admission_counts']['submitted'])->toBe($summary['submitted'])
+        ->and($dashboard['admission_counts']['draft'])->toBe($summary['draft'])
+        ->and($dashboard['admissions'])->toBe($summary['submitted']);
 
     $submitted = $this->getJson('/api/manager/admissions?status=submitted')
         ->assertOk()

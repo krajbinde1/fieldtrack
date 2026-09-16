@@ -88,6 +88,8 @@ class AdmissionRecord {
     this.reviewReason,
     this.reviewedAt,
     this.confirmedAt,
+    this.confirmedBy,
+    this.reviewedByUserId,
   });
 
   final int id;
@@ -119,6 +121,8 @@ class AdmissionRecord {
   final String? reviewReason;
   final String? reviewedAt;
   final String? confirmedAt;
+  final int? confirmedBy;
+  final int? reviewedByUserId;
 
   bool get isDraft => status == 'draft';
   bool get isSubmitted => status == 'submitted';
@@ -163,14 +167,19 @@ class AdmissionRecord {
     final employee = json['employee'];
     final documents = json['documents'];
 
+    final status = json['status']?.toString() ?? 'draft';
+    final editable = json.containsKey('editable')
+        ? json['editable'] == true
+        : status == 'draft' || status == 'reverted';
+
     return AdmissionRecord(
       id: json['id'] as int,
-      status: json['status']?.toString() ?? 'draft',
+      status: status,
       statusLabel: json['status_label']?.toString() ?? 'Draft',
       currentStep: json['current_step'] is int
           ? json['current_step'] as int
           : int.tryParse('${json['current_step']}') ?? 1,
-      editable: json['editable'] == true,
+      editable: editable,
       schemeId: scheme is Map ? scheme['id'] as int? : json['scheme_id'] as int?,
       schemeName: scheme is Map ? scheme['name']?.toString() : null,
       firstName: json['first_name']?.toString(),
@@ -202,6 +211,8 @@ class AdmissionRecord {
       reviewReason: json['review_reason']?.toString(),
       reviewedAt: json['reviewed_at']?.toString(),
       confirmedAt: json['confirmed_at']?.toString(),
+      confirmedBy: _asNullableInt(json['confirmed_by']),
+      reviewedByUserId: _asNullableInt(json['reviewed_by_user_id']),
     );
   }
 }
@@ -270,4 +281,11 @@ class AdmissionLookups {
     if (value is! List || value.isEmpty) return fallback;
     return value.map((item) => '$item').toList();
   }
+}
+
+int? _asNullableInt(Object? value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse('$value');
 }

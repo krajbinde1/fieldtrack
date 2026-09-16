@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AdmissionStatus;
 use App\Enums\UserRole;
 use App\Models\Admission;
 use App\Models\AdmissionTarget;
@@ -160,13 +161,39 @@ final class OrganizationAccessService
     public function admissionQuery(User $user): Builder
     {
         $query = Admission::query();
-        $ids = $this->visibleEmployeeIds($user);
 
-        if ($ids === null) {
+        if ($user->isEmployeeUser()) {
+            return $user->employee_id
+                ? $query->where('employee_id', (int) $user->employee_id)
+                : $query->whereRaw('1 = 0');
+        }
+
+        $centerIds = $this->visibleCenterIds($user);
+        if ($centerIds === null) {
             return $query;
         }
 
-        return $query->whereIn('employee_id', $ids);
+        return $query->whereIn('center_id', $centerIds);
+    }
+
+    /**
+     * @return array{submitted: int, confirmed: int, draft: int, reverted: int, rejected: int}
+     */
+    public function admissionStatusCounts(User $user): array
+    {
+        $counts = $this->admissionQuery($user)
+            ->toBase()
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return [
+            'submitted' => (int) ($counts[AdmissionStatus::Submitted->value] ?? 0),
+            'confirmed' => (int) ($counts[AdmissionStatus::Confirmed->value] ?? 0),
+            'draft' => (int) ($counts[AdmissionStatus::Draft->value] ?? 0),
+            'reverted' => (int) ($counts[AdmissionStatus::Reverted->value] ?? 0),
+            'rejected' => (int) ($counts[AdmissionStatus::Rejected->value] ?? 0),
+        ];
     }
 
     public function leaveQuery(User $user): Builder
@@ -197,9 +224,17 @@ final class OrganizationAccessService
 
     public function canViewAdmission(User $user, Admission $admission): bool
     {
-        $ids = $this->visibleEmployeeIds($user);
+        if ($user->isEmployeeUser()) {
+            return $user->employee_id !== null
+                && (int) $admission->employee_id === (int) $user->employee_id;
+        }
 
-        return $ids === null || in_array((int) $admission->employee_id, $ids, true);
+        $centerIds = $this->visibleCenterIds($user);
+        if ($centerIds === null) {
+            return true;
+        }
+
+        return in_array((int) $admission->center_id, $centerIds, true);
     }
 
     public function canViewLeave(User $user, LeaveRequest $leave): bool

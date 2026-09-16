@@ -17,10 +17,12 @@ class SupervisorAdmissionListScreen extends StatefulWidget {
     super.key,
     required this.auth,
     required this.apiPrefix,
+    this.initialStatus = 'submitted',
   });
 
   final AuthController auth;
   final String apiPrefix;
+  final String initialStatus;
 
   @override
   State<SupervisorAdmissionListScreen> createState() =>
@@ -38,12 +40,13 @@ class _SupervisorAdmissionListScreenState
   ];
 
   AdmissionApi? _api;
-  String _status = 'submitted';
+  late String _status;
   late Future<({Map<String, int> counts, List<AdmissionRecord> items})> _future;
 
   @override
   void initState() {
     super.initState();
+    _status = widget.initialStatus;
     _future = _load();
   }
 
@@ -168,7 +171,10 @@ class _SupervisorAdmissionListScreenState
                   ...[
                     for (final item in snapshot.data!.items) ...[
                       PgCard(
-                        onTap: () => context.push('$prefix/admissions/${item.id}'),
+                        onTap: () async {
+                          await context.push('$prefix/admissions/${item.id}');
+                          if (mounted) await _refresh();
+                        },
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [

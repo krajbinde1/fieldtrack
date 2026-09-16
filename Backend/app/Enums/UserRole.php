@@ -101,6 +101,7 @@ enum UserRole: string
                 'attendance_view_center',
                 'route_tracking_view_center',
                 'leave_manage_center',
+                'admission_review_center',
                 'admission_target_manage_center',
             ],
             self::ProjectHead => [
@@ -108,6 +109,7 @@ enum UserRole: string
                 'attendance_view_project',
                 'route_tracking_view_project',
                 'leave_view_project',
+                'admissions_view_project',
                 'admission_target_view_project',
             ],
             self::Director => [
@@ -115,6 +117,7 @@ enum UserRole: string
                 'attendance_view_assigned',
                 'route_tracking_view_assigned',
                 'leave_view_assigned',
+                'admissions_view_assigned',
                 'admission_target_view_assigned',
             ],
             self::Admin => [
@@ -122,6 +125,7 @@ enum UserRole: string
                 'attendance_view_all',
                 'route_tracking_view_all',
                 'leave_view_all',
+                'admissions_view_all',
                 'admission_target_view_all',
             ],
         };

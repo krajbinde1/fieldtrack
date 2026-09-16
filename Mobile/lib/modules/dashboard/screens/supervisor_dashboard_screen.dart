@@ -89,6 +89,23 @@ class SupervisorDashboardView extends StatelessWidget {
   String get _prefix =>
       role.isAdmin || role.isDirector ? '/director' : '/manager';
 
+  int _admissionCount(String status) {
+    final raw = data['admission_counts'];
+    if (raw is Map) {
+      final value = raw[status];
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse('$value') ?? 0;
+    }
+    if (status == 'submitted') {
+      final fallback = data['admissions'];
+      if (fallback is int) return fallback;
+      if (fallback is num) return fallback.toInt();
+      return int.tryParse('$fallback') ?? 0;
+    }
+    return 0;
+  }
+
   List<_DashboardModule> get _modules {
     return [
       if (role.isCenterManager)
@@ -164,12 +181,6 @@ class SupervisorDashboardView extends StatelessWidget {
             _metric('Punched In', '${data['punched_in_today'] ?? 0}', const Icon(Icons.fingerprint_rounded)),
             _metric('Active Routes', '${data['active_routes'] ?? 0}', const Icon(Icons.route_rounded)),
             _metric(
-              'Admissions',
-              '${data['admissions'] ?? 0}',
-              const Icon(Icons.how_to_reg_rounded),
-              AppColors.blueGradient,
-            ),
-            _metric(
               'Pending Leave',
               '${data['pending_leaves'] ?? 0}',
               const Icon(Icons.event_note_rounded),
@@ -181,6 +192,61 @@ class SupervisorDashboardView extends StatelessWidget {
               const Icon(Icons.flag_rounded),
               AppColors.violetGradient,
             ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'Admissions',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            for (final item in [
+              ('Submitted', 'submitted', AppColors.info),
+              ('Confirmed', 'confirmed', AppColors.success),
+              ('Draft', 'draft', AppColors.warning),
+              ('Reverted', 'reverted', AppColors.accent),
+              ('Rejected', 'rejected', AppColors.error),
+            ])
+              SizedBox(
+                width: 104,
+                child: Material(
+                  color: item.$3.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    onTap: () => onOpen('$_prefix/admissions?status=${item.$2}'),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_admissionCount(item.$2)}',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: item.$3,
+                                ),
+                          ),
+                          Text(
+                            item.$1,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),

@@ -193,9 +193,10 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/manager/admissions',
-          builder: (_, _) => SupervisorAdmissionListScreen(
+          builder: (_, state) => SupervisorAdmissionListScreen(
             auth: auth,
             apiPrefix: 'manager',
+            initialStatus: state.uri.queryParameters['status'] ?? 'submitted',
           ),
         ),
         GoRoute(
@@ -242,9 +243,10 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/director/admissions',
-          builder: (_, _) => SupervisorAdmissionListScreen(
+          builder: (_, state) => SupervisorAdmissionListScreen(
             auth: auth,
             apiPrefix: 'director',
+            initialStatus: state.uri.queryParameters['status'] ?? 'submitted',
           ),
         ),
         GoRoute(

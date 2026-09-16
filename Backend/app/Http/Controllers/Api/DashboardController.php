@@ -38,6 +38,8 @@ class DashboardController extends Controller
             ->whereNotNull('punch_out_time')
             ->count();
 
+        $admissionCounts = $access->admissionStatusCounts($user);
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -52,7 +54,8 @@ class DashboardController extends Controller
                 'punched_out_today' => $punchedOut,
                 'active_routes' => $activeRoutes,
                 'not_punched_in_today' => max(0, $employeeIds->count() - $punchedIn),
-                'admissions' => $access->admissionQuery($user)->count(),
+                'admissions' => $admissionCounts['submitted'],
+                'admission_counts' => $admissionCounts,
                 'pending_leaves' => $access->leaveQuery($user)
                     ->where('status', LeaveStatus::Pending->value)
                     ->count(),
