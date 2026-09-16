@@ -111,8 +111,8 @@ class EmployeeResource extends Resource
             Section::make('Organization')
                 ->description('Linked automatically from the Center Manager assignment.')
                 ->schema([
-                    TextInput::make('project_name')
-                        ->label('Project')
+                    TextInput::make('scheme_name')
+                        ->label('Scheme / Project')
                         ->disabled()
                         ->dehydrated(false),
                     TextInput::make('center_manager_name')

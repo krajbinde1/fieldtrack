@@ -26,8 +26,18 @@ class Scheme extends Model
         return $this->hasMany(Admission::class);
     }
 
+    public function centers(): HasMany
+    {
+        return $this->hasMany(Center::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function displayLabel(): string
+    {
+        return filled($this->code) ? "{$this->code} — {$this->name}" : $this->name;
     }
 }

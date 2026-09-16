@@ -17,7 +17,7 @@ class SupervisorAdmissionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = $this->access->admissionQuery($request->user())
-            ->with(['scheme', 'project', 'center', 'employee', 'district', 'taluka', 'documents']);
+            ->with(['scheme', 'center', 'employee', 'district', 'taluka', 'documents']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
@@ -26,7 +26,7 @@ class SupervisorAdmissionController extends Controller
             $query->where('scheme_id', $request->integer('scheme_id'));
         }
         if ($request->filled('project_id')) {
-            $query->where('project_id', $request->integer('project_id'));
+            $query->where('scheme_id', $request->integer('project_id'));
         }
         if ($request->filled('center_id')) {
             $query->where('center_id', $request->integer('center_id'));
@@ -76,7 +76,7 @@ class SupervisorAdmissionController extends Controller
             'success' => true,
             'message' => 'Admission loaded.',
             'data' => $admission->fresh([
-                'scheme', 'project', 'center', 'employee', 'district', 'taluka', 'documents',
+                'scheme', 'center', 'employee', 'district', 'taluka', 'documents',
             ])->toApiArray(),
         ]);
     }

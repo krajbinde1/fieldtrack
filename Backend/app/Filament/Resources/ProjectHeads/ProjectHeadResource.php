@@ -6,12 +6,12 @@ use App\Enums\UserRole;
 use App\Filament\Resources\ProjectHeads\Pages\CreateProjectHead;
 use App\Filament\Resources\ProjectHeads\Pages\EditProjectHead;
 use App\Filament\Resources\ProjectHeads\Pages\ListProjectHeads;
+use App\Filament\Support\CenterAssignmentSelect;
 use App\Filament\Support\LoginIdInput;
 use App\Models\User;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
@@ -62,47 +62,20 @@ class ProjectHeadResource extends Resource
             return $query;
         }
 
-        $projectIds = app(OrganizationAccessService::class)->visibleProjectIds($user) ?? [];
+        $centerIds = app(OrganizationAccessService::class)->visibleCenterIds($user) ?? [];
 
-        return $query->whereHas('headedProjects', fn ($q) => $q->whereIn('projects.id', $projectIds));
+        return $query->whereHas('headedCenters', fn ($q) => $q->whereIn('centers.id', $centerIds));
     }
 
     public static function form(Schema $schema): Schema
     {
-        $access = app(OrganizationAccessService::class);
-        $user = auth()->user();
-
         return $schema->components([
             TextInput::make('name')->required()->maxLength(255),
             LoginIdInput::mobileFallback(),
             LoginIdInput::make(),
             TextInput::make('email')->email()->required()->unique(ignoreRecord: true),
             TextInput::make('password')->password()->revealable()->dehydrated(fn ($state) => filled($state))->required(fn (string $operation): bool => $operation === 'create')->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
-            Select::make('headedProjects')
-                ->label('Assigned Project(s)')
-                ->relationship(
-                    name: 'headedProjects',
-                    titleAttribute: 'name',
-                    modifyQueryUsing: fn ($query) => $user ? $access->projectQuery($user) : $query->whereRaw('1=0'),
-                )
-                ->multiple()
-                ->preload()
-                ->searchable()
-                ->required()
-                ->saveRelationshipsUsing(function (User $record, $state) use ($access, $user): void {
-                    $visible = $user ? $access->visibleProjectIds($user) : [];
-                    if ($visible === null) {
-                        $record->headedProjects()->sync($state ?? []);
-
-                        return;
-                    }
-
-                    $keep = $record->headedProjects()
-                        ->whereNotIn('projects.id', $visible)
-                        ->pluck('projects.id')
-                        ->all();
-                    $record->headedProjects()->sync(array_values(array_unique(array_merge($keep, $state ?? []))));
-                }),
+            CenterAssignmentSelect::make(),
             Toggle::make('is_active')->default(true),
             Toggle::make('must_change_password')->default(true),
         ]);
@@ -114,7 +87,7 @@ class ProjectHeadResource extends Resource
             ->columns([
                 TextColumn::make('name')->searchable(),
                 TextColumn::make('login_id')->label('Login ID'),
-                TextColumn::make('headedProjects.name')->label('Projects')->badge(),
+                TextColumn::make('headedCenters.name')->label('Centers')->badge(),
                 IconColumn::make('is_active')->boolean()->label('Active'),
             ])
             ->recordActions([

@@ -46,7 +46,7 @@ class CreateEmployee extends CreateRecord
         $data['created_by_user_id'] = $actor->id;
         $data['status'] = (bool) ($data['status'] ?? true);
 
-        unset($data['login_password'], $data['login_id'], $data['project_name'], $data['center_manager_name']);
+        unset($data['login_password'], $data['login_id'], $data['scheme_name'], $data['project_name'], $data['center_manager_name']);
 
         $password = $this->data['login_password'] ?? null;
         if (! filled($password)) {

@@ -18,9 +18,9 @@ class ListLeaveRequests extends ListRecords
     protected function getTableQuery(): Builder
     {
         return parent::getTableQuery()->with([
-            'employee.center.project',
+            'employee.center.scheme',
             'center',
-            'project',
+            'scheme',
         ]);
     }
 }

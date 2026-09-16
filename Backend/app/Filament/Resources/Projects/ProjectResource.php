@@ -7,11 +7,8 @@ use App\Filament\Resources\Projects\Pages\CreateProject;
 use App\Filament\Resources\Projects\Pages\EditProject;
 use App\Filament\Resources\Projects\Pages\ListProjects;
 use App\Models\Project;
-use App\Models\User;
-use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -34,11 +31,14 @@ class ProjectResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleGroup;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-
-        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isProjectHead());
+        return false;
     }
 
     public static function canCreate(): bool
@@ -62,17 +62,6 @@ class ProjectResource extends Resource
             TextInput::make('name')->required()->maxLength(255),
             TextInput::make('code')->required()->maxLength(32)->unique(ignoreRecord: true),
             Textarea::make('description')->columnSpanFull(),
-            Select::make('projectHeads')
-                ->label('Project Head(s)')
-                ->relationship(
-                    name: 'projectHeads',
-                    titleAttribute: 'name',
-                    modifyQueryUsing: fn ($query) => $query->where('role', 'project_head')->where('is_active', true),
-                )
-                ->multiple()
-                ->preload()
-                ->searchable()
-                ->visible(fn (): bool => auth()->user()?->isAdmin() ?? false),
             Toggle::make('is_active')->default(true),
         ]);
     }
@@ -83,7 +72,16 @@ class ProjectResource extends Resource
             ->columns([
                 TextColumn::make('code')->searchable()->sortable(),
                 TextColumn::make('name')->searchable()->sortable(),
-                TextColumn::make('projectHeads.name')->label('Project Head(s)')->badge(),
+                TextColumn::make('project_heads')
+                    ->label('Project Head(s)')
+                    ->state(function (Project $record): string {
+                        $names = $record->centers
+                            ->flatMap(fn ($center) => $center->projectHeads)
+                            ->unique('id')
+                            ->pluck('name');
+
+                        return $names->isEmpty() ? '—' : $names->join(', ');
+                    }),
                 TextColumn::make('centers_count')->counts('centers')->label('Centers'),
                 IconColumn::make('is_active')->boolean()->label('Active'),
             ])

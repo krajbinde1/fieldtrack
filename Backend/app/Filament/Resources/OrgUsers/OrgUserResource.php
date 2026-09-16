@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Filament\Resources\OrgUsers\Pages\CreateOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\EditOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\ListOrgUsers;
+use App\Filament\Support\CenterAssignmentSelect;
 use App\Filament\Support\LoginIdInput;
 use App\Models\User;
 use App\Services\OrganizationAccessService;
@@ -65,7 +66,7 @@ class OrgUserResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->with(['directedProjects', 'headedProjects', 'managedCenters']);
+        $query = parent::getEloquentQuery()->with(['headedCenters.scheme', 'managedCenters.scheme']);
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
 
@@ -76,23 +77,8 @@ class OrgUserResource extends Resource
         $roles = $access->visibleOrgUserRoles($user);
         $query->whereIn('role', $roles);
 
-        if ($user->isAdmin()) {
+        if ($user->isAdmin() || $user->isDirector()) {
             return $query;
-        }
-
-        if ($user->isDirector()) {
-            $projectIds = $access->visibleProjectIds($user) ?? [];
-            $centerIds = $access->visibleCenterIds($user) ?? [];
-
-            return $query->where(function (Builder $inner) use ($projectIds, $centerIds): void {
-                $inner->where(function (Builder $ph) use ($projectIds): void {
-                    $ph->where('role', UserRole::ProjectHead->value)
-                        ->whereHas('headedProjects', fn ($q) => $q->whereIn('projects.id', $projectIds));
-                })->orWhere(function (Builder $cm) use ($centerIds): void {
-                    $cm->where('role', UserRole::CenterManager->value)
-                        ->whereHas('managedCenters', fn ($q) => $q->whereIn('centers.id', $centerIds));
-                });
-            });
         }
 
         $centerIds = $access->visibleCenterIds($user) ?? [];
@@ -117,49 +103,16 @@ class OrgUserResource extends Resource
                 ->live()
                 ->disabledOn('edit'),
             TextInput::make('name')->required()->maxLength(255),
-            LoginIdInput::mobileFallback(),
-            LoginIdInput::make(),
-            TextInput::make('email')->email()->required()->unique(ignoreRecord: true),
+            LoginIdInput::emailWithLoginIdSync(),
+            LoginIdInput::fromEmail(),
             TextInput::make('password')
                 ->password()
                 ->revealable()
                 ->dehydrated(fn ($state) => filled($state))
                 ->required(fn (string $operation): bool => $operation === 'create')
                 ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
-            Select::make('directedProjects')
-                ->label('Assigned Project(s)')
-                ->relationship('directedProjects', 'name')
-                ->multiple()
-                ->preload()
-                ->searchable()
-                ->required()
-                ->visible(fn ($get): bool => $get('role') === UserRole::Director->value),
-            Select::make('headedProjects')
-                ->label('Assigned Project(s)')
-                ->relationship(
-                    name: 'headedProjects',
-                    titleAttribute: 'name',
-                    modifyQueryUsing: fn ($query) => $user ? $access->projectQuery($user) : $query->whereRaw('1=0'),
-                )
-                ->multiple()
-                ->preload()
-                ->searchable()
-                ->required()
-                ->visible(fn ($get): bool => $get('role') === UserRole::ProjectHead->value)
-                ->saveRelationshipsUsing(function (User $record, $state) use ($access, $user): void {
-                    $visible = $user ? $access->visibleProjectIds($user) : [];
-                    if ($visible === null) {
-                        $record->headedProjects()->sync($state ?? []);
-
-                        return;
-                    }
-
-                    $keep = $record->headedProjects()
-                        ->whereNotIn('projects.id', $visible)
-                        ->pluck('projects.id')
-                        ->all();
-                    $record->headedProjects()->sync(array_values(array_unique(array_merge($keep, $state ?? []))));
-                }),
+            CenterAssignmentSelect::make()
+                ->visible(fn ($get): bool => $get('role') === UserRole::ProjectHead->value),
             Select::make('managedCenters')
                 ->label('Assigned Center(s)')
                 ->relationship(
@@ -192,10 +145,12 @@ class OrgUserResource extends Resource
                     ->label('Assignment')
                     ->state(function (User $record): string {
                         if ($record->isDirector()) {
-                            return $record->directedProjects->pluck('name')->join(', ') ?: '—';
+                            return 'All organization';
                         }
                         if ($record->isProjectHead()) {
-                            return $record->headedProjects->pluck('name')->join(', ') ?: '—';
+                            return $record->headedCenters
+                                ->map(fn ($center) => $center->assignmentLabel())
+                                ->join(', ') ?: '—';
                         }
                         if ($record->isCenterManager()) {
                             return $record->managedCenters->pluck('name')->join(', ') ?: '—';

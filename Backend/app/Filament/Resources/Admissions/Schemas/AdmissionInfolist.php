@@ -19,14 +19,13 @@ class AdmissionInfolist
                 TextEntry::make('gender'),
                 TextEntry::make('religion'),
                 TextEntry::make('caste'),
-                TextEntry::make('scheme.name')->label('Scheme'),
+                TextEntry::make('scheme.name')->label('Scheme / Project'),
                 TextEntry::make('status')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof AdmissionStatus ? $state->label() : (string) $state)
                     ->color(fn ($state): string => ($state instanceof AdmissionStatus ? $state : AdmissionStatus::tryFrom((string) $state)) === AdmissionStatus::Submitted ? 'success' : 'warning'),
             ]),
             Section::make('Organization')->columns(3)->schema([
-                TextEntry::make('project.name')->label('Project'),
                 TextEntry::make('center.name')->label('Center'),
                 TextEntry::make('employee.full_name')->label('Employee'),
                 TextEntry::make('submitted_at')->dateTime('d M Y h:i A')->placeholder('-'),

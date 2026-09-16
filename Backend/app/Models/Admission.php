@@ -13,7 +13,6 @@ class Admission extends Model
 {
     protected $fillable = [
         'scheme_id',
-        'project_id',
         'center_id',
         'employee_id',
         'created_by_user_id',
@@ -53,11 +52,6 @@ class Admission extends Model
     public function scheme(): BelongsTo
     {
         return $this->belongsTo(Scheme::class);
-    }
-
-    public function project(): BelongsTo
-    {
-        return $this->belongsTo(Project::class);
     }
 
     public function center(): BelongsTo
@@ -170,8 +164,7 @@ class Admission extends Model
     {
         $this->loadMissing([
             'scheme:id,name,code,is_active',
-            'project:id,name,code',
-            'center:id,name,code,project_id',
+            'center:id,name,code,scheme_id',
             'employee:id,full_name,employee_code,center_id',
             'district:id,name,code',
             'taluka:id,name,code,district_id',
@@ -190,11 +183,15 @@ class Admission extends Model
                 'code' => $this->scheme->code,
                 'is_active' => $this->scheme->is_active,
             ] : null,
-            'project' => $this->project ? [
-                'id' => $this->project->id,
-                'name' => $this->project->name,
-                'code' => $this->project->code,
-            ] : null,
+            'project' => $this->scheme ? [
+                'id' => $this->scheme->id,
+                'name' => $this->scheme->name,
+                'code' => $this->scheme->code,
+            ] : ($this->center?->scheme ? [
+                'id' => $this->center->scheme->id,
+                'name' => $this->center->scheme->name,
+                'code' => $this->center->scheme->code,
+            ] : null),
             'center' => $this->center ? [
                 'id' => $this->center->id,
                 'name' => $this->center->name,

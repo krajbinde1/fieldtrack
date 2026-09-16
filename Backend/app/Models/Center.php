@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Center extends Model
 {
     protected $fillable = [
-        'project_id',
+        'scheme_id',
         'name',
         'code',
         'address',
@@ -24,14 +24,20 @@ class Center extends Model
         ];
     }
 
-    public function project(): BelongsTo
+    public function scheme(): BelongsTo
     {
-        return $this->belongsTo(Project::class);
+        return $this->belongsTo(Scheme::class);
     }
 
     public function centerManagers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'center_manager_assignments')
+            ->withTimestamps();
+    }
+
+    public function projectHeads(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'project_head_center_assignments')
             ->withTimestamps();
     }
 
@@ -43,5 +49,12 @@ class Center extends Model
     public function displayLabel(): string
     {
         return filled($this->code) ? "{$this->code} — {$this->name}" : $this->name;
+    }
+
+    public function assignmentLabel(): string
+    {
+        $schemeName = $this->scheme?->name ?: 'Scheme';
+
+        return $schemeName.' — '.$this->name;
     }
 }

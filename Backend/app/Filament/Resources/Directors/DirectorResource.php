@@ -8,10 +8,8 @@ use App\Filament\Resources\Directors\Pages\EditDirector;
 use App\Filament\Resources\Directors\Pages\ListDirectors;
 use App\Filament\Support\LoginIdInput;
 use App\Models\User;
-use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
@@ -62,7 +60,6 @@ class DirectorResource extends Resource
             LoginIdInput::make(),
             TextInput::make('email')->email()->required()->unique(ignoreRecord: true),
             TextInput::make('password')->password()->revealable()->dehydrated(fn ($state) => filled($state))->required(fn (string $operation): bool => $operation === 'create')->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
-            Select::make('directedProjects')->label('Assigned Project(s)')->relationship('directedProjects', 'name')->multiple()->preload()->searchable()->required(),
             Toggle::make('is_active')->default(true),
             Toggle::make('must_change_password')->default(true),
         ]);
@@ -74,7 +71,6 @@ class DirectorResource extends Resource
             ->columns([
                 TextColumn::make('name')->searchable(),
                 TextColumn::make('login_id')->label('Login ID'),
-                TextColumn::make('directedProjects.name')->label('Projects')->badge(),
                 IconColumn::make('is_active')->boolean()->label('Active'),
             ])
             ->recordActions([

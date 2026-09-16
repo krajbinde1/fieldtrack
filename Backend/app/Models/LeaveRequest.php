@@ -13,7 +13,7 @@ class LeaveRequest extends Model
 {
     protected $fillable = [
         'employee_id',
-        'project_id',
+        'scheme_id',
         'center_id',
         'created_by_user_id',
         'leave_type',
@@ -51,9 +51,9 @@ class LeaveRequest extends Model
         return $this->belongsTo(Employee::class);
     }
 
-    public function project(): BelongsTo
+    public function scheme(): BelongsTo
     {
-        return $this->belongsTo(Project::class);
+        return $this->belongsTo(Scheme::class);
     }
 
     public function center(): BelongsTo
@@ -113,8 +113,8 @@ class LeaveRequest extends Model
     {
         $this->loadMissing([
             'employee:id,full_name,employee_code,center_id',
-            'project:id,name,code',
-            'center:id,name,code,project_id',
+            'scheme:id,name,code',
+            'center:id,name,code,scheme_id',
             'reviewedBy:id,name',
         ]);
 
@@ -134,9 +134,9 @@ class LeaveRequest extends Model
             'reviewed_by' => $this->reviewedBy?->name,
             'editable' => $this->isPending(),
             'cancellable' => $this->isPending(),
-            'project' => $this->project ? [
-                'id' => $this->project->id,
-                'name' => $this->project->name,
+            'project' => $this->scheme ? [
+                'id' => $this->scheme->id,
+                'name' => $this->scheme->name,
             ] : null,
             'center' => $this->center ? [
                 'id' => $this->center->id,

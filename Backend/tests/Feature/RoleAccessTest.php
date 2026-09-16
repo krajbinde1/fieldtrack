@@ -4,7 +4,7 @@ use App\Enums\UserRole;
 use App\Models\Attendance;
 use App\Models\Center;
 use App\Models\Employee;
-use App\Models\Project;
+use App\Models\Scheme;
 use App\Models\User;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\UploadedFile;
@@ -16,10 +16,10 @@ uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
 
 function seedOrg(): array
 {
-    $projectA = Project::create(['name' => 'Project A', 'code' => 'PA', 'is_active' => true]);
-    $projectB = Project::create(['name' => 'Project B', 'code' => 'PB', 'is_active' => true]);
-    $centerA = Center::create(['project_id' => $projectA->id, 'name' => 'Center A', 'code' => 'CA', 'is_active' => true]);
-    $centerB = Center::create(['project_id' => $projectB->id, 'name' => 'Center B', 'code' => 'CB', 'is_active' => true]);
+    $projectA = Scheme::create(['name' => 'Project A', 'code' => 'PA', 'is_active' => true]);
+    $projectB = Scheme::create(['name' => 'Project B', 'code' => 'PB', 'is_active' => true]);
+    $centerA = Center::create(['scheme_id' => $projectA->id, 'name' => 'Center A', 'code' => 'CA', 'is_active' => true]);
+    $centerB = Center::create(['scheme_id' => $projectB->id, 'name' => 'Center B', 'code' => 'CB', 'is_active' => true]);
 
     $admin = User::create([
         'name' => 'Admin',
@@ -38,7 +38,6 @@ function seedOrg(): array
         'role' => UserRole::Director->value,
         'is_active' => true,
     ]);
-    $director->directedProjects()->attach($projectA->id);
 
     $projectHead = User::create([
         'name' => 'PH',
@@ -48,7 +47,7 @@ function seedOrg(): array
         'role' => UserRole::ProjectHead->value,
         'is_active' => true,
     ]);
-    $projectHead->headedProjects()->attach($projectA->id);
+    $projectHead->headedCenters()->attach($centerA->id);
 
     $centerManager = User::create([
         'name' => 'CM',
@@ -92,7 +91,7 @@ function seedOrg(): array
         'is_active' => true,
     ]);
 
-    return compact('admin', 'director', 'projectHead', 'centerManager', 'empA', 'empB', 'userA');
+    return compact('admin', 'director', 'projectHead', 'centerManager', 'empA', 'empB', 'userA', 'centerA', 'centerB', 'projectA', 'projectB');
 }
 
 it('blocks project head from another project route record', function () {
@@ -127,7 +126,7 @@ it('allows admin to view every employee route', function () {
         ->assertOk();
 });
 
-it('lets a director view assigned-project routes and blocks other projects', function () {
+it('lets a director view routes from every project', function () {
     $org = seedOrg();
     $own = Attendance::create([
         'employee_id' => $org['empA']->id,
@@ -147,7 +146,7 @@ it('lets a director view assigned-project routes and blocks other projects', fun
     Sanctum::actingAs($org['director']);
 
     $this->getJson('/api/director/route-tracking/'.$own->id)->assertOk();
-    $this->getJson('/api/director/route-tracking/'.$other->id)->assertForbidden();
+    $this->getJson('/api/director/route-tracking/'.$other->id)->assertOk();
 });
 
 it('prevents duplicate punch in', function () {
@@ -317,4 +316,153 @@ it('keeps an open punch after a new mobile login', function () {
     expect($response->json('data.attendance.punch_in_time'))->not->toBeNull()
         ->and($response->json('data.attendance.punch_out_time'))->toBeNull()
         ->and($response->json('data.punch_in_allowed'))->toBeFalse();
+});
+
+it('scopes project head access to assigned centers and not every center in the project', function () {
+    $org = seedOrg();
+    $sameProjectOther = Center::create([
+        'scheme_id' => $org['projectA']->id,
+        'name' => 'Center A2',
+        'code' => 'CA2',
+        'is_active' => true,
+    ]);
+    $empSameProject = Employee::create([
+        'center_id' => $sameProjectOther->id,
+        'full_name' => 'Emp A2',
+        'mobile' => '9000000003',
+        'status' => true,
+    ]);
+    $userSame = User::create([
+        'employee_id' => $empSameProject->id,
+        'name' => 'Emp A2',
+        'email' => 'empa2@test.local',
+        'login_id' => '9000000003',
+        'password' => Hash::make('Employee@123'),
+        'role' => UserRole::Employee->value,
+        'is_active' => true,
+    ]);
+
+    $access = app(\App\Services\OrganizationAccessService::class);
+    $ph = $org['projectHead'];
+
+    expect($access->visibleCenterIds($ph))->toBe([(int) $org['centerA']->id])
+        ->and($access->canViewEmployee($ph, $org['empA']))->toBeTrue()
+        ->and($access->canViewEmployee($ph, $empSameProject))->toBeFalse()
+        ->and($access->canViewEmployee($ph, $org['empB']))->toBeFalse();
+
+    $ownAttendance = Attendance::create([
+        'employee_id' => $org['empA']->id,
+        'attendance_date' => AttendanceCalendar::today()->toDateString(),
+        'punch_in_time' => '09:00:00',
+        'attendance_status' => 'Punched In',
+        'approval_status' => 'Pending',
+    ]);
+    $hiddenAttendance = Attendance::create([
+        'employee_id' => $empSameProject->id,
+        'attendance_date' => AttendanceCalendar::today()->toDateString(),
+        'punch_in_time' => '09:00:00',
+        'attendance_status' => 'Punched In',
+        'approval_status' => 'Pending',
+    ]);
+
+    Sanctum::actingAs($ph);
+    $this->getJson('/api/manager/team-attendance/'.$ownAttendance->id)->assertOk();
+    $this->getJson('/api/manager/team-attendance/'.$hiddenAttendance->id)->assertForbidden();
+    $this->getJson('/api/manager/route-tracking/'.$hiddenAttendance->id)->assertForbidden();
+
+    $ownLeave = $this->actingAs($org['userA'], 'sanctum')
+        ->postJson('/api/leaves', [
+            'leave_type' => 'casual',
+            'from_date' => '2026-09-20',
+            'to_date' => '2026-09-21',
+            'reason' => 'Assigned center leave',
+        ])
+        ->json('data.id');
+    $hiddenLeave = $this->actingAs($userSame, 'sanctum')
+        ->postJson('/api/leaves', [
+            'leave_type' => 'casual',
+            'from_date' => '2026-09-20',
+            'to_date' => '2026-09-21',
+            'reason' => 'Unassigned center leave',
+        ])
+        ->json('data.id');
+
+    Sanctum::actingAs($ph);
+    $this->getJson('/api/manager/leaves/'.$ownLeave)->assertOk();
+    $this->getJson('/api/manager/leaves/'.$hiddenLeave)->assertForbidden();
+
+    $ownAdmission = \App\Models\Admission::create([
+        'scheme_id' => $org['projectA']->id,
+        'center_id' => $org['centerA']->id,
+        'employee_id' => $org['empA']->id,
+        'first_name' => 'Own',
+        'last_name' => 'Center',
+    ]);
+    $hiddenAdmission = \App\Models\Admission::create([
+        'scheme_id' => $org['projectA']->id,
+        'center_id' => $sameProjectOther->id,
+        'employee_id' => $empSameProject->id,
+        'first_name' => 'Hidden',
+        'last_name' => 'Center',
+    ]);
+
+    Sanctum::actingAs($ph);
+    $this->getJson('/api/manager/admissions/'.$ownAdmission->id)->assertOk();
+    $this->getJson('/api/manager/admissions/'.$hiddenAdmission->id)->assertForbidden();
+
+    $ownTarget = \App\Models\AdmissionTarget::create([
+        'employee_id' => $org['empA']->id,
+        'center_id' => $org['centerA']->id,
+        'scheme_id' => $org['projectA']->id,
+        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'period_start' => '2026-09-14',
+        'period_end' => '2026-09-20',
+        'target_count' => 5,
+    ]);
+    $hiddenTarget = \App\Models\AdmissionTarget::create([
+        'employee_id' => $empSameProject->id,
+        'center_id' => $sameProjectOther->id,
+        'scheme_id' => $org['projectA']->id,
+        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'period_start' => '2026-09-14',
+        'period_end' => '2026-09-20',
+        'target_count' => 5,
+    ]);
+
+    expect($access->canViewAdmissionTarget($ph, $ownTarget->load('employee')))->toBeTrue()
+        ->and($access->canViewAdmissionTarget($ph, $hiddenTarget->load('employee')))->toBeFalse()
+        ->and($access->admissionTargetQuery($ph)->pluck('id')->all())->toContain($ownTarget->id)
+        ->and($access->admissionTargetQuery($ph)->pluck('id')->all())->not->toContain($hiddenTarget->id);
+
+    \Livewire\Livewire::actingAs($ph)
+        ->test(\App\Filament\Resources\Centers\Pages\ListCenters::class)
+        ->assertCanSeeTableRecords([$org['centerA']])
+        ->assertCanNotSeeTableRecords([$sameProjectOther, $org['centerB']]);
+});
+
+it('lets a project head access centers from different projects when those centers are assigned', function () {
+    $org = seedOrg();
+    $org['projectHead']->headedCenters()->sync([$org['centerA']->id, $org['centerB']->id]);
+
+    $access = app(\App\Services\OrganizationAccessService::class);
+    $ids = $access->visibleCenterIds($org['projectHead']);
+
+    expect($ids)->toContain((int) $org['centerA']->id)
+        ->and($ids)->toContain((int) $org['centerB']->id)
+        ->and($access->canViewEmployee($org['projectHead'], $org['empA']))->toBeTrue()
+        ->and($access->canViewEmployee($org['projectHead'], $org['empB']))->toBeTrue();
+});
+
+it('gives a director organization-wide access without project or center assignment', function () {
+    $org = seedOrg();
+    $access = app(\App\Services\OrganizationAccessService::class);
+
+    expect($org['director']->directedProjects()->count())->toBe(0)
+        ->and($access->visibleProjectIds($org['director']))->toBeNull()
+        ->and($access->visibleCenterIds($org['director']))->toBeNull()
+        ->and($access->visibleEmployeeIds($org['director']))->toBeNull()
+        ->and($access->canViewEmployee($org['director'], $org['empA']))->toBeTrue()
+        ->and($access->canViewEmployee($org['director'], $org['empB']))->toBeTrue()
+        ->and($access->canManageOrgUser($org['director'], $org['projectHead']))->toBeTrue()
+        ->and($access->canManageOrgUser($org['director'], $org['centerManager']))->toBeTrue();
 });

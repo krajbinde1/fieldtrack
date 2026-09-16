@@ -22,6 +22,7 @@ class Login extends BaseLogin
         return TextInput::make('login_id')
             ->label('Login ID')
             ->required()
+            ->maxLength(255)
             ->autocomplete()
             ->autofocus();
     }

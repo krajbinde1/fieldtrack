@@ -225,7 +225,7 @@ it('authorizes admission visibility by role hierarchy', function () {
 
     Sanctum::actingAs($ctx['director']);
     $this->getJson('/api/director/admissions/'.$ownId)->assertOk();
-    $this->getJson('/api/director/admissions/'.$otherId)->assertForbidden();
+    $this->getJson('/api/director/admissions/'.$otherId)->assertOk();
 
     Sanctum::actingAs($ctx['admin']);
     $this->getJson('/api/director/admissions/'.$ownId)->assertOk();

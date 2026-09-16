@@ -37,11 +37,10 @@ it('lets an admin open organization, people, and field-operation pages', functio
 
     foreach ([
         '/admin/users',
-        '/admin/projects',
+        '/admin/schemes',
         '/admin/centers',
         '/admin/attendances',
         '/admin/employee-routes',
-        '/admin/schemes',
         '/admin/admissions',
         '/admin/leave-requests',
         '/admin/reports',
@@ -57,7 +56,7 @@ it('lets a director view assigned-scope pages but not admin-only management', fu
     expect($director->role)->toBe(UserRole::Director->value);
 
     $this->actingAs($director)->get('/admin')->assertOk();
-    $this->actingAs($director)->get('/admin/projects')->assertOk();
+    $this->actingAs($director)->get('/admin/schemes')->assertOk();
     $this->actingAs($director)->get('/admin/users')->assertOk();
     $this->actingAs($director)->get('/admin/centers')->assertOk();
     $this->actingAs($director)->get('/admin/admissions')->assertOk();
@@ -69,8 +68,8 @@ it('lets a director view assigned-scope pages but not admin-only management', fu
     $this->actingAs($director)->get('/admin/employees')->assertNotFound();
     $this->actingAs($director)->get('/admin/app-update-settings')->assertForbidden();
     $this->actingAs($director)->get('/admin/device-management')->assertForbidden();
-    $this->actingAs($director)->get('/admin/schemes')->assertForbidden();
-    $this->actingAs($director)->get('/admin/projects/create')->assertForbidden();
+    $this->actingAs($director)->get('/admin/projects')->assertForbidden();
+    $this->actingAs($director)->get('/admin/schemes/create')->assertForbidden();
 });
 
 it('blocks a project head from project-head administration', function () {
@@ -78,6 +77,7 @@ it('blocks a project head from project-head administration', function () {
 
     $this->actingAs($projectHead)->get('/admin')->assertOk();
     $this->actingAs($projectHead)->get('/admin/centers')->assertOk();
+    $this->actingAs($projectHead)->get('/admin/schemes')->assertOk();
     $this->actingAs($projectHead)->get('/admin/users')->assertOk();
     $this->actingAs($projectHead)->get('/admin/project-heads')->assertForbidden();
     $this->actingAs($projectHead)->get('/admin/directors')->assertForbidden();
@@ -109,7 +109,7 @@ it('blocks a center manager from project administration', function () {
     $this->actingAs($centerManager)->get('/admin/center-users')->assertOk();
     $this->actingAs($centerManager)->get('/admin/users')->assertForbidden();
     $this->actingAs($centerManager)->get('/admin/centers')->assertOk();
-    $this->actingAs($centerManager)->get('/admin/projects')->assertForbidden();
+    $this->actingAs($centerManager)->get('/admin/schemes')->assertForbidden();
     $this->actingAs($centerManager)->get('/admin/centers/create')->assertForbidden();
     $this->actingAs($centerManager)->get('/admin/directors')->assertForbidden();
 });

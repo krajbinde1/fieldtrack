@@ -29,8 +29,7 @@ class AdmissionsTable
                     ->label('Applicant')
                     ->searchable(['full_name', 'first_name', 'last_name'])
                     ->sortable(),
-                TextColumn::make('scheme.name')->label('Scheme')->searchable()->toggleable(),
-                TextColumn::make('project.name')->label('Project')->toggleable(),
+                TextColumn::make('scheme.name')->label('Scheme / Project')->searchable()->toggleable(),
                 TextColumn::make('center.name')->label('Center')->toggleable(),
                 TextColumn::make('employee.full_name')
                     ->label('Employee')
@@ -47,16 +46,11 @@ class AdmissionsTable
             ])
             ->filters([
                 SelectFilter::make('scheme_id')
-                    ->label('Scheme')
-                    ->relationship('scheme', 'name')
-                    ->preload()
-                    ->searchable(),
-                SelectFilter::make('project_id')
-                    ->label('Project')
+                    ->label('Scheme / Project')
                     ->relationship(
-                        name: 'project',
+                        name: 'scheme',
                         titleAttribute: 'name',
-                        modifyQueryUsing: fn ($query) => $user ? $access->projectQuery($user) : $query->whereRaw('1=0'),
+                        modifyQueryUsing: fn ($query) => $user ? $access->schemeQuery($user) : $query->whereRaw('1=0'),
                     )
                     ->preload()
                     ->searchable(),

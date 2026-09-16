@@ -9,7 +9,7 @@ use App\Models\Attendance;
 use App\Models\Center;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
-use App\Models\Project;
+use App\Models\Scheme;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -20,30 +20,34 @@ final class OrganizationAccessService
      */
     public function visibleProjectIds(User $user): ?array
     {
-        if ($user->isAdmin()) {
+        if ($this->hasOrganizationWideAccess($user)) {
             return null;
         }
 
-        if ($user->isDirector()) {
-            return $user->directedProjects()->pluck('projects.id')->map(fn ($id) => (int) $id)->all();
-        }
-
         if ($user->isProjectHead()) {
-            return $user->headedProjects()->pluck('projects.id')->map(fn ($id) => (int) $id)->all();
-        }
-
-        if ($user->isCenterManager()) {
             return Center::query()
                 ->whereIn('id', $this->visibleCenterIds($user) ?? [])
-                ->pluck('project_id')
+                ->pluck('scheme_id')
+                ->filter()
                 ->unique()
                 ->map(fn ($id) => (int) $id)
                 ->values()
                 ->all();
         }
 
-        if ($user->isEmployeeUser() && $user->employee?->center?->project_id) {
-            return [(int) $user->employee->center->project_id];
+        if ($user->isCenterManager()) {
+            return Center::query()
+                ->whereIn('id', $this->visibleCenterIds($user) ?? [])
+                ->pluck('scheme_id')
+                ->filter()
+                ->unique()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
+        if ($user->isEmployeeUser() && $user->employee?->center?->scheme_id) {
+            return [(int) $user->employee->center->scheme_id];
         }
 
         return [];
@@ -54,18 +58,12 @@ final class OrganizationAccessService
      */
     public function visibleCenterIds(User $user): ?array
     {
-        if ($user->isAdmin()) {
+        if ($this->hasOrganizationWideAccess($user)) {
             return null;
         }
 
-        if ($user->isDirector() || $user->isProjectHead()) {
-            $projectIds = $this->visibleProjectIds($user) ?? [];
-
-            return Center::query()
-                ->whereIn('project_id', $projectIds)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+        if ($user->isProjectHead()) {
+            return $user->headedCenters()->pluck('centers.id')->map(fn ($id) => (int) $id)->all();
         }
 
         if ($user->isCenterManager()) {
@@ -84,7 +82,7 @@ final class OrganizationAccessService
      */
     public function visibleEmployeeIds(User $user): ?array
     {
-        if ($user->isAdmin()) {
+        if ($this->hasOrganizationWideAccess($user)) {
             return null;
         }
 
@@ -101,10 +99,20 @@ final class OrganizationAccessService
             ->all();
     }
 
+    public function visibleSchemeIds(User $user): ?array
+    {
+        return $this->visibleProjectIds($user);
+    }
+
     public function projectQuery(User $user): Builder
     {
-        $query = Project::query();
-        $ids = $this->visibleProjectIds($user);
+        return $this->schemeQuery($user);
+    }
+
+    public function schemeQuery(User $user): Builder
+    {
+        $query = Scheme::query();
+        $ids = $this->visibleSchemeIds($user);
 
         if ($ids === null) {
             return $query;
@@ -291,26 +299,12 @@ final class OrganizationAccessService
         return $user->isAdmin();
     }
 
-    public function canManageProjectHeads(User $user, ?Project $project = null): bool
+    public function canManageProjectHeads(User $user, mixed $scope = null): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
-
-        if (! $user->isDirector()) {
-            return false;
-        }
-
-        if ($project === null) {
-            return true;
-        }
-
-        $ids = $this->visibleProjectIds($user) ?? [];
-
-        return in_array((int) $project->id, $ids, true);
+        return $user->isAdmin() || $user->isDirector();
     }
 
-    public function canManageCenters(User $user, ?Project $project = null): bool
+    public function canManageCenters(User $user, Scheme|Center|null $scope = null): bool
     {
         if ($user->isAdmin()) {
             return true;
@@ -320,13 +314,19 @@ final class OrganizationAccessService
             return false;
         }
 
-        if ($project === null) {
+        if ($scope === null) {
             return true;
         }
 
-        $ids = $this->visibleProjectIds($user) ?? [];
+        if ($scope instanceof Center) {
+            $ids = $this->visibleCenterIds($user) ?? [];
 
-        return in_array((int) $project->id, $ids, true);
+            return in_array((int) $scope->id, $ids, true);
+        }
+
+        $ids = $this->visibleSchemeIds($user) ?? [];
+
+        return in_array((int) $scope->id, $ids, true);
     }
 
     public function canManageCenterManagers(User $user, ?Center $center = null): bool
@@ -406,10 +406,8 @@ final class OrganizationAccessService
             return true;
         }
 
-        if ($actor->isDirector() && $record->isProjectHead()) {
-            $projectIds = $this->visibleProjectIds($actor) ?? [];
-
-            return $record->headedProjects()->whereIn('projects.id', $projectIds)->exists();
+        if ($actor->isDirector()) {
+            return $record->isProjectHead() || $record->isCenterManager();
         }
 
         if ($actor->isProjectHead() && $record->isCenterManager()) {
@@ -456,5 +454,10 @@ final class OrganizationAccessService
             UserRole::ProjectHead->value,
             UserRole::CenterManager->value,
         ];
+    }
+
+    public function hasOrganizationWideAccess(User $user): bool
+    {
+        return $user->isAdmin() || $user->isDirector();
     }
 }

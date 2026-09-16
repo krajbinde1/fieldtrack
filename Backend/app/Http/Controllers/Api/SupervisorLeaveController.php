@@ -28,8 +28,11 @@ class SupervisorLeaveController extends Controller
         if ($request->filled('leave_type')) {
             $query->where('leave_type', $request->string('leave_type'));
         }
+        if ($request->filled('scheme_id')) {
+            $query->where('scheme_id', $request->integer('scheme_id'));
+        }
         if ($request->filled('project_id')) {
-            $query->where('project_id', $request->integer('project_id'));
+            $query->where('scheme_id', $request->integer('project_id'));
         }
         if ($request->filled('center_id')) {
             $query->where('center_id', $request->integer('center_id'));

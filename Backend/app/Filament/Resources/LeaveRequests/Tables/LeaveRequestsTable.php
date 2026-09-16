@@ -46,16 +46,16 @@ class LeaveRequestsTable
                         LeaveStatus::Pending => 'warning',
                         default => 'gray',
                     }),
-                TextColumn::make('project.name')->label('Project')->toggleable(),
+                TextColumn::make('scheme.name')->label('Scheme / Project')->toggleable(),
                 TextColumn::make('center.name')->label('Center')->toggleable(),
             ])
             ->filters([
-                SelectFilter::make('project_id')
-                    ->label('Project')
+                SelectFilter::make('scheme_id')
+                    ->label('Scheme / Project')
                     ->relationship(
-                        name: 'project',
+                        name: 'scheme',
                         titleAttribute: 'name',
-                        modifyQueryUsing: fn ($query) => $user ? $access->projectQuery($user) : $query->whereRaw('1=0'),
+                        modifyQueryUsing: fn ($query) => $user ? $access->schemeQuery($user) : $query->whereRaw('1=0'),
                     )
                     ->preload()
                     ->searchable(),

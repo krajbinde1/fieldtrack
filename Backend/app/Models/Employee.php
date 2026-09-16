@@ -146,8 +146,8 @@ class Employee extends Authenticatable
         return $this->displayLabel();
     }
 
-    public function project(): ?Project
+    public function scheme(): ?Scheme
     {
-        return $this->center?->project;
+        return $this->center?->scheme;
     }
 }

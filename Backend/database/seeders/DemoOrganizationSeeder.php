@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Enums\UserRole;
 use App\Models\Center;
 use App\Models\Employee;
-use App\Models\Project;
 use App\Models\Scheme;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -15,7 +14,7 @@ class DemoOrganizationSeeder extends Seeder
 {
     public function run(): void
     {
-        $project = Project::query()->updateOrCreate(
+        $project = Scheme::query()->updateOrCreate(
             ['code' => 'DEMO'],
             [
                 'name' => 'Demo Project',
@@ -35,8 +34,6 @@ class DemoOrganizationSeeder extends Seeder
                 'must_change_password' => false,
             ],
         );
-        $projectHead->headedProjects()->syncWithoutDetaching([$project->id]);
-
         $director = User::query()->updateOrCreate(
             ['login_id' => 'fielddirector'],
             [
@@ -48,9 +45,7 @@ class DemoOrganizationSeeder extends Seeder
                 'must_change_password' => false,
             ],
         );
-        $director->directedProjects()->syncWithoutDetaching([$project->id]);
-
-        $otherProject = Project::query()->updateOrCreate(
+        $otherProject = Scheme::query()->updateOrCreate(
             ['code' => 'OTHER'],
             [
                 'name' => 'Other Project',
@@ -60,7 +55,7 @@ class DemoOrganizationSeeder extends Seeder
         );
 
         $center = Center::query()->updateOrCreate(
-            ['project_id' => $project->id, 'code' => 'C1'],
+            ['scheme_id' => $project->id, 'code' => 'C1'],
             [
                 'name' => 'Demo Center',
                 'address' => 'Pune',
@@ -69,13 +64,15 @@ class DemoOrganizationSeeder extends Seeder
         );
 
         $otherCenter = Center::query()->updateOrCreate(
-            ['project_id' => $otherProject->id, 'code' => 'C9'],
+            ['scheme_id' => $otherProject->id, 'code' => 'C9'],
             [
                 'name' => 'Other Center',
                 'address' => 'Nashik',
                 'is_active' => true,
             ],
         );
+
+        $projectHead->headedCenters()->sync([$center->id]);
 
         $centerManager = User::query()->updateOrCreate(
             ['login_id' => 'centermgr'],

@@ -19,7 +19,7 @@ class EditEmployee extends EditRecord
     {
         $employee = $this->record;
         $data['login_id'] = $employee->user?->login_id;
-        $data['project_name'] = $employee->center?->project?->name ?: '—';
+        $data['scheme_name'] = $employee->center?->scheme?->name ?: '—';
         $data['center_manager_name'] = $employee->createdByUser?->name
             ?: $employee->center?->centerManagers->pluck('name')->join(', ')
             ?: '—';
@@ -49,7 +49,7 @@ class EditEmployee extends EditRecord
         $data['staff_role'] = $role->value;
         $data['designation'] = $role->label();
 
-        unset($data['login_id'], $data['login_password'], $data['project_name'], $data['center_manager_name']);
+        unset($data['login_id'], $data['login_password'], $data['scheme_name'], $data['project_name'], $data['center_manager_name']);
 
         return $data;
     }

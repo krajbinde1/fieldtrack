@@ -24,7 +24,7 @@ class EmployeeAuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
-            'login_id' => ['required', 'string', 'max:32'],
+            'login_id' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
             'device_id' => ['nullable', 'string', 'max:64'],
         ]);
@@ -33,7 +33,7 @@ class EmployeeAuthController extends Controller
             ->with([
                 'employee.reportingManager',
                 'employee.createdByUser',
-                'employee.center.project',
+                'employee.center.scheme',
                 'employee.center.centerManagers',
             ])
             ->where('login_id', $credentials['login_id'])
@@ -80,7 +80,7 @@ class EmployeeAuthController extends Controller
         $user = $request->user()->load([
             'employee.reportingManager',
             'employee.createdByUser',
-            'employee.center.project',
+            'employee.center.scheme',
             'employee.center.centerManagers',
         ]);
 
@@ -208,8 +208,10 @@ class EmployeeAuthController extends Controller
             'designation' => $employee->designation,
             'center_id' => $employee->center_id,
             'center_name' => $employee->center?->name,
-            'project_id' => $employee->center?->project_id,
-            'project_name' => $employee->center?->project?->name,
+            'scheme_id' => $employee->center?->scheme_id,
+            'scheme_name' => $employee->center?->scheme?->name,
+            'project_id' => $employee->center?->scheme_id,
+            'project_name' => $employee->center?->scheme?->name,
             'reporting_manager' => $employee->reportingManager?->full_name,
             'base_location' => $employee->base_location,
             'joining_date' => $employee->joining_date?->toDateString(),

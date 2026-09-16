@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Schemes;
 
+use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\Schemes\Pages\CreateScheme;
 use App\Filament\Resources\Schemes\Pages\EditScheme;
 use App\Filament\Resources\Schemes\Pages\ListSchemes;
@@ -22,9 +23,11 @@ use Filament\Tables\Table;
 
 class SchemeResource extends Resource
 {
+    use ScopesRecordsByOrganization;
+
     protected static ?string $model = Scheme::class;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Admissions';
+    protected static string|\UnitEnum|null $navigationGroup = 'Organization';
 
     protected static ?int $navigationSort = 1;
 
@@ -34,11 +37,32 @@ class SchemeResource extends Resource
 
     protected static ?string $modelLabel = 'Scheme';
 
+    protected static ?string $pluralModelLabel = 'Schemes';
+
     public static function canAccess(): bool
     {
         $user = auth()->user();
 
+        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isProjectHead());
+    }
+
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
         return (bool) ($user && app(OrganizationAccessService::class)->canManageSchemes($user));
+    }
+
+    public static function canEdit($record): bool
+    {
+        $user = auth()->user();
+
+        return (bool) ($user && app(OrganizationAccessService::class)->canManageSchemes($user));
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
     }
 
     public static function form(Schema $schema): Schema
@@ -57,15 +81,16 @@ class SchemeResource extends Resource
             ->columns([
                 TextColumn::make('name')->searchable()->sortable(),
                 TextColumn::make('code')->searchable(),
-                IconColumn::make('is_active')->boolean()->label('Active'),
+                TextColumn::make('centers_count')->counts('centers')->label('Centers'),
                 TextColumn::make('admissions_count')->counts('admissions')->label('Admissions'),
+                IconColumn::make('is_active')->boolean()->label('Active'),
                 TextColumn::make('updated_at')->since()->sortable(),
             ])
             ->filters([
                 TernaryFilter::make('is_active')->label('Active'),
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()->visible(fn (): bool => auth()->user()?->isAdmin() ?? false),
             ]);
     }
 

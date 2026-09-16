@@ -42,7 +42,8 @@ class DashboardController extends Controller
             'data' => [
                 'role' => $user->role,
                 'role_label' => $user->roleEnum()->label(),
-                'projects' => $access->projectQuery($user)->count(),
+                'schemes' => $access->schemeQuery($user)->count(),
+                'projects' => $access->schemeQuery($user)->count(),
                 'centers' => $access->centerQuery($user)->count(),
                 'employees' => $employeeIds->count(),
                 'today' => $today,

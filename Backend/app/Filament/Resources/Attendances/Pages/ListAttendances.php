@@ -28,6 +28,6 @@ class ListAttendances extends ListRecords
 
     protected function getTableQuery(): Builder
     {
-        return parent::getTableQuery()->with(['employee.center.project']);
+        return parent::getTableQuery()->with(['employee.center.scheme']);
     }
 }

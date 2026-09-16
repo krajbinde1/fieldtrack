@@ -19,9 +19,8 @@ class ListAdmissions extends ListRecords
     {
         return parent::getTableQuery()->with([
             'scheme',
-            'employee.center.project',
+            'employee.center.scheme',
             'center',
-            'project',
             'district',
             'taluka',
         ]);

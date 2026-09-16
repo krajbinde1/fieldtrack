@@ -13,7 +13,7 @@ return new class extends Migration
             $table->unsignedBigInteger('employee_id')->nullable()->index();
             $table->string('name');
             $table->string('email')->unique();
-            $table->string('login_id', 32)->unique();
+            $table->string('login_id', 255)->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->boolean('must_change_password')->default(false);

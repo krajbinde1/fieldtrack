@@ -39,12 +39,12 @@ class Reports extends Page implements HasTable
         return $table
             ->query(fn (): Builder => app(OrganizationAccessService::class)
                 ->attendanceQuery(auth()->user())
-                ->with(['employee.center.project']))
+                ->with(['employee.center.scheme']))
             ->defaultSort('attendance_date', 'desc')
             ->columns([
                 TextColumn::make('attendance_date')->date('d M Y')->sortable(),
                 TextColumn::make('employee.full_name')->label('Employee')->searchable(),
-                TextColumn::make('employee.center.project.name')->label('Project'),
+                TextColumn::make('employee.center.scheme.name')->label('Scheme / Project'),
                 TextColumn::make('employee.center.name')->label('Center'),
                 TextColumn::make('punch_in_time')->label('Punch In'),
                 TextColumn::make('punch_out_time')->label('Punch Out'),

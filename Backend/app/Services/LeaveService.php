@@ -23,14 +23,14 @@ final class LeaveService
      */
     public function relations(): array
     {
-        return ['employee', 'project', 'center', 'reviewedBy'];
+        return ['employee', 'scheme', 'center', 'reviewedBy'];
     }
 
     public function create(User $user, array $payload, ?UploadedFile $file = null): LeaveRequest
     {
         $employee = $this->requireEmployee($user);
         $center = $employee->center;
-        if ($center === null || $center->project_id === null) {
+        if ($center === null || $center->scheme_id === null) {
             throw ValidationException::withMessages([
                 'center' => 'Employee is not assigned to a center.',
             ]);
@@ -44,7 +44,7 @@ final class LeaveService
         $leave = LeaveRequest::query()->create([
             'employee_id' => $employee->id,
             'center_id' => $center->id,
-            'project_id' => $center->project_id,
+            'scheme_id' => $center->scheme_id,
             'created_by_user_id' => $user->id,
             'leave_type' => LeaveType::from($payload['leave_type']),
             'from_date' => $from->toDateString(),

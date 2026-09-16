@@ -51,7 +51,7 @@ class CenterResource extends Resource
     {
         $user = auth()->user();
 
-        return (bool) ($user && app(OrganizationAccessService::class)->canManageCenters($user, $record->project));
+        return (bool) ($user && app(OrganizationAccessService::class)->canManageCenters($user, $record));
     }
 
     public static function form(Schema $schema): Schema
@@ -60,12 +60,12 @@ class CenterResource extends Resource
         $user = auth()->user();
 
         return $schema->components([
-            Select::make('project_id')
-                ->label('Project')
+            Select::make('scheme_id')
+                ->label('Scheme / Project')
                 ->relationship(
-                    name: 'project',
+                    name: 'scheme',
                     titleAttribute: 'name',
-                    modifyQueryUsing: fn ($query) => $user ? $access->projectQuery($user) : $query->whereRaw('1=0'),
+                    modifyQueryUsing: fn ($query) => $user ? $access->schemeQuery($user) : $query->whereRaw('1=0'),
                 )
                 ->required()
                 ->preload()
@@ -93,7 +93,7 @@ class CenterResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('project.name')->label('Project')->searchable()->sortable(),
+                TextColumn::make('scheme.name')->label('Scheme / Project')->searchable()->sortable(),
                 TextColumn::make('code')->searchable(),
                 TextColumn::make('name')->searchable(),
                 TextColumn::make('centerManagers.name')->label('Managers')->badge(),
@@ -101,7 +101,7 @@ class CenterResource extends Resource
                 IconColumn::make('is_active')->boolean(),
             ])
             ->filters([
-                SelectFilter::make('project_id')->label('Project')->relationship('project', 'name')->preload(),
+                SelectFilter::make('scheme_id')->label('Scheme / Project')->relationship('scheme', 'name')->preload(),
             ])
             ->recordActions([
                 EditAction::make(),

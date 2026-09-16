@@ -72,6 +72,12 @@ class User extends Authenticatable implements FilamentUser
             ->withTimestamps();
     }
 
+    public function headedCenters(): BelongsToMany
+    {
+        return $this->belongsToMany(Center::class, 'project_head_center_assignments')
+            ->withTimestamps();
+    }
+
     public function managedCenters(): BelongsToMany
     {
         return $this->belongsToMany(Center::class, 'center_manager_assignments')

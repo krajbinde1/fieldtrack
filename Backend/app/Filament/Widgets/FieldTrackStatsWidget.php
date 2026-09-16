@@ -33,7 +33,7 @@ class FieldTrackStatsWidget extends StatsOverviewWidget
             ->count();
 
         return [
-            Stat::make('Projects', (string) $access->projectQuery($user)->count()),
+            Stat::make('Schemes', (string) $access->schemeQuery($user)->count()),
             Stat::make('Centers', (string) $access->centerQuery($user)->count()),
             Stat::make('Employees', (string) $employeeIds->count()),
             Stat::make('Punched In Today', (string) $punchedIn),

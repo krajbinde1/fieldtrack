@@ -12,6 +12,15 @@ it('requires mobile when login id is blank', function () {
     LoginId::resolve('  ', '');
 })->throws(ValidationException::class);
 
+it('uses email as login id when org user login id is blank', function () {
+    expect(LoginId::resolveFromEmail(null, 'director2@fieldtrack.local'))->toBe('director2@fieldtrack.local')
+        ->and(LoginId::resolveFromEmail('  custom.dir  ', 'director2@fieldtrack.local'))->toBe('custom.dir');
+});
+
+it('requires email when org user login id is blank', function () {
+    LoginId::resolveFromEmail('  ', '');
+})->throws(ValidationException::class);
+
 it('rejects a duplicate login id', function () {
     seedOrg();
     LoginId::assertUnique('director');

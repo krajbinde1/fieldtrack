@@ -118,7 +118,7 @@ it('requires a rejection remark and keeps other center managers from acting', fu
     $this->postJson('/api/manager/leaves/'.$otherId.'/approve')->assertForbidden();
 });
 
-it('lets project head view assigned project leave but not approve, director view assigned project, and admin view all', function () {
+it('lets project head view assigned project leave but not approve, director view all, and admin view all', function () {
     $org = seedOrg();
 
     $ownId = $this->actingAs($org['userA'], 'sanctum')
@@ -137,7 +137,7 @@ it('lets project head view assigned project leave but not approve, director view
 
     Sanctum::actingAs($org['director']);
     $this->getJson('/api/director/leaves/'.$ownId)->assertOk();
-    $this->getJson('/api/director/leaves/'.$otherId)->assertForbidden();
+    $this->getJson('/api/director/leaves/'.$otherId)->assertOk();
     $this->postJson('/api/director/leaves/'.$ownId.'/approve')->assertNotFound();
 
     Sanctum::actingAs($org['admin']);

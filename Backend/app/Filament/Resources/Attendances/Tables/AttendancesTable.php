@@ -31,7 +31,7 @@ class AttendancesTable
                     ->formatStateUsing(fn (Attendance $record): string => $record->employee?->displayLabel() ?? '-')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('employee.center.project.name')->label('Project')->toggleable(),
+                TextColumn::make('employee.center.scheme.name')->label('Scheme / Project')->toggleable(),
                 TextColumn::make('employee.center.name')->label('Center')->toggleable(),
                 TextColumn::make('attendance_date')
                     ->label('Attendance Date')

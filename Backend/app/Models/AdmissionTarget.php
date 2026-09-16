@@ -12,7 +12,7 @@ class AdmissionTarget extends Model
     protected $fillable = [
         'employee_id',
         'center_id',
-        'project_id',
+        'scheme_id',
         'assigned_by_user_id',
         'parent_id',
         'target_type',
@@ -41,9 +41,9 @@ class AdmissionTarget extends Model
         return $this->belongsTo(Center::class);
     }
 
-    public function project(): BelongsTo
+    public function scheme(): BelongsTo
     {
-        return $this->belongsTo(Project::class);
+        return $this->belongsTo(Scheme::class);
     }
 
     public function assignedBy(): BelongsTo
@@ -81,13 +81,13 @@ class AdmissionTarget extends Model
      */
     public function toApiArray(): array
     {
-        $this->loadMissing(['employee:id,full_name,employee_code', 'center:id,name', 'project:id,name', 'weeks']);
+        $this->loadMissing(['employee:id,full_name,employee_code', 'center:id,name', 'scheme:id,name', 'weeks']);
 
         return [
             'id' => $this->id,
             'employee_id' => $this->employee_id,
             'center_id' => $this->center_id,
-            'project_id' => $this->project_id,
+            'scheme_id' => $this->scheme_id,
             'parent_id' => $this->parent_id,
             'target_type' => $this->target_type?->value,
             'target_type_label' => $this->target_type?->label(),
@@ -100,7 +100,8 @@ class AdmissionTarget extends Model
                 'employee_code' => $this->employee->employee_code,
             ] : null,
             'center' => $this->center ? ['id' => $this->center->id, 'name' => $this->center->name] : null,
-            'project' => $this->project ? ['id' => $this->project->id, 'name' => $this->project->name] : null,
+            'scheme' => $this->scheme ? ['id' => $this->scheme->id, 'name' => $this->scheme->name] : null,
+            'project' => $this->scheme ? ['id' => $this->scheme->id, 'name' => $this->scheme->name] : null,
             'weekly_splits' => $this->weeks->map(fn (self $week) => [
                 'id' => $week->id,
                 'period_start' => $week->period_start?->toDateString(),

@@ -15,12 +15,12 @@ function makeAttendanceEmployee(array $overrides = []): Employee
     static $n = 0;
     $n++;
 
-    $project = \App\Models\Project::query()->firstOrCreate(
+    $scheme = \App\Models\Scheme::query()->firstOrCreate(
         ['code' => 'T'.$n],
-        ['name' => 'Test Project '.$n, 'is_active' => true],
+        ['name' => 'Test Scheme '.$n, 'is_active' => true],
     );
     $center = \App\Models\Center::query()->firstOrCreate(
-        ['project_id' => $project->id, 'code' => 'C'.$n],
+        ['scheme_id' => $scheme->id, 'code' => 'C'.$n],
         ['name' => 'Test Center '.$n, 'is_active' => true],
     );
 

@@ -80,7 +80,7 @@ enum UserRole: string
 
     public function canViewAllOrganization(): bool
     {
-        return $this === self::Admin;
+        return $this === self::Admin || $this === self::Director;
     }
 
     /**

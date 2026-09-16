@@ -24,7 +24,7 @@ final class AdmissionService
         $employee = $this->requireEmployee($user);
         $center = $employee->center;
 
-        if ($center === null || $center->project_id === null) {
+        if ($center === null || $center->scheme_id === null) {
             throw ValidationException::withMessages([
                 'center' => 'Employee is not assigned to a center.',
             ]);
@@ -35,7 +35,6 @@ final class AdmissionService
             [
                 'employee_id' => $employee->id,
                 'center_id' => $center->id,
-                'project_id' => $center->project_id,
                 'created_by_user_id' => $user->id,
                 'status' => AdmissionStatus::Draft,
                 'state' => AdmissionLookups::STATE_MAHARASHTRA,
@@ -271,7 +270,6 @@ final class AdmissionService
     {
         return [
             'scheme',
-            'project',
             'center',
             'employee',
             'district',

@@ -68,8 +68,9 @@ final class AdmissionTargetService
     {
         return $this->access->admissionTargetQuery($user)
             ->whereNull('parent_id')
-            ->with(['employee', 'center', 'project', 'weeks'])
-            ->when(isset($filters['project_id']), fn ($q) => $q->where('project_id', $filters['project_id']))
+            ->with(['employee', 'center', 'scheme', 'weeks'])
+            ->when(isset($filters['scheme_id']), fn ($q) => $q->where('scheme_id', $filters['scheme_id']))
+            ->when(isset($filters['project_id']), fn ($q) => $q->where('scheme_id', $filters['project_id']))
             ->when(isset($filters['center_id']), fn ($q) => $q->where('center_id', $filters['center_id']))
             ->when(isset($filters['employee_id']), fn ($q) => $q->where('employee_id', $filters['employee_id']))
             ->when(isset($filters['target_type']), fn ($q) => $q->where('target_type', $filters['target_type']))
@@ -84,7 +85,13 @@ final class AdmissionTargetService
     public function lookups(User $user): array
     {
         return [
-            'projects' => $this->access->projectQuery($user)
+            'schemes' => $this->access->schemeQuery($user)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($row) => ['id' => $row->id, 'name' => $row->name])
+                ->values()
+                ->all(),
+            'projects' => $this->access->schemeQuery($user)
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn ($row) => ['id' => $row->id, 'name' => $row->name])
@@ -92,16 +99,17 @@ final class AdmissionTargetService
                 ->all(),
             'centers' => $this->access->centerQuery($user)
                 ->orderBy('name')
-                ->get(['id', 'name', 'project_id'])
+                ->get(['id', 'name', 'scheme_id'])
                 ->map(fn ($row) => [
                     'id' => $row->id,
                     'name' => $row->name,
-                    'project_id' => $row->project_id,
+                    'scheme_id' => $row->scheme_id,
+                    'project_id' => $row->scheme_id,
                 ])
                 ->values()
                 ->all(),
             'employees' => $this->access->employeeQuery($user)
-                ->with('center:id,name,project_id')
+                ->with('center:id,name,scheme_id')
                 ->where('status', true)
                 ->orderBy('full_name')
                 ->get(['id', 'full_name', 'employee_code', 'center_id'])
@@ -111,7 +119,8 @@ final class AdmissionTargetService
                     'employee_code' => $employee->employee_code,
                     'center_id' => $employee->center_id,
                     'center_name' => $employee->center?->name,
-                    'project_id' => $employee->center?->project_id,
+                    'scheme_id' => $employee->center?->scheme_id,
+                    'project_id' => $employee->center?->scheme_id,
                 ])
                 ->values()
                 ->all(),
@@ -136,8 +145,9 @@ final class AdmissionTargetService
         [$start, $end] = AdmissionTargetPeriod::resolve($preset, $from, $to);
 
         $employees = $this->access->employeeQuery($viewer)
-            ->with(['center.project'])
-            ->when(isset($filters['project_id']), fn ($q) => $q->whereHas('center', fn ($c) => $c->where('project_id', $filters['project_id'])))
+            ->with(['center.scheme'])
+            ->when(isset($filters['scheme_id']), fn ($q) => $q->whereHas('center', fn ($c) => $c->where('scheme_id', $filters['scheme_id'])))
+            ->when(isset($filters['project_id']), fn ($q) => $q->whereHas('center', fn ($c) => $c->where('scheme_id', $filters['project_id'])))
             ->when(isset($filters['center_id']), fn ($q) => $q->where('center_id', $filters['center_id']))
             ->when(isset($filters['employee_id']), fn ($q) => $q->where('id', $filters['employee_id']))
             ->orderBy('full_name')
@@ -167,8 +177,10 @@ final class AdmissionTargetService
             'employee_code' => $employee->employee_code,
             'center_id' => $employee->center_id,
             'center_name' => $employee->center?->name,
-            'project_id' => $employee->center?->project_id,
-            'project_name' => $employee->center?->project?->name,
+            'scheme_id' => $employee->center?->scheme_id,
+            'scheme_name' => $employee->center?->scheme?->name,
+            'project_id' => $employee->center?->scheme_id,
+            'project_name' => $employee->center?->scheme?->name,
             'period' => [
                 'preset' => $preset,
                 'from' => $start->toDateString(),
@@ -207,7 +219,7 @@ final class AdmissionTargetService
             $parent = AdmissionTarget::query()->create([
                 'employee_id' => $employee->id,
                 'center_id' => $employee->center_id,
-                'project_id' => $employee->center->project_id,
+                'scheme_id' => $employee->center->scheme_id,
                 'assigned_by_user_id' => $user->id,
                 'parent_id' => null,
                 'target_type' => AdmissionTargetType::Monthly,
@@ -220,7 +232,7 @@ final class AdmissionTargetService
                 AdmissionTarget::query()->create([
                     'employee_id' => $employee->id,
                     'center_id' => $employee->center_id,
-                    'project_id' => $employee->center->project_id,
+                    'scheme_id' => $employee->center->scheme_id,
                     'assigned_by_user_id' => $user->id,
                     'parent_id' => $parent->id,
                     'target_type' => AdmissionTargetType::Weekly,
@@ -230,7 +242,7 @@ final class AdmissionTargetService
                 ]);
             }
 
-            return $parent->fresh(['weeks', 'employee', 'center', 'project']);
+            return $parent->fresh(['weeks', 'employee', 'center', 'scheme']);
         });
     }
 
@@ -264,14 +276,14 @@ final class AdmissionTargetService
             return AdmissionTarget::query()->create([
                 'employee_id' => $employee->id,
                 'center_id' => $employee->center_id,
-                'project_id' => $employee->center->project_id,
+                'scheme_id' => $employee->center->scheme_id,
                 'assigned_by_user_id' => $user->id,
                 'parent_id' => null,
                 'target_type' => AdmissionTargetType::Weekly,
                 'period_start' => $weekStart->toDateString(),
                 'period_end' => $weekEnd->toDateString(),
                 'target_count' => $count,
-            ])->fresh(['employee', 'center', 'project']);
+            ])->fresh(['employee', 'center', 'scheme']);
         });
     }
 

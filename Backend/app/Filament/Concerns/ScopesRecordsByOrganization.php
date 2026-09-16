@@ -8,7 +8,7 @@ use App\Models\Attendance;
 use App\Models\Center;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
-use App\Models\Project;
+use App\Models\Scheme;
 use App\Services\OrganizationAccessService;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -27,7 +27,7 @@ trait ScopesRecordsByOrganization
         $model = static::getModel();
 
         $ids = match ($model) {
-            Project::class => $access->visibleProjectIds($user),
+            Scheme::class => $access->visibleSchemeIds($user),
             Center::class => $access->visibleCenterIds($user),
             Employee::class, Attendance::class, Admission::class, LeaveRequest::class, AdmissionTarget::class => $access->visibleEmployeeIds($user),
             default => null,
@@ -38,13 +38,13 @@ trait ScopesRecordsByOrganization
         }
 
         if ($model === Attendance::class) {
-            return $query->whereIn('employee_id', $ids)->with(['employee.center.project']);
+            return $query->whereIn('employee_id', $ids)->with(['employee.center.scheme']);
         }
 
         if ($model === Admission::class) {
             return $query->whereIn('employee_id', $ids)->with([
                 'scheme',
-                'employee.center.project',
+                'employee.center.scheme',
                 'district',
                 'taluka',
             ]);
@@ -52,17 +52,17 @@ trait ScopesRecordsByOrganization
 
         if ($model === LeaveRequest::class) {
             return $query->whereIn('employee_id', $ids)->with([
-                'employee.center.project',
+                'employee.center.scheme',
                 'center',
-                'project',
+                'scheme',
             ]);
         }
 
         if ($model === AdmissionTarget::class) {
             return $query->whereNull('parent_id')->whereIn('employee_id', $ids)->with([
-                'employee.center.project',
+                'employee.center.scheme',
                 'center',
-                'project',
+                'scheme',
                 'weeks',
             ]);
         }

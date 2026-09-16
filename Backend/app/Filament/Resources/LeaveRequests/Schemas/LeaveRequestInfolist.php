@@ -34,7 +34,7 @@ class LeaveRequestInfolist
                 TextEntry::make('rejection_remark')->placeholder('-')->columnSpanFull(),
             ]),
             Section::make('Organization')->columns(3)->schema([
-                TextEntry::make('project.name')->label('Project'),
+                TextEntry::make('scheme.name')->label('Scheme / Project'),
                 TextEntry::make('center.name')->label('Center'),
                 TextEntry::make('reviewedBy.name')->label('Reviewed By')->placeholder('-'),
                 TextEntry::make('reviewed_at')->dateTime('d M Y h:i A')->placeholder('-'),
