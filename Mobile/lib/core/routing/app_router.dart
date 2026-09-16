@@ -5,6 +5,7 @@ import 'route_permissions.dart';
 import '../../modules/admissions/screens/admission_hub_screen.dart';
 import '../../modules/admissions/screens/admission_list_screen.dart';
 import '../../modules/admissions/screens/admission_wizard_screen.dart';
+import '../../modules/admissions/screens/employee_targets_screen.dart';
 import '../../modules/admissions/screens/supervisor_admission_detail_screen.dart';
 import '../../modules/admissions/screens/supervisor_admission_list_screen.dart';
 import '../../modules/attendance/models/attendance.dart';
@@ -129,6 +130,10 @@ GoRouter createRouter(
         GoRoute(
           path: '/admissions/submitted',
           builder: (_, _) => const AdmissionListScreen(drafts: false),
+        ),
+        GoRoute(
+          path: '/admissions/targets',
+          builder: (_, _) => const EmployeeTargetsScreen(),
         ),
         GoRoute(
           path: '/admissions/:id',

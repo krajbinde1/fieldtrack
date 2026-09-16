@@ -9,12 +9,16 @@ class PgWelcomeCard extends StatelessWidget {
     required this.dateLabel,
     this.photoUrl,
     this.role,
+    this.padding = const EdgeInsets.all(AppSpacing.lg),
+    this.avatarRadius = 32,
   });
 
   final String name;
   final String dateLabel;
   final String? photoUrl;
   final String? role;
+  final EdgeInsetsGeometry padding;
+  final double avatarRadius;
 
   @override
   Widget build(BuildContext context) => PgCard(
@@ -23,7 +27,7 @@ class PgWelcomeCard extends StatelessWidget {
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ),
-    padding: const EdgeInsets.all(AppSpacing.lg),
+    padding: padding,
     child: Row(
       children: [
         Container(
@@ -32,7 +36,7 @@ class PgWelcomeCard extends StatelessWidget {
             border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
           ),
           child: CircleAvatar(
-            radius: 32,
+            radius: avatarRadius,
             backgroundColor: Colors.white.withValues(alpha: 0.2),
             backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
             child: photoUrl == null
@@ -85,11 +89,15 @@ class PgWelcomeCard extends StatelessWidget {
                     child: const Icon(Icons.calendar_today_rounded),
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    dateLabel,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontWeight: FontWeight.w500,
+                  Expanded(
+                    child: Text(
+                      dateLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],

@@ -32,6 +32,31 @@ const _documentSlots = [
   ('other', 'Other Document', false),
 ];
 
+/// 0-based local wizard index (UI steps 1–5). Draft API `current_step` is 1-based
+/// and must not be applied as an extra increment on top of Next/Back.
+class AdmissionWizardNavigation {
+  const AdmissionWizardNavigation._();
+
+  static const int firstIndex = 0;
+  static const int lastIndex = 4;
+
+  static int next(int current) {
+    if (current >= lastIndex) return lastIndex;
+    return current + 1;
+  }
+
+  static int back(int current) {
+    if (current <= firstIndex) return firstIndex;
+    return current - 1;
+  }
+
+  /// 1-based `current_step` to persist when advancing from [current] via Next.
+  static int draftStepOnNext(int current) => next(current) + 1;
+
+  /// 1-based `current_step` to persist on Save as Draft without leaving [current].
+  static int draftStepOnSave(int current) => current + 1;
+}
+
 class AdmissionWizardScreen extends StatefulWidget {
   const AdmissionWizardScreen({super.key, this.admissionId});
 
@@ -121,13 +146,15 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
     }
   }
 
-  void _applyRecord(AdmissionRecord record) {
+  void _applyRecord(AdmissionRecord record, {bool applyStep = true}) {
     _record = record;
     _admissionId = record.id;
     _editable = record.editable;
-    _step = record.isSubmitted
-        ? 4
-        : (record.currentStep - 1).clamp(0, 4);
+    if (applyStep) {
+      _step = record.isSubmitted
+          ? 4
+          : (record.currentStep - 1).clamp(0, 4);
+    }
     _schemeId = record.schemeId;
     _firstName.text = record.firstName ?? '';
     _middleName.text = record.middleName ?? '';
@@ -195,7 +222,7 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
       );
       if (!mounted) return false;
       setState(() {
-        _applyRecord(record);
+        _applyRecord(record, applyStep: false);
         _busy = false;
       });
       return true;
@@ -208,16 +235,23 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
   }
 
   Future<void> _saveDraft() async {
-    final ok = await _persist(step: _step + 1, validate: false);
+    final ok = await _persist(
+      step: AdmissionWizardNavigation.draftStepOnSave(_step),
+      validate: false,
+    );
     if (ok && mounted) {
       _toast('Draft saved.');
     }
   }
 
   Future<void> _next() async {
-    if (_step < 4) {
-      final ok = await _persist(step: _step + 2, validate: true);
-      if (ok && mounted) setState(() => _step += 1);
+    if (_step < AdmissionWizardNavigation.lastIndex) {
+      final nextStep = AdmissionWizardNavigation.next(_step);
+      final ok = await _persist(
+        step: AdmissionWizardNavigation.draftStepOnNext(_step),
+        validate: true,
+      );
+      if (ok && mounted) setState(() => _step = nextStep);
       return;
     }
     await _submit();
@@ -726,7 +760,11 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
             if (_step > 0)
               Expanded(
                 child: OutlinedButton(
-                  onPressed: _busy ? null : () => setState(() => _step -= 1),
+                  onPressed: _busy
+                      ? null
+                      : () => setState(
+                          () => _step = AdmissionWizardNavigation.back(_step),
+                        ),
                   child: const Text('Back'),
                 ),
               ),

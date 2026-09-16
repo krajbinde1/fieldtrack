@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\Director\DirectorRouteTrackingController;
 use App\Http\Controllers\Api\EmployeeAdmissionController;
+use App\Http\Controllers\Api\EmployeeAdmissionTargetController;
 use App\Http\Controllers\Api\EmployeeAuthController;
 use App\Http\Controllers\Api\EmployeeLeaveController;
 use App\Http\Controllers\Api\EmployeeRoutePointController;
@@ -97,6 +98,8 @@ Route::middleware(['auth:sanctum', 'role:employee'])->prefix('admissions')->grou
     Route::patch('drafts/{admission}', [EmployeeAdmissionController::class, 'updateDraft']);
     Route::delete('drafts/{admission}', [EmployeeAdmissionController::class, 'destroyDraft']);
     Route::get('submitted', [EmployeeAdmissionController::class, 'submitted']);
+    Route::get('targets/summary', [EmployeeAdmissionTargetController::class, 'summary']);
+    Route::get('targets', [EmployeeAdmissionTargetController::class, 'index']);
     Route::post('{admission}/submit', [EmployeeAdmissionController::class, 'submit']);
     Route::post('{admission}/documents', [EmployeeAdmissionController::class, 'uploadDocument']);
     Route::delete('{admission}/documents/{document}', [EmployeeAdmissionController::class, 'removeDocument']);

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_dio.dart';
 import '../../../core/api/api_errors.dart';
 import '../models/admission.dart';
+import '../models/admission_target.dart';
 
 class AdmissionApiException implements Exception {
   const AdmissionApiException(this.message);
@@ -78,6 +79,28 @@ class AdmissionApi {
   Future<List<AdmissionRecord>> drafts() => _list('/admissions/drafts');
 
   Future<List<AdmissionRecord>> submitted() => _list('/admissions/submitted');
+
+  Future<AdmissionTargetSummary> targetSummary({
+    String preset = 'this_week',
+  }) async {
+    final data = await _get(
+      '/admissions/targets/summary',
+      query: {'preset': preset},
+    );
+    return AdmissionTargetSummary.fromJson(_map(data));
+  }
+
+  Future<List<AdmissionTargetRecord>> targets() async {
+    final data = await _get('/admissions/targets');
+    final items = data is List ? data : const <dynamic>[];
+    return items
+        .whereType<Map>()
+        .map(
+          (item) =>
+              AdmissionTargetRecord.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList();
+  }
 
   Future<AdmissionRecord> show(int id) async {
     final data = await _get('/admissions/$id');
@@ -187,9 +210,9 @@ class AdmissionApi {
         .toList();
   }
 
-  Future<dynamic> _get(String path) async {
+  Future<dynamic> _get(String path, {Map<String, dynamic>? query}) async {
     try {
-      final response = await _dio.get(path);
+      final response = await _dio.get(path, queryParameters: query);
       return response.data['data'];
     } on DioException catch (error) {
       throw _error(error);
