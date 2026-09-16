@@ -52,23 +52,26 @@ class AdmissionApi {
 
   Future<AdmissionLookups> lookups() async {
     final data = await _get('/admissions/districts');
-    return AdmissionLookups.fromJson(
-      data is Map<String, dynamic>
-          ? data
-          : data is Map
-          ? Map<String, dynamic>.from(data)
-          : <String, dynamic>{},
-    );
+    if (data is List) {
+      return AdmissionLookups.fromJson({
+        'state': 'Maharashtra',
+        'districts': data,
+      });
+    }
+    return AdmissionLookups.fromJson(_map(data));
   }
 
   Future<List<NamedLookup>> talukas(int districtId) async {
     final data = await _get('/admissions/districts/$districtId/talukas');
     final items = data is Map && data['talukas'] is List
         ? data['talukas'] as List
-        : const <dynamic>[];
+        : data is List
+            ? data
+            : const <dynamic>[];
     return items
         .whereType<Map>()
         .map((item) => NamedLookup.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.id > 0 && item.name.trim().isNotEmpty)
         .toList();
   }
 

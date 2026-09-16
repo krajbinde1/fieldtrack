@@ -140,4 +140,19 @@ final class MaharashtraGeoCatalog
 
         return $talukas;
     }
+
+    public static function districtCount(): int
+    {
+        return count(self::districts());
+    }
+
+    public static function talukaCount(): int
+    {
+        $count = 0;
+        foreach (self::districts() as $district) {
+            $count += count($district['talukas']);
+        }
+
+        return $count;
+    }
 }

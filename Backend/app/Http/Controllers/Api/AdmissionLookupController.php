@@ -7,6 +7,7 @@ use App\Models\MaharashtraDistrict;
 use App\Models\MaharashtraTaluka;
 use App\Models\Scheme;
 use App\Support\AdmissionLookups;
+use Database\Seeders\MaharashtraGeoSeeder;
 use Illuminate\Http\JsonResponse;
 
 class AdmissionLookupController extends Controller
@@ -23,6 +24,8 @@ class AdmissionLookupController extends Controller
 
     public function districts(): JsonResponse
     {
+        MaharashtraGeoSeeder::ensure();
+
         $districts = MaharashtraDistrict::query()
             ->where('is_active', true)
             ->orderBy('sort_order')
@@ -40,6 +43,8 @@ class AdmissionLookupController extends Controller
 
     public function talukas(MaharashtraDistrict $district): JsonResponse
     {
+        MaharashtraGeoSeeder::ensure();
+
         $talukas = MaharashtraTaluka::query()
             ->where('district_id', $district->id)
             ->where('is_active', true)

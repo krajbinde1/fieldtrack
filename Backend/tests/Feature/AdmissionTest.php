@@ -61,6 +61,38 @@ it('lists only active schemes to employees and hides inactive ones', function ()
         ->assertJsonMissing(['name' => 'Closed Scheme']);
 });
 
+it('returns every Maharashtra district and keeps Maharashtra as the state', function () {
+    $org = seedOrg();
+
+    $response = $this->actingAs($org['userA'], 'sanctum')
+        ->getJson('/api/admissions/districts')
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.state', 'Maharashtra');
+
+    $districts = collect($response->json('data.districts'));
+    expect($districts)->toHaveCount(\App\Support\MaharashtraGeoCatalog::districtCount())
+        ->and($districts->pluck('name'))->toContain('Pune')
+        ->and($districts->pluck('name'))->toContain('Nashik')
+        ->and($districts->pluck('name'))->toContain('Chhatrapati Sambhajinagar')
+        ->and(\App\Models\MaharashtraDistrict::query()->count())->toBe(\App\Support\MaharashtraGeoCatalog::districtCount())
+        ->and(\App\Models\MaharashtraTaluka::query()->count())->toBe(\App\Support\MaharashtraGeoCatalog::talukaCount());
+});
+
+it('seeds district master data without duplicates when the lookup table is empty', function () {
+    $org = seedOrg();
+    (new MaharashtraGeoSeeder)->run();
+    (new MaharashtraGeoSeeder)->run();
+
+    expect(\App\Models\MaharashtraDistrict::query()->count())->toBe(\App\Support\MaharashtraGeoCatalog::districtCount())
+        ->and(\App\Models\MaharashtraTaluka::query()->count())->toBe(\App\Support\MaharashtraGeoCatalog::talukaCount());
+
+    $this->actingAs($org['userA'], 'sanctum')
+        ->getJson('/api/admissions/districts')
+        ->assertOk()
+        ->assertJsonPath('data.state', 'Maharashtra');
+});
+
 it('returns talukas only for the selected district', function () {
     $ctx = seedAdmissionsContext();
 

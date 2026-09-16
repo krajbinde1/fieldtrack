@@ -6,10 +6,16 @@ class NamedLookup {
   final String? code;
 
   factory NamedLookup.fromJson(Map<String, dynamic> json) => NamedLookup(
-    id: json['id'] as int,
+    id: _asInt(json['id']),
     name: json['name']?.toString() ?? '',
     code: json['code']?.toString(),
   );
+
+  static int _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse('$value') ?? 0;
+  }
 }
 
 class AdmissionDocumentInfo {
@@ -203,15 +209,10 @@ class AdmissionLookups {
   final List<String> castes;
 
   factory AdmissionLookups.fromJson(Map<String, dynamic> json) {
-    final districts = json['districts'];
+    final districts = json['districts'] ?? json['data'];
     return AdmissionLookups(
       state: json['state']?.toString() ?? 'Maharashtra',
-      districts: districts is List
-          ? districts
-                .whereType<Map>()
-                .map((item) => NamedLookup.fromJson(Map<String, dynamic>.from(item)))
-                .toList()
-          : const [],
+      districts: _lookups(districts),
       genders: _strings(json['genders'], const ['Male', 'Female', 'Other']),
       religions: _strings(json['religions'], const [
         'Hindu',
@@ -233,6 +234,15 @@ class AdmissionLookups {
         'Other',
       ]),
     );
+  }
+
+  static List<NamedLookup> _lookups(Object? value) {
+    if (value is! List || value.isEmpty) return const [];
+    return value
+        .whereType<Map>()
+        .map((item) => NamedLookup.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.id > 0 && item.name.trim().isNotEmpty)
+        .toList();
   }
 
   static List<String> _strings(Object? value, List<String> fallback) {

@@ -9,6 +9,16 @@ use Illuminate\Database\Seeder;
 
 class MaharashtraGeoSeeder extends Seeder
 {
+    public static function ensure(): void
+    {
+        $missingDistricts = MaharashtraDistrict::query()->count() < MaharashtraGeoCatalog::districtCount();
+        $missingTalukas = MaharashtraTaluka::query()->count() < MaharashtraGeoCatalog::talukaCount();
+
+        if ($missingDistricts || $missingTalukas) {
+            (new self)->run();
+        }
+    }
+
     public function run(): void
     {
         foreach (MaharashtraGeoCatalog::districts() as $districtIndex => $districtData) {

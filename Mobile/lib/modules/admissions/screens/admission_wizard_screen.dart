@@ -513,11 +513,14 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
           ),
           const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<int>(
-            key: ValueKey('district-$_districtId-$_editable'),
+            key: ValueKey('district-${_lookups.districts.length}-$_districtId-$_editable'),
             initialValue: _lookups.districts.any((item) => item.id == _districtId)
                 ? _districtId
                 : null,
-            decoration: const InputDecoration(labelText: 'District'),
+            decoration: const InputDecoration(
+              labelText: 'District',
+              hintText: 'Select district',
+            ),
             items: [
               for (final district in _lookups.districts)
                 DropdownMenuItem(value: district.id, child: Text(district.name)),
@@ -526,9 +529,12 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
           ),
           const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<int>(
-            key: ValueKey('taluka-$_talukaId-$_districtId-$_editable'),
+            key: ValueKey('taluka-${_talukas.length}-$_talukaId-$_districtId-$_editable'),
             initialValue: _talukas.any((item) => item.id == _talukaId) ? _talukaId : null,
-            decoration: const InputDecoration(labelText: 'Taluka'),
+            decoration: const InputDecoration(
+              labelText: 'Taluka',
+              hintText: 'Select taluka',
+            ),
             items: [
               for (final taluka in _talukas)
                 DropdownMenuItem(value: taluka.id, child: Text(taluka.name)),
