@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/design/app_spacing.dart';
@@ -42,6 +43,16 @@ class _ManagerEmployeesScreenState extends State<ManagerEmployeesScreen> {
     return PgPageScaffold(
       title: 'Users / Employees',
       showBack: true,
+      floatingActionButton: widget.auth.userRole.isCenterManager
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                final result = await context.push<bool>('/manager/employees/create');
+                if (result == true) await _refresh();
+              },
+              icon: const Icon(Icons.person_add_alt_1_rounded),
+              label: const Text('Add User'),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<Map<String, dynamic>>>(

@@ -28,7 +28,10 @@ import '../../modules/leaves/screens/leave_list_screen.dart';
 import '../../modules/leaves/screens/supervisor_leave_detail_screen.dart';
 import '../../modules/leaves/screens/supervisor_leave_list_screen.dart';
 import '../../modules/manager/screens/manager_admission_targets_screen.dart';
+import '../../modules/manager/screens/manager_create_admission_target_screen.dart';
+import '../../modules/manager/screens/manager_create_employee_screen.dart';
 import '../../modules/manager/screens/manager_employees_screen.dart';
+import '../../modules/manager/screens/manager_reports_screen.dart';
 import '../../modules/manager/screens/manager_route_tracking_screen.dart';
 import '../../modules/manager/screens/manager_team_attendance_screen.dart';
 import '../../modules/profile/screens/profile_screen.dart';
@@ -195,6 +198,10 @@ GoRouter createRouter(
           ),
         ),
         GoRoute(
+          path: '/manager/employees/create',
+          builder: (_, _) => ManagerCreateEmployeeScreen(auth: auth),
+        ),
+        GoRoute(
           path: '/manager/employees',
           builder: (_, _) => ManagerEmployeesScreen(auth: auth),
         ),
@@ -215,8 +222,16 @@ GoRouter createRouter(
           ),
         ),
         GoRoute(
+          path: '/manager/admission-targets/create',
+          builder: (_, _) => ManagerCreateAdmissionTargetScreen(auth: auth),
+        ),
+        GoRoute(
           path: '/manager/admission-targets',
           builder: (_, _) => ManagerAdmissionTargetsScreen(auth: auth),
+        ),
+        GoRoute(
+          path: '/manager/reports',
+          builder: (_, _) => ManagerReportsScreen(auth: auth),
         ),
         GoRoute(
           path: '/manager/leaves',

@@ -182,6 +182,7 @@ class EmployeeAuthController extends Controller
             'id' => $user->id,
             'employee_id' => $user->employee_id,
             'login_id' => $user->login_id,
+            'name' => $user->name,
             'role' => $user->role,
             'role_label' => $user->roleEnum()->label(),
             'must_change_password' => $user->must_change_password,

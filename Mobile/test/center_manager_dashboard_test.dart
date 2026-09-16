@@ -13,8 +13,11 @@ void main() {
     expect(role.canAccessEmployeeWorkflow(), isFalse);
     expect(RoutePermissions.canAccessPath('/dashboard', role), isTrue);
     expect(RoutePermissions.canAccessPath('/manager/employees', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/manager/employees/create', role), isTrue);
     expect(RoutePermissions.canAccessPath('/manager/admissions', role), isTrue);
     expect(RoutePermissions.canAccessPath('/manager/admission-targets', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/manager/admission-targets/create', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/manager/reports', role), isTrue);
     expect(RoutePermissions.canAccessPath('/profile', role), isTrue);
     expect(RoutePermissions.canAccessPath('/attendance', role), isFalse);
     expect(RoutePermissions.canAccessPath('/admissions', role), isFalse);
@@ -38,20 +41,13 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: SupervisorDashboardView(
-            name: 'Center Manager',
+            name: 'Anita Sharma',
             role: UserRole.centerManager,
             data: const {
               'employees': 3,
               'punched_in_today': 1,
+              'punched_out_today': 0,
               'active_routes': 1,
-              'admissions': 2,
-              'admission_counts': {
-                'submitted': 2,
-                'confirmed': 1,
-                'draft': 0,
-                'reverted': 0,
-                'rejected': 0,
-              },
               'pending_leaves': 0,
               'admission_targets': 4,
             },
@@ -62,22 +58,33 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
+    expect(find.text('Anita Sharma'), findsOneWidget);
     expect(find.text('Center Manager'), findsWidgets);
-    expect(find.text('Employees'), findsOneWidget);
-    expect(find.text('Admissions'), findsWidgets);
-    expect(find.text('Submitted'), findsOneWidget);
-    expect(find.text('Confirmed'), findsOneWidget);
-    expect(find.text('Draft'), findsOneWidget);
-    expect(find.text('Reverted'), findsOneWidget);
-    expect(find.text('Rejected'), findsOneWidget);
+    expect(find.text('Welcome back,'), findsOneWidget);
+    expect(find.text('Employees'), findsWidgets);
+    expect(find.text('Punched In'), findsWidgets);
+    expect(find.text('Active Routes'), findsOneWidget);
+    expect(find.text('Pending Leave'), findsOneWidget);
+    expect(find.text('Targets'), findsOneWidget);
+    expect(find.text('Attendance Status'), findsOneWidget);
+    expect(find.text('View Details'), findsOneWidget);
+    expect(find.text('Param FieldTrack'), findsNothing);
+    expect(find.text('Submitted'), findsNothing);
+    expect(find.text('Confirmed'), findsNothing);
+    expect(find.text('Draft'), findsNothing);
+    expect(find.text('Reverted'), findsNothing);
+    expect(find.text('Rejected'), findsNothing);
 
     for (final label in [
+      'Quick Actions',
+      'Set Admission Targets',
+      'Add User',
       'Users / Employees',
-      'Admission Targets',
-      'Leave Requests',
+      'Admissions',
       'Attendance',
       'Employee Routes',
-      'Profile',
+      'Leave Requests',
+      'Reports',
     ]) {
       await tester.scrollUntilVisible(
         find.text(label),

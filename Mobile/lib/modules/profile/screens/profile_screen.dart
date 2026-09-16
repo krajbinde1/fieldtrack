@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../core/auth/user_role.dart';
 import '../../../core/design/app_colors.dart';
 import '../../../core/design/app_spacing.dart';
 import '../../../core/widgets/app_version_label.dart';
@@ -90,7 +89,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ('Joining Date', employee.joiningDate ?? '—'),
           ('Active Status', employee.active ? 'Active' : 'Inactive'),
         ];
-        final showBack = widget.auth.userRole != UserRole.employee;
         final uploading = widget.auth.loading;
         final initial = employee.fullName.trim().isNotEmpty
             ? employee.fullName.trim()[0].toUpperCase()
@@ -99,7 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return PgPageScaffold(
           auth: widget.auth,
           title: 'My Profile',
-          showBack: showBack,
+          showBack: false,
           body: ListView(
             padding: const EdgeInsets.all(AppSpacing.screenPadding),
             children: [
@@ -234,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return PgPageScaffold(
       auth: widget.auth,
       title: 'My Profile',
-      showBack: true,
+      showBack: false,
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         children: [

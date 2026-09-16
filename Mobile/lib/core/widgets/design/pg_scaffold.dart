@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../auth/user_role.dart';
 import '../../design/app_spacing.dart';
 import '../../navigation/navigation_guard.dart';
 import '../../../modules/auth/providers/auth_controller.dart';
@@ -21,10 +20,9 @@ class PgEmployeeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final role = UserRole.fromValue(auth.session?.user.role);
     final location = GoRouterState.of(context).matchedLocation;
     final tab = EmployeeNavRoutes.tabForPath(location);
-    final showNav = role.canAccessEmployeeWorkflow() && tab != null;
+    final showNav = tab != null && auth.authenticated;
 
     return Scaffold(
       body: child,

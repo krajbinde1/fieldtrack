@@ -7,12 +7,14 @@ class AuthUser {
     required this.roleLabel,
     required this.mustChangePassword,
     required this.permissions,
+    this.name,
     this.canViewProductionCosts = false,
   });
 
   final int id;
   final int employeeId;
   final String loginId;
+  final String? name;
   final String role;
   final String roleLabel;
   final bool mustChangePassword;
@@ -30,6 +32,7 @@ class AuthUser {
       id: _asInt(json['id']),
       employeeId: _asInt(json['employee_id']),
       loginId: _asString(json['login_id']),
+      name: _asNullableString(json['name']),
       role: _asString(json['role'], fallback: 'employee'),
       roleLabel: _asString(json['role_label'], fallback: 'Employee'),
       mustChangePassword: json['must_change_password'] == true,
@@ -42,6 +45,7 @@ class AuthUser {
         'id': id,
         'employee_id': employeeId,
         'login_id': loginId,
+        'name': name,
         'role': role,
         'role_label': roleLabel,
         'must_change_password': mustChangePassword,

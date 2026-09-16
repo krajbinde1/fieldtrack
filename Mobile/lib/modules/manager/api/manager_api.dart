@@ -184,6 +184,46 @@ class ManagerApi {
     }
   }
 
+  Future<Map<String, dynamic>> employeesMeta() async {
+    try {
+      final response = await _dio.get('/manager/employees');
+      final body = response.data as Map;
+      return Map<String, dynamic>.from(body['meta'] as Map? ?? const {});
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> createEmployee({
+    required String fullName,
+    required String mobile,
+    required String password,
+    required String staffRole,
+    int? centerId,
+    String? email,
+    String? loginId,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/manager/employees',
+        data: {
+          'full_name': fullName,
+          'mobile': mobile,
+          'login_password': password,
+          'staff_role': staffRole,
+          'center_id': ?centerId,
+          if (email != null && email.isNotEmpty) 'email': email,
+          if (loginId != null && loginId.isNotEmpty) 'login_id': loginId,
+        },
+      );
+      return Map<String, dynamic>.from(
+        (response.data as Map)['data'] as Map? ?? const {},
+      );
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
   Future<List<Map<String, dynamic>>> listAdmissionTargets() async {
     try {
       final response = await _dio.get('/manager/admission-targets');
@@ -193,6 +233,30 @@ class ManagerApi {
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
           .toList();
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> createAdmissionTarget({
+    required int employeeId,
+    required String targetType,
+    required int targetCount,
+    required String period,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/manager/admission-targets',
+        data: {
+          'employee_id': employeeId,
+          'target_type': targetType,
+          'target_count': targetCount,
+          'period': period,
+        },
+      );
+      return Map<String, dynamic>.from(
+        (response.data as Map)['data'] as Map? ?? const {},
+      );
     } on DioException catch (error) {
       throw mapApiError(error);
     }

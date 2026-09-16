@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
@@ -51,6 +52,17 @@ class _ManagerAdmissionTargetsScreenState
     return PgPageScaffold(
       title: 'Admission Targets',
       showBack: true,
+      floatingActionButton: widget.auth.userRole.isCenterManager
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                final result =
+                    await context.push<bool>('/manager/admission-targets/create');
+                if (result == true) await _refresh();
+              },
+              icon: const Icon(Icons.flag_rounded),
+              label: const Text('Set Target'),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<Map<String, dynamic>>>(

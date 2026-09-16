@@ -32,6 +32,26 @@ class ManagerAdmissionTargetController extends Controller
         ]);
     }
 
+    public function store(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user?->isCenterManager() === true, 403);
+
+        $data = $request->validate([
+            'employee_id' => ['required', 'integer'],
+            'target_type' => ['required', 'string'],
+            'target_count' => ['required', 'integer', 'min:0'],
+            'period' => ['required', 'date'],
+        ]);
+
+        $target = $this->targets->assign($user, $data);
+
+        return response()->json([
+            'success' => true,
+            'data' => $target->toApiArray(),
+        ], 201);
+    }
+
     public function show(Request $request, AdmissionTarget $admissionTarget): JsonResponse
     {
         $this->access->assertCanViewAdmissionTarget(
