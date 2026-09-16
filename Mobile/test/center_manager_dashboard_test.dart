@@ -19,7 +19,8 @@ void main() {
     expect(RoutePermissions.canAccessPath('/manager/admission-targets/create', role), isTrue);
     expect(RoutePermissions.canAccessPath('/manager/reports', role), isTrue);
     expect(RoutePermissions.canAccessPath('/profile', role), isTrue);
-    expect(RoutePermissions.canAccessPath('/attendance', role), isFalse);
+    expect(RoutePermissions.canAccessPath('/attendance', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/attendance/punch-in', role), isTrue);
     expect(RoutePermissions.canAccessPath('/admissions', role), isFalse);
   });
 
@@ -66,6 +67,7 @@ void main() {
     expect(find.text('Active Routes'), findsOneWidget);
     expect(find.text('Pending Leave'), findsOneWidget);
     expect(find.text('Targets'), findsOneWidget);
+    expect(find.text('My Attendance'), findsOneWidget);
     expect(find.text('Attendance Status'), findsOneWidget);
     expect(find.text('View Details'), findsOneWidget);
     expect(find.text('Param FieldTrack'), findsNothing);
@@ -74,14 +76,14 @@ void main() {
     expect(find.text('Draft'), findsNothing);
     expect(find.text('Reverted'), findsNothing);
     expect(find.text('Rejected'), findsNothing);
+    expect(find.text('Quick Actions'), findsNothing);
+    expect(find.text('Set Admission Targets'), findsNothing);
+    expect(find.text('Add User'), findsNothing);
 
     for (final label in [
-      'Quick Actions',
-      'Set Admission Targets',
-      'Add User',
       'Users / Employees',
       'Admissions',
-      'Attendance',
+      'Admission Targets',
       'Employee Routes',
       'Leave Requests',
       'Reports',

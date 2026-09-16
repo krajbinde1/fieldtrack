@@ -194,9 +194,10 @@ class AuthSession {
 
     final user = AuthUser.fromJson(userJson);
     final employeeRaw = json['employee'];
+    final fallbackName = _usablePersonName(user.name) ?? '';
     final employee = employeeRaw is Map
         ? EmployeeProfile.fromJson(Map<String, dynamic>.from(employeeRaw))
-        : EmployeeProfile.empty(name: user.loginId);
+        : EmployeeProfile.empty(name: fallbackName);
 
     return AuthSession(
       token: token,
@@ -217,6 +218,13 @@ class AuthSession {
         user: user ?? this.user,
         employee: employee ?? this.employee,
       );
+
+  /// Person name for welcome UI. Never email or login ID.
+  String get displayName {
+    return _usablePersonName(user.name, loginId: user.loginId) ??
+        _usablePersonName(employee.fullName, loginId: user.loginId) ??
+        '';
+  }
 }
 
 int _asInt(Object? value, {int fallback = 0}) {
@@ -235,4 +243,15 @@ String? _asNullableString(Object? value) {
   if (value == null) return null;
   final text = '$value'.trim();
   return text.isEmpty ? null : text;
+}
+
+String? _usablePersonName(String? value, {String loginId = ''}) {
+  final name = value?.trim() ?? '';
+  if (name.isEmpty) return null;
+  if (name.contains('@')) return null;
+  if (loginId.trim().isNotEmpty &&
+      name.toLowerCase() == loginId.trim().toLowerCase()) {
+    return null;
+  }
+  return name;
 }

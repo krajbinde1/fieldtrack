@@ -95,6 +95,9 @@ final class OrganizationAccessService
 
         return Employee::query()
             ->whereIn('center_id', $centerIds)
+            ->whereDoesntHave('user', function (Builder $query) {
+                $query->where('role', '!=', UserRole::Employee->value);
+            })
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();

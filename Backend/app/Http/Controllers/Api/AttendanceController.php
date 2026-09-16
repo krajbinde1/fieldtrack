@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\EmployeeRoutePoint;
 use App\Services\Attendance\AttendanceStatusCalculator;
+use App\Services\CenterManagerAttendanceProfile;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,7 +49,12 @@ class AttendanceController extends Controller
 
     private function employeeId(Request $request): int
     {
-        $employee = $request->user()->employee;
+        $user = $request->user();
+        $employee = $user->employee;
+
+        if ($employee === null && $user->isCenterManager()) {
+            $employee = app(CenterManagerAttendanceProfile::class)->employeeFor($user);
+        }
 
         if ($employee === null) {
             throw ValidationException::withMessages([

@@ -70,7 +70,7 @@ enum UserRole: string
 
     public function canPunch(): bool
     {
-        return $this === self::Employee;
+        return $this === self::Employee || $this === self::CenterManager;
     }
 
     public function canAccessWeb(): bool

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -9,19 +12,23 @@ import '../../../core/design/app_spacing.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
 import '../../../core/widgets/design/pg_welcome_card.dart';
+import '../../attendance/models/attendance.dart';
+import '../../attendance/models/attendance_format.dart';
+import '../../attendance/providers/attendance_provider.dart';
 import '../../auth/providers/auth_controller.dart';
 import '../../manager/api/manager_api.dart';
 
-class SupervisorDashboardScreen extends StatefulWidget {
+class SupervisorDashboardScreen extends ConsumerStatefulWidget {
   const SupervisorDashboardScreen({super.key, required this.auth});
   final AuthController auth;
 
   @override
-  State<SupervisorDashboardScreen> createState() =>
+  ConsumerState<SupervisorDashboardScreen> createState() =>
       _SupervisorDashboardScreenState();
 }
 
-class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
+class _SupervisorDashboardScreenState
+    extends ConsumerState<SupervisorDashboardScreen> {
   late Future<_DashboardSnapshot> _future;
 
   @override
@@ -46,8 +53,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     } catch (_) {}
 
     TeamAttendancePulse? pulse;
-    if (widget.auth.userRole.isCenterManager ||
-        widget.auth.userRole.isProjectHead) {
+    if (widget.auth.userRole.isProjectHead) {
       try {
         final result = await api.listTeamAttendance();
         pulse = TeamAttendancePulse.fromRows(result.rows, result.meta);
@@ -58,6 +64,9 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
   }
 
   Future<void> _refresh() async {
+    if (widget.auth.userRole.isCenterManager) {
+      ref.invalidate(todayAttendanceProvider);
+    }
     final next = _load();
     setState(() => _future = next);
     await next;
@@ -66,6 +75,10 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
   Future<void> _open(String path) async {
     await context.push(path);
     if (!mounted) return;
+    if (widget.auth.userRole.isCenterManager &&
+        path.startsWith('/attendance')) {
+      await ref.read(todayAttendanceProvider.notifier).refresh();
+    }
     await _refresh();
   }
 
@@ -73,13 +86,14 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
   Widget build(BuildContext context) {
     final role = widget.auth.userRole;
     final session = widget.auth.session;
-    final employeeName = session?.employee.fullName.trim() ?? '';
-    final userName = session?.user.name?.trim() ?? '';
-    final name = employeeName.isNotEmpty
-        ? employeeName
-        : (userName.isNotEmpty
-            ? userName
-            : (session?.user.loginId ?? role.label));
+    final displayName = session?.displayName.trim() ?? '';
+    final name = displayName.isNotEmpty ? displayName : role.label;
+    final ownAttendance = role.isCenterManager
+        ? ref.watch(todayAttendanceProvider).maybeWhen(
+              data: (value) => value,
+              orElse: () => null,
+            )
+        : null;
 
     return PgPageScaffold(
       auth: widget.auth,
@@ -93,6 +107,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
               role: role,
               data: snapshot.data?.data ?? const {},
               pulse: snapshot.data?.pulse,
+              ownAttendance: ownAttendance,
               onOpen: _open,
             ),
           );
@@ -110,12 +125,14 @@ class SupervisorDashboardView extends StatelessWidget {
     required this.data,
     required this.onOpen,
     this.pulse,
+    this.ownAttendance,
   });
 
   final String name;
   final UserRole role;
   final Map<String, dynamic> data;
   final TeamAttendancePulse? pulse;
+  final Attendance? ownAttendance;
   final ValueChanged<String> onOpen;
 
   String get _prefix =>
@@ -174,29 +191,23 @@ class SupervisorDashboardView extends StatelessWidget {
         color: const Color(0xFFDB2777),
         background: const Color(0xFFFDE8F0),
       ),
+      if (role.isCenterManager)
+        _DashboardTile(
+          icon: const Icon(Icons.access_time_filled_rounded),
+          label: 'My Attendance',
+          value: _ownAttendanceValue,
+          path: '/attendance',
+          color: const Color(0xFF0D9488),
+          background: const Color(0xFFD1FAE5),
+        ),
     ];
   }
 
-  List<_DashboardTile> get _quickActions {
-    if (!role.isCenterManager) return const [];
-    return const [
-      _DashboardTile(
-        icon: Icon(Icons.flag_rounded),
-        label: 'Set Admission Targets',
-        subtitle: 'Assign weekly or monthly targets',
-        path: '/manager/admission-targets/create',
-        color: Color(0xFF7C3AED),
-        background: Color(0xFFF0E9FF),
-      ),
-      _DashboardTile(
-        icon: Icon(Icons.person_add_alt_1_rounded),
-        label: 'Add User',
-        subtitle: 'Create staff in your center(s)',
-        path: '/manager/employees/create',
-        color: Color(0xFF2563EB),
-        background: Color(0xFFE8F1FF),
-      ),
-    ];
+  String get _ownAttendanceValue {
+    final record = ownAttendance;
+    if (record == null || record.punchIn == null) return '—';
+    if (record.punchOut != null) return 'Out';
+    return 'In';
   }
 
   List<_DashboardTile> get _modules {
@@ -218,14 +229,24 @@ class SupervisorDashboardView extends StatelessWidget {
         color: const Color(0xFF0EA5E9),
         background: const Color(0xFFE0F4FF),
       ),
-      _DashboardTile(
-        icon: const Icon(Icons.event_available_rounded),
-        label: 'Attendance',
-        subtitle: 'Daily team attendance',
-        path: '$_prefix/team-attendance',
-        color: const Color(0xFF0F766E),
-        background: const Color(0xFFE6F7F1),
-      ),
+      if (role.isCenterManager)
+        const _DashboardTile(
+          icon: Icon(Icons.flag_rounded),
+          label: 'Admission Targets',
+          subtitle: 'Set employee/Mobilizer targets',
+          path: '/manager/admission-targets',
+          color: Color(0xFFDB2777),
+          background: Color(0xFFFDE8F0),
+        ),
+      if (!role.isCenterManager)
+        _DashboardTile(
+          icon: const Icon(Icons.event_available_rounded),
+          label: 'Attendance',
+          subtitle: 'Daily team attendance',
+          path: '$_prefix/team-attendance',
+          color: const Color(0xFF0F766E),
+          background: const Color(0xFFE6F7F1),
+        ),
       _DashboardTile(
         icon: const Icon(Icons.route_rounded),
         label: 'Employee Routes',
@@ -277,24 +298,18 @@ class SupervisorDashboardView extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _AttendanceStatusCard(
-          pulse: pulse,
+          pulse: role.isCenterManager
+              ? TeamAttendancePulse.fromOwn(ownAttendance)
+              : pulse,
+          ownAttendance: role.isCenterManager ? ownAttendance : null,
           punchedIn: _count('punched_in_today'),
           punchedOut: _count('punched_out_today'),
-          onDetails: () => onOpen('$_prefix/team-attendance'),
+          onDetails: () => onOpen(
+            role.isCenterManager ? '/attendance' : '$_prefix/team-attendance',
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
         _SummaryGrid(tiles: _summary, onOpen: onOpen),
-        if (_quickActions.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Quick Actions',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _QuickActionRow(tiles: _quickActions, onOpen: onOpen),
-        ],
         const SizedBox(height: AppSpacing.lg),
         Text(
           'Modules',
@@ -323,12 +338,40 @@ class TeamAttendancePulse {
     required this.punchInTime,
     required this.punchOutTime,
     required this.workingDuration,
+    this.livePunchIn,
   });
 
   final String status;
   final String punchInTime;
   final String punchOutTime;
   final String workingDuration;
+  final DateTime? livePunchIn;
+
+  static TeamAttendancePulse fromOwn(Attendance? attendance) {
+    if (attendance == null || attendance.punchIn == null) {
+      return const TeamAttendancePulse(
+        status: 'Not Punched In',
+        punchInTime: '—',
+        punchOutTime: '—',
+        workingDuration: '—',
+      );
+    }
+    if (attendance.punchOut != null) {
+      return TeamAttendancePulse(
+        status: 'Punched Out',
+        punchInTime: AttendanceFormat.time(attendance.punchIn),
+        punchOutTime: AttendanceFormat.time(attendance.punchOut),
+        workingDuration: attendance.workingHours ?? '—',
+      );
+    }
+    return TeamAttendancePulse(
+      status: 'Punched In',
+      punchInTime: AttendanceFormat.time(attendance.punchIn),
+      punchOutTime: '—',
+      workingDuration: attendance.workingHours ?? '—',
+      livePunchIn: attendance.punchIn,
+    );
+  }
 
   static TeamAttendancePulse fromRows(
     List<Map<String, dynamic>> rows, [
@@ -392,21 +435,80 @@ class TeamAttendancePulse {
   }
 }
 
-class _AttendanceStatusCard extends StatelessWidget {
+class _AttendanceStatusCard extends StatefulWidget {
   const _AttendanceStatusCard({
     required this.onDetails,
     required this.punchedIn,
     required this.punchedOut,
     this.pulse,
+    this.ownAttendance,
   });
 
   final TeamAttendancePulse? pulse;
+  final Attendance? ownAttendance;
   final int punchedIn;
   final int punchedOut;
   final VoidCallback onDetails;
 
   @override
+  State<_AttendanceStatusCard> createState() => _AttendanceStatusCardState();
+}
+
+class _AttendanceStatusCardState extends State<_AttendanceStatusCard> {
+  Timer? _timer;
+  String _duration = '—';
+
+  @override
+  void initState() {
+    super.initState();
+    _syncTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AttendanceStatusCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pulse?.livePunchIn != widget.pulse?.livePunchIn ||
+        oldWidget.pulse?.workingDuration != widget.pulse?.workingDuration ||
+        oldWidget.ownAttendance?.punchIn != widget.ownAttendance?.punchIn ||
+        oldWidget.ownAttendance?.punchOut != widget.ownAttendance?.punchOut) {
+      _syncTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _syncTimer() {
+    _timer?.cancel();
+    final liveFrom = widget.pulse?.livePunchIn;
+    if (liveFrom != null) {
+      _duration = _liveDuration(liveFrom);
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() => _duration = _liveDuration(liveFrom));
+      });
+      return;
+    }
+    _duration = widget.pulse?.workingDuration ?? '—';
+  }
+
+  String _liveDuration(DateTime punchIn) {
+    final elapsed = AttendanceFormat.istNow().difference(punchIn);
+    final totalSeconds = elapsed.isNegative ? 0 : elapsed.inSeconds;
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    return '${hours}h ${minutes.toString().padLeft(2, '0')}m';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final pulse = widget.pulse;
+    final punchedIn = widget.punchedIn;
+    final punchedOut = widget.punchedOut;
+    final onDetails = widget.onDetails;
     final status = pulse?.status ??
         (punchedIn > punchedOut
             ? 'Punched In'
@@ -503,7 +605,7 @@ class _AttendanceStatusCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     _MetaChip(
                       label: 'Duration',
-                      value: pulse?.workingDuration ?? '—',
+                      value: _duration,
                       background: const Color(0xFFEDE9FE),
                     ),
                   ],
@@ -669,27 +771,6 @@ class _SummaryCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _QuickActionRow extends StatelessWidget {
-  const _QuickActionRow({required this.tiles, required this.onOpen});
-
-  final List<_DashboardTile> tiles;
-  final ValueChanged<String> onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < tiles.length; i++) ...[
-          if (i > 0) const SizedBox(width: 12),
-          Expanded(
-            child: _ModuleCard(tile: tiles[i], onTap: () => onOpen(tiles[i].path)),
-          ),
-        ],
-      ],
     );
   }
 }

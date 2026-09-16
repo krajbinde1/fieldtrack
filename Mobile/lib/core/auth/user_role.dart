@@ -31,6 +31,7 @@ enum UserRole {
   bool get isManager => isProjectHead || isCenterManager;
 
   bool canAccessEmployeeWorkflow() => isEmployee;
+  bool canAccessOwnAttendance() => isEmployee || isCenterManager;
   bool canAccessManagerRoutes() => isProjectHead || isCenterManager;
   bool canAccessDirectorRoutes() => isAdmin || isDirector;
 }

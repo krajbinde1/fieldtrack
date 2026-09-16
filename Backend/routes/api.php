@@ -29,7 +29,7 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
     Route::post('profile-photo', [EmployeeAuthController::class, 'updateProfilePhoto']);
     Route::get('dashboard', DashboardController::class);
 
-    Route::middleware('role:employee')->group(function () {
+    Route::middleware('role:employee,center_manager')->group(function () {
         if (! app()->environment('production')) {
             Route::post('employee/attendance/reset-today', [AttendanceController::class, 'resetToday']);
         }
@@ -91,7 +91,7 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
     });
 });
 
-Route::middleware(['auth:sanctum', 'role:employee'])->prefix('attendance')->group(function () {
+Route::middleware(['auth:sanctum', 'role:employee,center_manager'])->prefix('attendance')->group(function () {
     Route::post('punch-in', [AttendanceController::class, 'punchIn']);
     Route::post('punch-out', [AttendanceController::class, 'punchOut']);
     Route::get('today', [AttendanceController::class, 'today']);

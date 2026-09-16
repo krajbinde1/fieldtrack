@@ -537,3 +537,41 @@ it('lets a center manager login and load a center-scoped mobile dashboard', func
     $this->getJson('/api/manager/route-tracking/'.$ownAttendance->id)->assertOk();
     $this->getJson('/api/manager/route-tracking/'.$hiddenAttendance->id)->assertForbidden();
 });
+
+it('lets a center manager punch using the employee attendance API without joining team counts', function () {
+    Storage::fake('public');
+    $org = seedOrg();
+
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->post('/api/attendance/punch-in', [
+            'latitude' => 18.52,
+            'longitude' => 73.85,
+            'location_address' => 'Pune',
+            'photo' => UploadedFile::fake()->image('cm-in.jpg'),
+        ], ['Accept' => 'application/json'])
+        ->assertCreated();
+
+    $today = $this->actingAs($org['centerManager']->fresh(), 'sanctum')
+        ->getJson('/api/attendance/today')
+        ->assertOk();
+
+    expect($today->json('data.attendance.punch_in_time'))->not->toBeNull()
+        ->and($today->json('data.punch_in_allowed'))->toBeFalse();
+
+    $dashboard = $this->actingAs($org['centerManager']->fresh(), 'sanctum')
+        ->getJson('/api/dashboard')
+        ->assertOk();
+
+    expect($dashboard->json('data.employees'))->toBe(1)
+        ->and($dashboard->json('data.punched_in_today'))->toBe(0);
+
+    $employeeIds = collect(
+        $this->actingAs($org['centerManager']->fresh(), 'sanctum')
+            ->getJson('/api/manager/employees')
+            ->assertOk()
+            ->json('data'),
+    )->pluck('id')->all();
+
+    expect($employeeIds)->toContain($org['empA']->id)
+        ->and($employeeIds)->not->toContain($org['centerManager']->fresh()->employee_id);
+});

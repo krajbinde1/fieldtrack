@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\EmployeeRoutePoint;
+use App\Services\CenterManagerAttendanceProfile;
 use App\Services\EmployeeRouteAnalysisService;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +23,12 @@ class EmployeeRoutePointController extends Controller
 
     public function storeBatch(Request $request): JsonResponse
     {
-        $employee = $request->user()->employee;
+        $user = $request->user();
+        $employee = $user->employee;
+
+        if ($employee === null && $user->isCenterManager()) {
+            $employee = app(CenterManagerAttendanceProfile::class)->employeeFor($user);
+        }
 
         if ($employee === null) {
             throw ValidationException::withMessages([
