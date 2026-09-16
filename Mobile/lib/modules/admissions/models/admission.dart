@@ -1,3 +1,5 @@
+import '../../../core/widgets/design/pg_status_badge.dart';
+
 class NamedLookup {
   const NamedLookup({required this.id, required this.name, this.code});
 
@@ -83,6 +85,9 @@ class AdmissionRecord {
     this.employeeName,
     this.submittedAt,
     this.updatedAt,
+    this.reviewReason,
+    this.reviewedAt,
+    this.confirmedAt,
   });
 
   final int id;
@@ -111,9 +116,22 @@ class AdmissionRecord {
   final String? employeeName;
   final String? submittedAt;
   final String? updatedAt;
+  final String? reviewReason;
+  final String? reviewedAt;
+  final String? confirmedAt;
 
   bool get isDraft => status == 'draft';
   bool get isSubmitted => status == 'submitted';
+  bool get isConfirmed => status == 'confirmed';
+  bool get isReverted => status == 'reverted';
+  bool get isRejected => status == 'rejected';
+
+  PgStatusTone get statusTone {
+    if (isConfirmed) return PgStatusTone.approved;
+    if (isRejected) return PgStatusTone.rejected;
+    if (isSubmitted) return PgStatusTone.info;
+    return PgStatusTone.pending;
+  }
 
   String get displayName {
     if (fullName != null && fullName!.trim().isNotEmpty) return fullName!.trim();
@@ -181,6 +199,9 @@ class AdmissionRecord {
       employeeName: employee is Map ? employee['full_name']?.toString() : null,
       submittedAt: json['submitted_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
+      reviewReason: json['review_reason']?.toString(),
+      reviewedAt: json['reviewed_at']?.toString(),
+      confirmedAt: json['confirmed_at']?.toString(),
     );
   }
 }

@@ -30,6 +30,10 @@ class Admission extends Model
         'status',
         'current_step',
         'submitted_at',
+        'review_reason',
+        'reviewed_by_user_id',
+        'reviewed_at',
+        'confirmed_at',
     ];
 
     protected function casts(): array
@@ -38,6 +42,8 @@ class Admission extends Model
             'status' => AdmissionStatus::class,
             'current_step' => 'integer',
             'submitted_at' => 'datetime',
+            'reviewed_at' => 'datetime',
+            'confirmed_at' => 'datetime',
         ];
     }
 
@@ -69,6 +75,11 @@ class Admission extends Model
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_user_id');
+    }
+
     public function district(): BelongsTo
     {
         return $this->belongsTo(MaharashtraDistrict::class, 'district_id');
@@ -92,6 +103,26 @@ class Admission extends Model
     public function isSubmitted(): bool
     {
         return $this->status === AdmissionStatus::Submitted;
+    }
+
+    public function isConfirmed(): bool
+    {
+        return $this->status === AdmissionStatus::Confirmed;
+    }
+
+    public function isReverted(): bool
+    {
+        return $this->status === AdmissionStatus::Reverted;
+    }
+
+    public function isRejected(): bool
+    {
+        return $this->status === AdmissionStatus::Rejected;
+    }
+
+    public function isEditable(): bool
+    {
+        return $this->isDraft() || $this->isReverted();
     }
 
     public function composeFullName(): string
@@ -224,9 +255,13 @@ class Admission extends Model
             'village' => $this->village,
             'documents' => $this->documents->map(fn (AdmissionDocument $document) => $document->toApiArray())->values()->all(),
             'submitted_at' => $this->submitted_at?->toIso8601String(),
+            'review_reason' => $this->review_reason,
+            'reviewed_by_user_id' => $this->reviewed_by_user_id,
+            'reviewed_at' => $this->reviewed_at?->toIso8601String(),
+            'confirmed_at' => $this->confirmed_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
-            'editable' => $this->isDraft(),
+            'editable' => $this->isEditable(),
         ];
     }
 

@@ -7,7 +7,7 @@ use App\Models\AdmissionTarget;
 use App\Support\AdmissionTargetPeriod;
 use Laravel\Sanctum\Sanctum;
 
-it('exposes this-week target performance using submitted admissions only', function () {
+it('exposes this-week target performance using confirmed admissions only', function () {
     $org = seedOrg();
     [$start, $end] = AdmissionTargetPeriod::resolve('this_week');
 
@@ -35,9 +35,20 @@ it('exposes this-week target performance using submitted admissions only', funct
         'center_id' => $org['centerA']->id,
         'employee_id' => $org['empA']->id,
         'first_name' => 'Submitted',
-        'last_name' => 'Count',
+        'last_name' => 'Skip',
         'status' => AdmissionStatus::Submitted,
         'submitted_at' => $start->copy()->addDay()->setTime(10, 0),
+    ]);
+
+    Admission::create([
+        'scheme_id' => $org['projectA']->id,
+        'center_id' => $org['centerA']->id,
+        'employee_id' => $org['empA']->id,
+        'first_name' => 'Confirmed',
+        'last_name' => 'Count',
+        'status' => AdmissionStatus::Confirmed,
+        'submitted_at' => $start->copy()->addDay()->setTime(10, 0),
+        'confirmed_at' => $start->copy()->addDay()->setTime(12, 0),
     ]);
 
     Sanctum::actingAs($org['userA']);

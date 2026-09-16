@@ -138,9 +138,7 @@ class _AdmissionListScreenState extends State<AdmissionListScreen> {
                           ),
                           PgStatusBadge(
                             label: item.statusLabel,
-                            tone: item.isSubmitted
-                                ? PgStatusTone.approved
-                                : PgStatusTone.pending,
+                            tone: item.statusTone,
                           ),
                         ],
                       ),
@@ -149,11 +147,19 @@ class _AdmissionListScreenState extends State<AdmissionListScreen> {
                         item.schemeName ?? 'Scheme not selected',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      if (item.addressLabel.isNotEmpty)
+                      if ((item.reviewReason ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
                         Text(
-                          item.addressLabel,
-                          style: Theme.of(context).textTheme.bodySmall,
+                          item.isRejected
+                              ? 'Rejected: ${item.reviewReason}'
+                              : 'Reverted: ${item.reviewReason}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: item.isRejected
+                                    ? AppColors.error
+                                    : AppColors.warning,
+                              ),
                         ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         children: [
@@ -163,7 +169,7 @@ class _AdmissionListScreenState extends State<AdmissionListScreen> {
                                 ?.copyWith(color: AppColors.textMuted),
                           ),
                           const Spacer(),
-                          if (widget.drafts)
+                          if (widget.drafts && item.isDraft)
                             IconButton(
                               onPressed: () => _delete(item),
                               icon: const Icon(Icons.delete_outline_rounded),
@@ -183,7 +189,7 @@ class _AdmissionListScreenState extends State<AdmissionListScreen> {
   }
 
   String _dateLabel(AdmissionRecord item) {
-    final raw = item.isSubmitted ? item.submittedAt : item.updatedAt;
+    final raw = item.submittedAt ?? item.updatedAt;
     if (raw == null || raw.isEmpty) return '';
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return raw;

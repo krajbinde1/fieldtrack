@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AdmissionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Admission;
 use App\Models\AdmissionDocument;
+use App\Services\AdmissionService;
 use App\Services\OrganizationAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +14,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SupervisorAdmissionController extends Controller
 {
-    public function __construct(private readonly OrganizationAccessService $access) {}
+    public function __construct(
+        private readonly AdmissionService $admissions,
+        private readonly OrganizationAccessService $access,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -68,6 +73,27 @@ class SupervisorAdmissionController extends Controller
         ]);
     }
 
+    public function summary(Request $request): JsonResponse
+    {
+        $counts = $this->access->admissionQuery($request->user())
+            ->toBase()
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Admission summary loaded.',
+            'data' => [
+                'submitted' => (int) ($counts[AdmissionStatus::Submitted->value] ?? 0),
+                'confirmed' => (int) ($counts[AdmissionStatus::Confirmed->value] ?? 0),
+                'draft' => (int) ($counts[AdmissionStatus::Draft->value] ?? 0),
+                'reverted' => (int) ($counts[AdmissionStatus::Reverted->value] ?? 0),
+                'rejected' => (int) ($counts[AdmissionStatus::Rejected->value] ?? 0),
+            ],
+        ]);
+    }
+
     public function show(Request $request, Admission $admission): JsonResponse
     {
         $this->access->assertCanViewAdmission($request->user(), $admission);
@@ -78,6 +104,48 @@ class SupervisorAdmissionController extends Controller
             'data' => $admission->fresh([
                 'scheme', 'center', 'employee', 'district', 'taluka', 'documents',
             ])->toApiArray(),
+        ]);
+    }
+
+    public function confirm(Request $request, Admission $admission): JsonResponse
+    {
+        $this->access->assertCanReviewAdmission($request->user(), $admission);
+        $admission = $this->admissions->confirm($admission, $request->user());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Admission confirmed.',
+            'data' => $admission->toApiArray(),
+        ]);
+    }
+
+    public function revert(Request $request, Admission $admission): JsonResponse
+    {
+        $this->access->assertCanReviewAdmission($request->user(), $admission);
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+        $admission = $this->admissions->revert($admission, $request->user(), $validated['reason']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Admission reverted.',
+            'data' => $admission->toApiArray(),
+        ]);
+    }
+
+    public function reject(Request $request, Admission $admission): JsonResponse
+    {
+        $this->access->assertCanReviewAdmission($request->user(), $admission);
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+        $admission = $this->admissions->reject($admission, $request->user(), $validated['reason']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Admission rejected.',
+            'data' => $admission->toApiArray(),
         ]);
     }
 

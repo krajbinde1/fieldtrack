@@ -200,7 +200,7 @@ final class AdmissionTargetService
     {
         return Admission::query()
             ->where('employee_id', $employeeId)
-            ->where('status', AdmissionStatus::Submitted)
+            ->where('status', AdmissionStatus::Confirmed)
             ->whereNotNull('submitted_at')
             ->whereDate('submitted_at', '>=', $start->toDateString())
             ->whereDate('submitted_at', '<=', $end->toDateString())

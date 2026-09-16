@@ -42,7 +42,14 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
         Route::get('admission-targets/{admissionTarget}', [ManagerAdmissionTargetController::class, 'show'])
             ->whereNumber('admissionTarget');
         Route::get('admissions', [SupervisorAdmissionController::class, 'index']);
+        Route::get('admissions/summary', [SupervisorAdmissionController::class, 'summary']);
         Route::get('admissions/{admission}', [SupervisorAdmissionController::class, 'show'])
+            ->whereNumber('admission');
+        Route::post('admissions/{admission}/confirm', [SupervisorAdmissionController::class, 'confirm'])
+            ->whereNumber('admission');
+        Route::post('admissions/{admission}/revert', [SupervisorAdmissionController::class, 'revert'])
+            ->whereNumber('admission');
+        Route::post('admissions/{admission}/reject', [SupervisorAdmissionController::class, 'reject'])
             ->whereNumber('admission');
         Route::get('admissions/{admission}/documents/{document}', [SupervisorAdmissionController::class, 'downloadDocument'])
             ->whereNumber('admission')
@@ -73,6 +80,7 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
         Route::get('team-attendance/employees/{employee}', [ManagerTeamAttendanceController::class, 'employeeHistory']);
         Route::get('team-attendance/{attendance}', [ManagerTeamAttendanceController::class, 'show']);
         Route::get('admissions', [SupervisorAdmissionController::class, 'index']);
+        Route::get('admissions/summary', [SupervisorAdmissionController::class, 'summary']);
         Route::get('admissions/{admission}', [SupervisorAdmissionController::class, 'show']);
         Route::get('admissions/{admission}/documents/{document}', [SupervisorAdmissionController::class, 'downloadDocument']);
         Route::get('leaves', [SupervisorLeaveController::class, 'index']);

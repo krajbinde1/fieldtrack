@@ -35,7 +35,7 @@ class AdmissionHubScreen extends StatelessWidget {
           _HubTile(
             icon: Icons.drafts_outlined,
             title: 'Draft Admissions',
-            subtitle: 'Continue incomplete applications',
+            subtitle: 'Continue drafts and reverted applications',
             color: AppColors.warning,
             onTap: () => context.push('/admissions/drafts'),
           ),
@@ -43,7 +43,7 @@ class AdmissionHubScreen extends StatelessWidget {
           _HubTile(
             icon: Icons.task_alt_rounded,
             title: 'Submitted Admissions',
-            subtitle: 'View completed applications',
+            subtitle: 'Track submitted, confirmed and rejected',
             color: AppColors.success,
             onTap: () => context.push('/admissions/submitted'),
           ),

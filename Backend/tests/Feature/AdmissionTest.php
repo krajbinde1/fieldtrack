@@ -311,3 +311,161 @@ it('keeps punch in working after admissions tables exist', function () {
         ], ['Accept' => 'application/json'])
         ->assertCreated();
 });
+
+function submitCompleteAdmission(array $ctx, array $overrides = []): int
+{
+    $id = test()->actingAs($ctx['userA'], 'sanctum')
+        ->postJson('/api/admissions/drafts', admissionPayload($ctx, $overrides))
+        ->json('data.id');
+
+    test()->actingAs($ctx['userA'], 'sanctum')
+        ->post('/api/admissions/'.$id.'/documents', [
+            'document_type' => AdmissionDocumentType::Aadhaar->value,
+            'file' => UploadedFile::fake()->create('aadhaar.pdf', 80, 'application/pdf'),
+        ], ['Accept' => 'application/json'])
+        ->assertOk();
+
+    test()->actingAs($ctx['userA'], 'sanctum')
+        ->postJson('/api/admissions/'.$id.'/submit')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'submitted');
+
+    return $id;
+}
+
+it('lets the assigned center manager confirm a submitted admission', function () {
+    Storage::fake('local');
+    $ctx = seedAdmissionsContext();
+    $id = submitCompleteAdmission($ctx);
+
+    Sanctum::actingAs($ctx['centerManager']);
+    $this->postJson('/api/manager/admissions/'.$id.'/confirm')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'confirmed');
+
+    expect(Admission::query()->find($id)->confirmed_at)->not->toBeNull();
+});
+
+it('requires a reason to revert and lets the employee edit and resubmit', function () {
+    Storage::fake('local');
+    $ctx = seedAdmissionsContext();
+    $id = submitCompleteAdmission($ctx);
+
+    Sanctum::actingAs($ctx['centerManager']);
+    $this->postJson('/api/manager/admissions/'.$id.'/revert')
+        ->assertStatus(422);
+
+    $this->postJson('/api/manager/admissions/'.$id.'/revert', [
+        'reason' => 'Village name is incomplete.',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'reverted')
+        ->assertJsonPath('data.editable', true)
+        ->assertJsonPath('data.review_reason', 'Village name is incomplete.');
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->getJson('/api/admissions/drafts')
+        ->assertOk()
+        ->assertJsonFragment(['id' => $id, 'status' => 'reverted']);
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->patchJson('/api/admissions/drafts/'.$id, ['village' => 'Kharadi'])
+        ->assertOk()
+        ->assertJsonPath('data.village', 'Kharadi');
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->postJson('/api/admissions/'.$id.'/submit')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'submitted')
+        ->assertJsonPath('data.review_reason', null);
+});
+
+it('rejects a submitted admission with a mandatory reason', function () {
+    Storage::fake('local');
+    $ctx = seedAdmissionsContext();
+    $id = submitCompleteAdmission($ctx);
+
+    Sanctum::actingAs($ctx['centerManager']);
+    $this->postJson('/api/manager/admissions/'.$id.'/reject', [
+        'reason' => 'Documents are not readable.',
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'rejected')
+        ->assertJsonPath('data.editable', false);
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->getJson('/api/admissions/submitted')
+        ->assertOk()
+        ->assertJsonFragment(['status' => 'rejected', 'review_reason' => 'Documents are not readable.']);
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->postJson('/api/admissions/'.$id.'/submit')
+        ->assertStatus(422);
+});
+
+it('keeps drafts out of review and scopes manager admissions to assigned centers', function () {
+    Storage::fake('local');
+    $ctx = seedAdmissionsContext();
+    $draftId = $this->actingAs($ctx['userA'], 'sanctum')
+        ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'DraftOnly']))
+        ->json('data.id');
+    $submittedId = submitCompleteAdmission($ctx, ['first_name' => 'Ready']);
+
+    Sanctum::actingAs($ctx['centerManager']);
+    $this->postJson('/api/manager/admissions/'.$draftId.'/confirm')->assertStatus(403);
+
+    $summary = $this->getJson('/api/manager/admissions/summary')->assertOk()->json('data');
+    expect($summary['draft'])->toBeGreaterThanOrEqual(1)
+        ->and($summary['submitted'])->toBeGreaterThanOrEqual(1);
+
+    $submitted = $this->getJson('/api/manager/admissions?status=submitted')
+        ->assertOk()
+        ->json('data');
+    expect(collect($submitted)->pluck('id'))->toContain($submittedId)
+        ->and(collect($submitted)->pluck('id'))->not->toContain($draftId)
+        ->and(collect($submitted)->pluck('status')->unique()->all())->toBe(['submitted']);
+
+    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $hiddenId = $this->actingAs($otherUser, 'sanctum')
+        ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'Hidden']))
+        ->json('data.id');
+
+    Sanctum::actingAs($ctx['centerManager']);
+    $this->getJson('/api/manager/admissions/'.$hiddenId)->assertForbidden();
+    $this->postJson('/api/manager/admissions/'.$hiddenId.'/confirm')->assertForbidden();
+});
+
+it('counts only confirmed admissions toward employee target achievement', function () {
+    Storage::fake('local');
+    $ctx = seedAdmissionsContext();
+    [$start] = \App\Support\AdmissionTargetPeriod::resolve('this_week');
+
+    \App\Models\AdmissionTarget::create([
+        'employee_id' => $ctx['empA']->id,
+        'center_id' => $ctx['centerA']->id,
+        'scheme_id' => $ctx['projectA']->id,
+        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'period_start' => $start->toDateString(),
+        'period_end' => $start->copy()->endOfWeek()->toDateString(),
+        'target_count' => 5,
+    ]);
+
+    $submittedId = submitCompleteAdmission($ctx, ['first_name' => 'Pending']);
+    Admission::query()->whereKey($submittedId)->update([
+        'submitted_at' => $start->copy()->addDay(),
+    ]);
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->getJson('/api/admissions/targets/summary?preset=this_week')
+        ->assertOk()
+        ->assertJsonPath('data.achieved', 0);
+
+    Sanctum::actingAs($ctx['centerManager']);
+    $this->postJson('/api/manager/admissions/'.$submittedId.'/confirm')->assertOk();
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->getJson('/api/admissions/targets/summary?preset=this_week')
+        ->assertOk()
+        ->assertJsonPath('data.achieved', 1);
+});
+

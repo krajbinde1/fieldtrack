@@ -10,6 +10,8 @@ import '../../../core/widgets/design/pg_scaffold.dart';
 import '../../../core/widgets/design/pg_welcome_card.dart';
 import '../../admissions/api/admission_api.dart';
 import '../../admissions/models/admission_target.dart';
+import '../../attendance/models/attendance.dart';
+import '../../attendance/models/attendance_format.dart';
 import '../../attendance/providers/attendance_provider.dart';
 import '../../auth/providers/auth_controller.dart';
 
@@ -60,17 +62,19 @@ class _EmployeeDashboardScreenState
   }
 
   Future<void> _open(String path) async {
-    if (path == '/attendance') {
-      ref.invalidate(todayAttendanceProvider);
-    }
     await context.push(path);
-    if (path.startsWith('/admissions') && mounted) {
+    if (!mounted) return;
+    if (path.startsWith('/attendance')) {
+      await ref.read(todayAttendanceProvider.notifier).refresh();
+    }
+    if (path.startsWith('/admissions')) {
       await _load();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final today = ref.watch(todayAttendanceProvider);
     final name = widget.auth.session?.employee.fullName ??
         widget.auth.session?.user.loginId ??
         'Employee';
@@ -83,6 +87,9 @@ class _EmployeeDashboardScreenState
           name: name,
           role: widget.auth.userRole.label,
           photoUrl: widget.auth.session?.employee.profilePhotoUrl,
+          locationName: widget.auth.session?.employee.baseLocation,
+          attendance: today.valueOrNull,
+          attendanceLoading: today.isLoading && !today.hasValue,
           preset: _preset,
           summary: _summary,
           loading: _loading,
@@ -110,6 +117,9 @@ class EmployeeDashboardView extends StatelessWidget {
     required this.onRetry,
     required this.onOpen,
     this.photoUrl,
+    this.locationName,
+    this.attendance,
+    this.attendanceLoading = false,
     this.summary,
     this.error,
   });
@@ -117,6 +127,9 @@ class EmployeeDashboardView extends StatelessWidget {
   final String name;
   final String role;
   final String? photoUrl;
+  final String? locationName;
+  final Attendance? attendance;
+  final bool attendanceLoading;
   final String preset;
   final AdmissionTargetSummary? summary;
   final bool loading;
@@ -188,6 +201,14 @@ class EmployeeDashboardView extends StatelessWidget {
                   prominent: true,
                   padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
                   avatarRadius: 36,
+                ),
+                const SizedBox(height: 12),
+                _PunchStatusCard(
+                  attendance: attendance,
+                  loading: attendanceLoading,
+                  locationName: locationName,
+                  onPunchIn: () => onOpen('/attendance/punch-in'),
+                  onPunchOut: () => onOpen('/attendance/punch-out'),
                 ),
                 const SizedBox(height: 12),
                 _AdmissionTargetCard(

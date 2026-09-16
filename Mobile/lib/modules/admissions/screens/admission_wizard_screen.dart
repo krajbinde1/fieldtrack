@@ -12,6 +12,7 @@ import '../../../core/design/app_spacing.dart';
 import '../../../core/widgets/design/pg_card.dart';
 import '../../../core/widgets/design/pg_empty_state.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
+import '../../../core/widgets/design/pg_status_badge.dart';
 import '../api/admission_api.dart';
 import '../models/admission.dart';
 import '../widgets/admission_step_indicator.dart';
@@ -151,9 +152,9 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
     _admissionId = record.id;
     _editable = record.editable;
     if (applyStep) {
-      _step = record.isSubmitted
-          ? 4
-          : (record.currentStep - 1).clamp(0, 4);
+      _step = record.editable
+          ? (record.currentStep - 1).clamp(0, 4)
+          : 4;
     }
     _schemeId = record.schemeId;
     _firstName.text = record.firstName ?? '';
@@ -165,7 +166,7 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
     _districtId = record.districtId;
     _talukaId = record.talukaId;
     _village.text = record.village ?? '';
-    _submittedLock = record.isSubmitted;
+    _submittedLock = !record.editable;
   }
 
   Map<String, dynamic> _payload({required int step}) => {
@@ -410,7 +411,9 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
   @override
   Widget build(BuildContext context) {
     return PgPageScaffold(
-      title: _editable ? 'New Admission' : 'Admission',
+      title: !_editable
+          ? 'Admission'
+          : (_record?.isReverted == true ? 'Edit Admission' : 'New Admission'),
       showBack: true,
       body: _loading
           ? const PgLoadingState()
@@ -436,14 +439,66 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
                       horizontal: AppSpacing.screenPadding,
                     ),
                     children: [
-                      if (!_editable)
+                      if (_record != null) ...[
                         Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: Text(
-                            'This admission has been submitted and cannot be edited.',
-                            style: Theme.of(context).textTheme.bodySmall,
+                          child: PgCard(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Status',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelMedium,
+                                      ),
+                                    ),
+                                    PgStatusBadge(
+                                      label: _record!.statusLabel,
+                                      tone: _record!.statusTone,
+                                    ),
+                                  ],
+                                ),
+                                if ((_record!.reviewReason ?? '')
+                                    .trim()
+                                    .isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _record!.isRejected
+                                        ? 'Reject reason'
+                                        : 'Revert reason',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: AppColors.textMuted),
+                                  ),
+                                  Text(
+                                    _record!.reviewReason!,
+                                    style:
+                                        Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ],
+                                if (!_editable) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _record!.isConfirmed
+                                        ? 'This admission is confirmed and cannot be edited.'
+                                        : _record!.isRejected
+                                            ? 'This admission was rejected and cannot be edited.'
+                                            : 'This admission has been submitted and cannot be edited.',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ),
+                      ],
                       _stepBody(),
                       const SizedBox(height: 120),
                     ],

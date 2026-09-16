@@ -23,12 +23,14 @@ class AdmissionInfolist
                 TextEntry::make('status')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof AdmissionStatus ? $state->label() : (string) $state)
-                    ->color(fn ($state): string => ($state instanceof AdmissionStatus ? $state : AdmissionStatus::tryFrom((string) $state)) === AdmissionStatus::Submitted ? 'success' : 'warning'),
+                    ->color(fn ($state): string => ($state instanceof AdmissionStatus ? $state : AdmissionStatus::tryFrom((string) $state))?->color() ?? 'gray'),
             ]),
             Section::make('Organization')->columns(3)->schema([
                 TextEntry::make('center.name')->label('Center'),
                 TextEntry::make('employee.full_name')->label('Employee'),
                 TextEntry::make('submitted_at')->dateTime('d M Y h:i A')->placeholder('-'),
+                TextEntry::make('confirmed_at')->dateTime('d M Y h:i A')->placeholder('-'),
+                TextEntry::make('review_reason')->placeholder('-')->columnSpanFull(),
                 TextEntry::make('created_at')->dateTime('d M Y h:i A'),
             ]),
             Section::make('Address')->columns(2)->schema([

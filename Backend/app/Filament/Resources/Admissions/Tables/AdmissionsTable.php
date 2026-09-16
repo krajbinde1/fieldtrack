@@ -40,7 +40,7 @@ class AdmissionsTable
                 TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof AdmissionStatus ? $state->label() : ucfirst((string) $state))
-                    ->color(fn ($state): string => ($state instanceof AdmissionStatus ? $state : AdmissionStatus::tryFrom((string) $state)) === AdmissionStatus::Submitted ? 'success' : 'warning'),
+                    ->color(fn ($state): string => ($state instanceof AdmissionStatus ? $state : AdmissionStatus::tryFrom((string) $state))?->color() ?? 'gray'),
                 TextColumn::make('submitted_at')->dateTime('d M Y')->placeholder('-')->sortable(),
                 TextColumn::make('created_at')->dateTime('d M Y')->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])

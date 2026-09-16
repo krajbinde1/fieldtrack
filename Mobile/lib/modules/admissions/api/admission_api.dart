@@ -107,12 +107,68 @@ class AdmissionApi {
     return AdmissionRecord.fromJson(_map(data));
   }
 
-  Future<List<AdmissionRecord>> supervisorList(String prefix) =>
-      _list('/$prefix/admissions');
+  Future<List<AdmissionRecord>> supervisorList(
+    String prefix, {
+    String? status,
+  }) =>
+      _list(
+        '/$prefix/admissions',
+        query: {
+          if (status != null && status.isNotEmpty) 'status': status,
+        },
+      );
+
+  Future<Map<String, int>> supervisorSummary(String prefix) async {
+    final data = await _get('/$prefix/admissions/summary');
+    final map = _map(data);
+    int count(String key) {
+      final value = map[key];
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse('$value') ?? 0;
+    }
+
+    return {
+      'submitted': count('submitted'),
+      'confirmed': count('confirmed'),
+      'draft': count('draft'),
+      'reverted': count('reverted'),
+      'rejected': count('rejected'),
+    };
+  }
 
   Future<AdmissionRecord> supervisorShow(String prefix, int id) async {
     final data = await _get('/$prefix/admissions/$id');
     return AdmissionRecord.fromJson(_map(data));
+  }
+
+  Future<AdmissionRecord> confirm(int id) =>
+      _postRecord('/manager/admissions/$id/confirm');
+
+  Future<AdmissionRecord> revert(int id, String reason) => _postRecord(
+        '/manager/admissions/$id/revert',
+        data: {'reason': reason},
+      );
+
+  Future<AdmissionRecord> reject(int id, String reason) => _postRecord(
+        '/manager/admissions/$id/reject',
+        data: {'reason': reason},
+      );
+
+  Future<List<int>> supervisorDownloadDocument({
+    required String prefix,
+    required int admissionId,
+    required int documentId,
+  }) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        '/$prefix/admissions/$admissionId/documents/$documentId',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      return response.data ?? const <int>[];
+    } on DioException catch (error) {
+      throw _error(error);
+    }
   }
 
   Future<AdmissionRecord> saveDraft(Map<String, dynamic> payload, {int? id}) async {
@@ -201,13 +257,28 @@ class AdmissionApi {
     }
   }
 
-  Future<List<AdmissionRecord>> _list(String path) async {
-    final data = await _get(path);
+  Future<List<AdmissionRecord>> _list(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
+    final data = await _get(path, query: query);
     final items = data is List ? data : const <dynamic>[];
     return items
         .whereType<Map>()
         .map((item) => AdmissionRecord.fromJson(Map<String, dynamic>.from(item)))
         .toList();
+  }
+
+  Future<AdmissionRecord> _postRecord(
+    String path, {
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      final response = await _dio.post(path, data: data);
+      return AdmissionRecord.fromJson(_map(response.data['data']));
+    } on DioException catch (error) {
+      throw _error(error);
+    }
   }
 
   Future<dynamic> _get(String path, {Map<String, dynamic>? query}) async {

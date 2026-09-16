@@ -25,7 +25,7 @@ class EmployeeAdmissionController extends Controller
     public function drafts(Request $request): JsonResponse
     {
         $items = $this->ownQuery($request)
-            ->where('status', AdmissionStatus::Draft)
+            ->whereIn('status', [AdmissionStatus::Draft, AdmissionStatus::Reverted])
             ->latest('updated_at')
             ->get()
             ->map(fn (Admission $admission) => $admission->toApiArray())
@@ -37,7 +37,11 @@ class EmployeeAdmissionController extends Controller
     public function submitted(Request $request): JsonResponse
     {
         $items = $this->ownQuery($request)
-            ->where('status', AdmissionStatus::Submitted)
+            ->whereIn('status', [
+                AdmissionStatus::Submitted,
+                AdmissionStatus::Confirmed,
+                AdmissionStatus::Rejected,
+            ])
             ->latest('submitted_at')
             ->get()
             ->map(fn (Admission $admission) => $admission->toApiArray())

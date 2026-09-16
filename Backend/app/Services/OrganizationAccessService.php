@@ -221,6 +221,18 @@ final class OrganizationAccessService
             && $this->canViewLeave($user, $leave);
     }
 
+    public function canReviewAdmission(User $user, Admission $admission): bool
+    {
+        if (! $user->isCenterManager() || ! $admission->isSubmitted()) {
+            return false;
+        }
+
+        $centerIds = $this->visibleCenterIds($user) ?? [];
+
+        return in_array((int) $admission->center_id, $centerIds, true)
+            && $this->canViewAdmission($user, $admission);
+    }
+
     public function canManageSchemes(User $user): bool
     {
         return $user->isAdmin();
@@ -288,6 +300,15 @@ final class OrganizationAccessService
     public function assertCanApproveLeave(User $user, LeaveRequest $leave): void
     {
         abort_unless($this->canApproveLeave($user, $leave), 403, 'Only the assigned Center Manager can approve or reject this leave.');
+    }
+
+    public function assertCanReviewAdmission(User $user, Admission $admission): void
+    {
+        abort_unless(
+            $this->canReviewAdmission($user, $admission),
+            403,
+            'Only the employee\'s assigned Center Manager can review this admission.',
+        );
     }
 
     public function assertCanAssignAdmissionTarget(User $user, Employee $employee): void
