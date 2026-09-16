@@ -1,0 +1,1679 @@
+import 'dart:convert';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import '../../../core/api/api_client.dart';
+import '../../../core/api/api_errors.dart';
+import '../../../core/design/app_colors.dart';
+import '../../../core/design/app_spacing.dart';
+import '../../../core/storage/session_store.dart';
+import '../../../core/widgets/design/pg_card.dart';
+import '../../../core/widgets/design/pg_detail_widgets.dart';
+import '../../../core/widgets/design/pg_empty_state.dart';
+import '../../../core/widgets/design/pg_status_badge.dart';
+import '../../../core/widgets/role_shell_widgets.dart';
+import '../../auth/providers/auth_controller.dart';
+import '../api/manager_api.dart';
+
+class ManagerTeamAttendanceScreen extends StatefulWidget {
+  const ManagerTeamAttendanceScreen({super.key, required this.auth});
+
+  final AuthController auth;
+
+  @override
+  State<ManagerTeamAttendanceScreen> createState() =>
+      _ManagerTeamAttendanceScreenState();
+}
+
+class _ManagerTeamAttendanceScreenState
+    extends State<ManagerTeamAttendanceScreen> {
+  late final ManagerApi _api;
+  late Future<ManagerTeamAttendanceListResult> _future;
+  final _searchController = TextEditingController();
+  DateTime _date = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _api = ManagerApi(
+      ApiClient(SessionStore(), onUnauthorized: widget.auth.sessionExpired).dio,
+    );
+    _future = _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  String get _dateParam => DateFormat('yyyy-MM-dd').format(_date);
+
+  Future<ManagerTeamAttendanceListResult> _load() => _api.listTeamAttendance(
+        date: _dateParam,
+        search: _searchController.text.trim(),
+      );
+
+  Future<void> _reload() async {
+    setState(() => _future = _load());
+    await _future;
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (picked == null) return;
+    setState(() => _date = picked);
+    await _reload();
+  }
+
+  String _formatTime(Object? value) {
+    if (value == null) return '—';
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) return value.toString();
+    return DateFormat('hh:mm a').format(parsed.toLocal());
+  }
+
+  String _workingDuration(Map<String, dynamic> row) {
+    final minutes = int.tryParse('${row['total_working_minutes'] ?? ''}');
+    if (minutes != null && minutes >= 0) {
+      return '${minutes ~/ 60}h ${minutes % 60}m';
+    }
+    final hours = row['working_hours']?.toString().trim() ?? '';
+    final match = RegExp(r'^(\d+):(\d+)$').firstMatch(hours);
+    if (match != null) {
+      return '${int.parse(match.group(1)!)}h ${int.parse(match.group(2)!)}m';
+    }
+    if (hours.isNotEmpty) return hours;
+    return '-';
+  }
+
+  String _distance(Map<String, dynamic> row) {
+    final value = double.tryParse('${row['total_route_distance_km'] ?? ''}');
+    if (value == null) return '-';
+    return '${value.toStringAsFixed(1)} km';
+  }
+
+  String _badgeLabel(Map<String, dynamic> row, String displayStatus) {
+    if (displayStatus.toLowerCase().contains('completed')) {
+      final attendance = row['attendance_status']?.toString().trim() ?? '';
+      final lower = attendance.toLowerCase();
+      if (lower == 'present' || lower.contains('half') || lower == 'absent') {
+        return attendance;
+      }
+    }
+    return displayStatus;
+  }
+
+  PgStatusTone _statusTone(String status) {
+    final value = status.toLowerCase();
+    if (value.contains('working')) return PgStatusTone.info;
+    if (value.contains('completed') || value == 'present') {
+      return PgStatusTone.approved;
+    }
+    if (value.contains('half')) return PgStatusTone.pending;
+    if (value.contains('absent')) return PgStatusTone.rejected;
+    return PgStatusTone.pending;
+  }
+
+  bool _isWorking(String status) => status.toLowerCase().contains('working');
+
+  bool _isNotPunchedIn(String status, bool hasAttendance) {
+    if (!hasAttendance) return true;
+    return status.toLowerCase().contains('not punched');
+  }
+
+  int? _workingMinutes(Map<String, dynamic> row) {
+    final minutes = int.tryParse('${row['total_working_minutes'] ?? ''}');
+    if (minutes != null && minutes >= 0) return minutes;
+    final hours = row['working_hours']?.toString().trim() ?? '';
+    final match = RegExp(r'^(\d+):(\d+)$').firstMatch(hours);
+    if (match != null) {
+      return int.parse(match.group(1)!) * 60 + int.parse(match.group(2)!);
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: RoleAppBar(title: 'Team Attendance', auth: widget.auth),
+      body: RefreshIndicator(
+        onRefresh: _reload,
+        child: FutureBuilder<ManagerTeamAttendanceListResult>(
+          future: _future,
+          builder: (context, snapshot) {
+            final result = snapshot.data;
+            final rows = result?.rows ?? const <Map<String, dynamic>>[];
+
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.screenPadding),
+              children: [
+                InkWell(
+                  onTap: _pickDate,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            DateFormat('d MMM yyyy').format(_date),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Select date',
+                          onPressed: _pickDate,
+                          icon: const Icon(
+                            Icons.calendar_month_rounded,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _AttendanceSummaryGrid(
+                  tiles: [
+                    _AttendanceSummaryTile(
+                      value: '${result?.totalEmployees ?? 0}',
+                      label: 'Total Team',
+                      icon: Icons.groups_rounded,
+                      color: AppColors.primary,
+                    ),
+                    _AttendanceSummaryTile(
+                      value: '${result?.punchedIn ?? 0}',
+                      label: 'Punched In',
+                      icon: Icons.login_rounded,
+                      color: AppColors.info,
+                    ),
+                    _AttendanceSummaryTile(
+                      value: '${result?.punchedOut ?? 0}',
+                      label: 'Punched Out',
+                      icon: Icons.logout_rounded,
+                      color: AppColors.secondary,
+                    ),
+                    _AttendanceSummaryTile(
+                      value: '${result?.notPunchedIn ?? 0}',
+                      label: 'Not Punched In',
+                      icon: Icons.hourglass_empty_rounded,
+                      color: AppColors.warning,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search employee',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchController.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear',
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                              _reload();
+                            },
+                          ),
+                    isDense: true,
+                    border: const OutlineInputBorder(),
+                  ),
+                  textInputAction: TextInputAction.search,
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _reload(),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    result == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 80),
+                    child: PgLoadingState(),
+                  )
+                else if (snapshot.hasError)
+                  PgErrorState(
+                    message: errorMessage(snapshot.error),
+                    onRetry: _reload,
+                  )
+                else ...[
+                  if (rows.isEmpty)
+                    const PgEmptyState(
+                      message: 'No attendance recorded for this date.',
+                      icon: Icon(Icons.groups_outlined),
+                    )
+                  else
+                    ...rows.map((row) {
+                      final displayStatus = row['display_status']?.toString() ??
+                          row['attendance_status']?.toString() ??
+                          'Not Punched In';
+                      final status = _badgeLabel(row, displayStatus);
+                      final hasAttendance = row['has_attendance'] == true;
+                      final employeeId =
+                          int.tryParse('${row['employee_id'] ?? 0}') ?? 0;
+                      final attendanceId =
+                          int.tryParse('${row['id'] ?? 0}') ?? 0;
+
+                      return _TeamAttendanceCard(
+                        name: row['employee_name']?.toString() ?? '-',
+                        code: row['employee_code']?.toString() ?? '-',
+                        status: status,
+                        statusTone: _statusTone(status),
+                        notPunchedIn:
+                            _isNotPunchedIn(displayStatus, hasAttendance),
+                        working: _isWorking(displayStatus),
+                        punchIn: hasAttendance
+                            ? _formatTime(row['punch_in_time'])
+                            : '—',
+                        punchOut: hasAttendance
+                            ? (row['punch_out_time'] == null
+                                ? '—'
+                                : _formatTime(row['punch_out_time']))
+                            : '—',
+                        workingLabel: _isWorking(displayStatus)
+                            ? 'In Progress'
+                            : _workingDuration(row),
+                        distance: _distance(row),
+                        workingMinutes: _workingMinutes(row),
+                        onTap: employeeId <= 0
+                            ? null
+                            : () {
+                                if (attendanceId > 0) {
+                                  context.push(
+                                    '/manager/team-attendance/$attendanceId',
+                                  );
+                                  return;
+                                }
+                                context.push(
+                                  '/manager/team-attendance/employees/$employeeId'
+                                  '?date=$_dateParam',
+                                );
+                              },
+                      );
+                    }),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _AttendanceSummaryGrid extends StatelessWidget {
+  const _AttendanceSummaryGrid({required this.tiles});
+
+  final List<Widget> tiles;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fourAcross = constraints.maxWidth >= 420 && tiles.length == 4;
+        if (fourAcross) {
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < tiles.length; i++) ...[
+                  if (i > 0) const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: tiles[i]),
+                ],
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            for (var i = 0; i < tiles.length; i += 2) ...[
+              if (i > 0) const SizedBox(height: AppSpacing.sm),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: tiles[i]),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: i + 1 < tiles.length
+                          ? tiles[i + 1]
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _AttendanceSummaryTile extends StatelessWidget {
+  const _AttendanceSummaryTile({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return PgCard(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    height: 1.1,
+                  ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeamAttendanceCard extends StatelessWidget {
+  const _TeamAttendanceCard({
+    required this.name,
+    required this.code,
+    required this.status,
+    required this.statusTone,
+    required this.notPunchedIn,
+    required this.working,
+    required this.punchIn,
+    required this.punchOut,
+    required this.workingLabel,
+    required this.distance,
+    required this.workingMinutes,
+    required this.onTap,
+  });
+
+  final String name;
+  final String code;
+  final String status;
+  final PgStatusTone statusTone;
+  final bool notPunchedIn;
+  final bool working;
+  final String punchIn;
+  final String punchOut;
+  final String workingLabel;
+  final String distance;
+  final int? workingMinutes;
+  final VoidCallback? onTap;
+
+  static const _fullDayMinutes = 480;
+
+  @override
+  Widget build(BuildContext context) {
+    final showProgress = working &&
+        workingMinutes != null &&
+        workingMinutes! > 0;
+
+    return PgCard(
+      onTap: onTap,
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      code,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                flex: 2,
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: PgStatusBadge(label: status, tone: statusTone),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (notPunchedIn) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.event_busy_rounded,
+                    size: 18,
+                    color: AppColors.textMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No attendance recorded today',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _AttendanceMetric(
+                    icon: Icons.login_rounded,
+                    label: 'IN',
+                    value: punchIn,
+                    color: AppColors.primary,
+                  ),
+                ),
+                Expanded(
+                  child: _AttendanceMetric(
+                    icon: Icons.logout_rounded,
+                    label: 'OUT',
+                    value: punchOut,
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _AttendanceMetric(
+                    icon: Icons.schedule_rounded,
+                    label: 'WORKING',
+                    value: workingLabel,
+                    color: working ? AppColors.info : AppColors.textPrimary,
+                  ),
+                ),
+                Expanded(
+                  child: _AttendanceMetric(
+                    icon: Icons.route_rounded,
+                    label: 'DISTANCE',
+                    value: distance,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            if (showProgress) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Working Hours',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: (workingMinutes! / _fullDayMinutes).clamp(
+                          0.0,
+                          1.0,
+                        ),
+                        minHeight: 6,
+                        color: AppColors.info,
+                        backgroundColor: const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      workingLabel == 'In Progress'
+                          ? _minutesLabel(workingMinutes!)
+                          : workingLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.info,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _minutesLabel(int minutes) {
+    return '${minutes ~/ 60}h ${minutes % 60}m';
+  }
+}
+
+class _AttendanceMetric extends StatelessWidget {
+  const _AttendanceMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: AppColors.textSecondary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+              ),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class ManagerEmployeeAttendanceScreen extends StatefulWidget {
+  const ManagerEmployeeAttendanceScreen({
+    super.key,
+    required this.auth,
+    required this.employeeId,
+    this.initialDate,
+  });
+
+  final AuthController auth;
+  final int employeeId;
+  final String? initialDate;
+
+  @override
+  State<ManagerEmployeeAttendanceScreen> createState() =>
+      _ManagerEmployeeAttendanceScreenState();
+}
+
+class _ManagerEmployeeAttendanceScreenState
+    extends State<ManagerEmployeeAttendanceScreen> {
+  late Future<ManagerEmployeeAttendanceHistoryResult> _future;
+  late DateTime _month;
+  DateTime? _selectedDate;
+
+  ManagerApi get _api => ManagerApi(
+    ApiClient(SessionStore(), onUnauthorized: widget.auth.sessionExpired).dio,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = DateTime.tryParse(widget.initialDate ?? '') ?? DateTime.now();
+    _selectedDate = DateTime(initial.year, initial.month, initial.day);
+    _month = DateTime(initial.year, initial.month);
+    _future = _load();
+  }
+
+  String get _monthParam => DateFormat('yyyy-MM').format(_month);
+
+  Future<ManagerEmployeeAttendanceHistoryResult> _load() =>
+      _api.getEmployeeAttendanceHistory(
+        widget.employeeId,
+        month: _monthParam,
+      );
+
+  Future<void> _reload() async {
+    setState(() => _future = _load());
+    await _future;
+  }
+
+  Future<void> _pickMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? _month,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+      helpText: 'Select date / month',
+    );
+    if (picked == null) return;
+    setState(() {
+      _selectedDate = DateTime(picked.year, picked.month, picked.day);
+      _month = DateTime(picked.year, picked.month);
+    });
+    await _reload();
+  }
+
+  String _formatTime(Object? value, {String empty = '-'}) {
+    if (value == null) return empty;
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) return value.toString();
+    return DateFormat('hh:mm a').format(parsed.toLocal());
+  }
+
+  String _duration(Map<String, dynamic> row) {
+    final hours = row['working_hours']?.toString();
+    if (hours != null && hours.trim().isNotEmpty) return hours;
+    final minutes = int.tryParse('${row['total_working_minutes'] ?? ''}');
+    if (minutes == null) return '-';
+    return '${minutes ~/ 60}h ${minutes % 60}m';
+  }
+
+  String _distance(Map<String, dynamic> row) {
+    final value = double.tryParse('${row['total_route_distance_km'] ?? ''}');
+    if (value == null) return '-';
+    return '${value.toStringAsFixed(1)} km';
+  }
+
+  Map<String, dynamic>? _selectedRow(List<Map<String, dynamic>> rows) {
+    if (_selectedDate == null) return rows.isEmpty ? null : rows.first;
+    final key = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+    for (final row in rows) {
+      if (row['attendance_date']?.toString() == key) return row;
+    }
+    return null;
+  }
+
+  Future<void> _openAttendanceDetail(int attendanceId) async {
+    await context.push('/manager/team-attendance/$attendanceId');
+  }
+
+  Future<void> _openRoute(int attendanceId) async {
+    await context.push('/manager/team-attendance/$attendanceId/route');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: RoleAppBar(
+        title: 'Employee Attendance',
+        auth: widget.auth,
+        actions: [
+          IconButton(
+            tooltip: 'Select date',
+            onPressed: _pickMonth,
+            icon: const Icon(Icons.calendar_month_outlined),
+          ),
+        ],
+      ),
+      body: FutureBuilder<ManagerEmployeeAttendanceHistoryResult>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return const PgLoadingState();
+          }
+          if (snapshot.hasError) {
+            return PgErrorState(
+              message: errorMessage(snapshot.error),
+              onRetry: _reload,
+            );
+          }
+
+          final result = snapshot.data!;
+          final employee = result.employee;
+          final selected = _selectedRow(result.rows);
+          final selectedKey = _selectedDate == null
+              ? null
+              : DateFormat('yyyy-MM-dd').format(_selectedDate!);
+
+          return RefreshIndicator(
+            onRefresh: _reload,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.screenPadding),
+              children: [
+                PgDetailHeader(
+                  title: employee['full_name']?.toString() ?? '-',
+                  subtitle: employee['employee_code']?.toString() ?? '-',
+                  badgeLabel: selected?['display_status']?.toString() ??
+                      'No attendance',
+                  badgeTone: PgStatusTone.pending,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                PgCard(
+                  onTap: _pickMonth,
+                  child: PgInvoiceRow(
+                    label: 'Selected Date',
+                    value: _selectedDate == null
+                        ? DateFormat('MMM yyyy').format(_month)
+                        : DateFormat('dd MMM yyyy').format(_selectedDate!),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (selected == null)
+                  const PgEmptyState(
+                    message: 'No attendance recorded for this date.',
+                    icon: Icon(Icons.event_busy_outlined),
+                  )
+                else
+                  PgCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Attendance Summary',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        PgInvoiceRow(
+                          label: 'Punch In',
+                          value: _formatTime(selected['punch_in_time']),
+                        ),
+                        PgInvoiceRow(
+                          label: 'Punch Out',
+                          value: _formatTime(
+                            selected['punch_out_time'],
+                            empty: 'Not Punched Out',
+                          ),
+                        ),
+                        PgInvoiceRow(
+                          label: 'Working Duration',
+                          value: _duration(selected),
+                        ),
+                        PgInvoiceRow(
+                          label: 'Route Distance',
+                          value: _distance(selected),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        OutlinedButton(
+                          onPressed: () {
+                            final id =
+                                int.tryParse('${selected['id'] ?? 0}') ?? 0;
+                            if (id > 0) _openAttendanceDetail(id);
+                          },
+                          child: const Text('Open Full Attendance Detail'),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'Route History',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                if (result.rows.isEmpty)
+                  const PgEmptyState(
+                    message: 'No attendance history for this month.',
+                    icon: Icon(Icons.history_outlined),
+                  )
+                else
+                  ...result.rows.map((row) {
+                    final date = row['attendance_date']?.toString() ?? '-';
+                    final attendanceId =
+                        int.tryParse('${row['id'] ?? 0}') ?? 0;
+                    final isSelected = date == selectedKey;
+                    return PgCard(
+                      onTap: () {
+                        final parsed = DateTime.tryParse(date);
+                        if (parsed != null) {
+                          setState(() => _selectedDate = parsed);
+                        }
+                      },
+                      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  DateFormat('dd MMM yyyy').format(
+                                    DateTime.tryParse(date) ?? DateTime.now(),
+                                  ),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              if (isSelected)
+                                const PgStatusBadge(
+                                  label: 'Selected',
+                                  tone: PgStatusTone.info,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Punch In: ${_formatTime(row['punch_in_time'])}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          Text(
+                            'Punch Out: ${_formatTime(row['punch_out_time'], empty: 'Not Punched Out')}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          Text(
+                            'Duration: ${_duration(row)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          Text(
+                            'Distance: ${_distance(row)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton.tonalIcon(
+                              onPressed: attendanceId <= 0
+                                  ? null
+                                  : () => _openRoute(attendanceId),
+                              icon: const Icon(Icons.map_outlined),
+                              label: const Text('View Route'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                const SizedBox(height: AppSpacing.xl),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class ManagerTeamAttendanceDetailScreen extends StatefulWidget {
+  const ManagerTeamAttendanceDetailScreen({
+    super.key,
+    required this.auth,
+    required this.attendanceId,
+  });
+
+  final AuthController auth;
+  final int attendanceId;
+
+  @override
+  State<ManagerTeamAttendanceDetailScreen> createState() =>
+      _ManagerTeamAttendanceDetailScreenState();
+}
+
+class _ManagerTeamAttendanceDetailScreenState
+    extends State<ManagerTeamAttendanceDetailScreen> {
+  late Future<Map<String, dynamic>> _future;
+
+  ManagerApi get _api => ManagerApi(
+    ApiClient(SessionStore(), onUnauthorized: widget.auth.sessionExpired).dio,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _api.getTeamAttendance(widget.attendanceId);
+  }
+
+  Future<void> _reload() async {
+    setState(() => _future = _api.getTeamAttendance(widget.attendanceId));
+    await _future;
+  }
+
+  String _formatTime(Object? value, {String empty = '-'}) {
+    if (value == null) return empty;
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) return value.toString();
+    return DateFormat('hh:mm a').format(parsed.toLocal());
+  }
+
+  Map<String, dynamic> _asMap(Object? value) {
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return const {};
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: RoleAppBar(title: 'Employee Attendance', auth: widget.auth),
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const PgLoadingState();
+          }
+          if (snapshot.hasError) {
+            return PgErrorState(
+              message: errorMessage(snapshot.error),
+              onRetry: _reload,
+            );
+          }
+
+          final data = snapshot.data!;
+          final employee = _asMap(data['employee']);
+          final attendance = _asMap(data['attendance']);
+          final summary = _asMap(data['summary']);
+          final punchIn = _asMap(attendance['punch_in']);
+          final punchOut = _asMap(attendance['punch_out']);
+          final punchInPhoto = punchIn['photo_url']?.toString() ?? '';
+          final punchOutPhoto = punchOut['photo_url']?.toString() ?? '';
+          final status = attendance['display_status']?.toString() ??
+              attendance['attendance_status']?.toString() ??
+              '-';
+          final workingHours = attendance['working_hours']?.toString();
+          final distance = attendance['total_route_distance_km'] ??
+              summary['total_distance_km'];
+          final hasRoute = data['has_route'] == true;
+
+          return ListView(
+            padding: const EdgeInsets.all(AppSpacing.screenPadding),
+            children: [
+              PgDetailHeader(
+                title: employee['full_name']?.toString() ?? '-',
+                subtitle: employee['employee_code']?.toString() ?? '-',
+                badgeLabel: status,
+                badgeTone: PgStatusTone.info,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              PgCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Attendance Summary',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    PgInvoiceRow(
+                      label: 'Date',
+                      value: attendance['attendance_date']?.toString() ?? '-',
+                    ),
+                    PgInvoiceRow(
+                      label: 'Punch In',
+                      value: _formatTime(punchIn['time']),
+                    ),
+                    PgInvoiceRow(
+                      label: 'Punch Out',
+                      value: _formatTime(
+                        punchOut['time'],
+                        empty: 'Not Punched Out',
+                      ),
+                    ),
+                    PgInvoiceRow(
+                      label: 'Working Duration',
+                      value: (workingHours == null || workingHours.isEmpty)
+                          ? '-'
+                          : workingHours,
+                    ),
+                    PgInvoiceRow(
+                      label: 'Route Distance',
+                      value: distance == null
+                          ? '-'
+                          : '${double.tryParse('$distance')?.toStringAsFixed(1) ?? distance} km',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              PgCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Locations',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    PgInvoiceRow(
+                      label: 'Punch In Location',
+                      value: punchIn['location']?.toString() ?? '-',
+                    ),
+                    PgInvoiceRow(
+                      label: 'Punch Out Location',
+                      value: punchOut['location']?.toString() ?? '-',
+                    ),
+                  ],
+                ),
+              ),
+              if (punchInPhoto.isNotEmpty || punchOutPhoto.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (punchInPhoto.isNotEmpty)
+                      Expanded(
+                        child: _AttendancePhotoCard(
+                          label: 'Punch In Photo',
+                          url: punchInPhoto,
+                        ),
+                      ),
+                    if (punchInPhoto.isNotEmpty && punchOutPhoto.isNotEmpty)
+                      const SizedBox(width: AppSpacing.sm),
+                    if (punchOutPhoto.isNotEmpty)
+                      Expanded(
+                        child: _AttendancePhotoCard(
+                          label: 'Punch Out Photo',
+                          url: punchOutPhoto,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              if (hasRoute)
+                FilledButton.icon(
+                  onPressed: () => context.push(
+                    '/manager/team-attendance/${widget.attendanceId}/route',
+                  ),
+                  icon: const Icon(Icons.map_outlined),
+                  label: const Text('View Route'),
+                )
+              else
+                const PgEmptyState(
+                  message: 'Route data not available for this attendance.',
+                  icon: Icon(Icons.map_outlined),
+                ),
+              const SizedBox(height: AppSpacing.xl),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AttendancePhotoCard extends StatelessWidget {
+  const _AttendancePhotoCard({required this.label, required this.url});
+
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return PgCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                errorWidget: (_, _, _) =>
+                    const Icon(Icons.broken_image, size: 48),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ManagerTeamRouteMapScreen extends StatefulWidget {
+  const ManagerTeamRouteMapScreen({
+    super.key,
+    required this.auth,
+    required this.attendanceId,
+    this.loadRoute,
+  });
+
+  final AuthController auth;
+  final int attendanceId;
+  /// Optional loader so Director (and others) can reuse this map screen.
+  final Future<Map<String, dynamic>> Function(int attendanceId)? loadRoute;
+
+  @override
+  State<ManagerTeamRouteMapScreen> createState() =>
+      _ManagerTeamRouteMapScreenState();
+}
+
+class _ManagerTeamRouteMapScreenState extends State<ManagerTeamRouteMapScreen> {
+  late Future<Map<String, dynamic>> _future;
+  WebViewController? _controller;
+  List<Map<String, dynamic>> _stops = const [];
+
+  ManagerApi get _api => ManagerApi(
+    ApiClient(SessionStore(), onUnauthorized: widget.auth.sessionExpired).dio,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<Map<String, dynamic>> _load() async {
+    final data = widget.loadRoute != null
+        ? await widget.loadRoute!(widget.attendanceId)
+        : await _api.getTeamAttendance(widget.attendanceId);
+    if (!mounted) return data;
+    if (data['has_route'] == true) {
+      _setupController(data);
+    }
+    return data;
+  }
+
+  void _setupController(Map<String, dynamic> data) {
+    final attendance = _asMap(data['attendance']);
+    final summary = _asMap(data['summary']);
+    final punchIn = _asMap(attendance['punch_in']);
+    final punchOut = _asMap(attendance['punch_out']);
+    final routePoints = ((data['route_points'] as List?) ?? const [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+    final stops = ((data['stops'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+
+    final html = _buildLeafletHtml(
+      routePoints: routePoints,
+      punchIn: punchIn,
+      punchOut: punchOut,
+      summary: summary,
+      distanceKm: attendance['total_route_distance_km'],
+      stops: stops,
+    );
+
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadHtmlString(html);
+
+    setState(() {
+      _controller = controller;
+      _stops = stops;
+    });
+  }
+
+  Map<String, dynamic> _asMap(Object? value) {
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return const {};
+  }
+
+  String _formatTime(Object? value) {
+    if (value == null) return '-';
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) return value.toString();
+    return DateFormat('hh:mm a').format(parsed.toLocal());
+  }
+
+  Future<void> _focusStoppage(int index) async {
+    final controller = _controller;
+    if (controller == null) return;
+    await controller.runJavaScript('window.focusStoppage && window.focusStoppage($index);');
+  }
+
+  String _buildLeafletHtml({
+    required List<Map<String, dynamic>> routePoints,
+    required Map<String, dynamic> punchIn,
+    required Map<String, dynamic> punchOut,
+    required Map<String, dynamic> summary,
+    required Object? distanceKm,
+    required List<Map<String, dynamic>> stops,
+  }) {
+    final points = <List<double>>[];
+    for (final point in routePoints) {
+      final lat = double.tryParse('${point['latitude']}');
+      final lng = double.tryParse('${point['longitude']}');
+      if (lat != null && lng != null) points.add([lat, lng]);
+    }
+
+    void addPoint(Map<String, dynamic> source) {
+      final lat = double.tryParse('${source['latitude']}');
+      final lng = double.tryParse('${source['longitude']}');
+      if (lat != null && lng != null) points.add([lat, lng]);
+    }
+
+    addPoint(punchIn);
+    addPoint(punchOut);
+
+    final center = points.isNotEmpty ? points.first : [19.8762, 75.3433];
+    final encodedPoints = jsonEncode(points);
+    final punchInLat = punchIn['latitude'];
+    final punchInLng = punchIn['longitude'];
+    final punchOutLat = punchOut['latitude'];
+    final punchOutLng = punchOut['longitude'];
+    final distance = distanceKm ?? summary['total_distance_km'] ?? '-';
+
+    final stopPayload = <Map<String, dynamic>>[];
+    for (var i = 0; i < stops.length; i++) {
+      final stop = stops[i];
+      final lat = double.tryParse('${stop['latitude']}');
+      final lng = double.tryParse('${stop['longitude']}');
+      if (lat == null || lng == null) continue;
+      final duration = int.tryParse('${stop['duration_minutes'] ?? 0}') ?? 0;
+      stopPayload.add({
+        'index': i,
+        'label': 'S${i + 1}',
+        'lat': lat,
+        'lng': lng,
+        'title': 'Stoppage #${i + 1}',
+        'time_range':
+            '${_formatTime(stop['start_time'])} – ${_formatTime(stop['end_time'])}',
+        'duration': '$duration min',
+        'coords':
+            '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+      });
+    }
+    final encodedStops = jsonEncode(stopPayload);
+
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    .ep-pin {
+      width: 22px; height: 22px; border-radius: 999px; color: #fff;
+      font: 700 10px/22px sans-serif; text-align: center;
+      border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35);
+    }
+    .ep-start { background: #16a34a; }
+    .ep-end { background: #dc2626; }
+    .ep-stop { background: #ea580c; width: 24px; height: 24px; line-height: 24px; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    const map = L.map('map').setView([${center[0]}, ${center[1]}], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    const points = $encodedPoints;
+    if (points.length > 1) {
+      const line = L.polyline(points, { color: '#0B6E4F', weight: 4 }).addTo(map);
+      map.fitBounds(line.getBounds(), { padding: [28, 28] });
+    }
+
+    function endpointIcon(kind, label) {
+      return L.divIcon({
+        className: '',
+        html: '<div class="ep-pin ' + kind + '">' + label + '</div>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+    }
+
+    function stopIcon(label) {
+      return L.divIcon({
+        className: '',
+        html: '<div class="ep-pin ep-stop">' + label + '</div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+    }
+
+    ${punchInLat != null && punchInLng != null ? "L.marker([$punchInLat, $punchInLng], { icon: endpointIcon('ep-start', ''), zIndexOffset: 700 }).addTo(map).bindPopup('<strong>Start</strong><br>Punch In');" : ''}
+    ${punchOutLat != null && punchOutLng != null ? "L.marker([$punchOutLat, $punchOutLng], { icon: endpointIcon('ep-end', ''), zIndexOffset: 700 }).addTo(map).bindPopup('<strong>End</strong><br>Punch Out');" : ''}
+
+    window.__stopMarkers = [];
+    const stops = $encodedStops;
+    stops.forEach(function(stop) {
+      const marker = L.marker([stop.lat, stop.lng], {
+        icon: stopIcon(stop.label),
+        zIndexOffset: 500,
+      }).addTo(map);
+      marker.bindPopup(
+        '<strong>' + stop.title + '</strong><br>' +
+        stop.time_range + '<br>' +
+        'Duration: ' + stop.duration + '<br>' +
+        stop.coords
+      );
+      window.__stopMarkers[stop.index] = marker;
+    });
+
+    window.focusStoppage = function(index) {
+      const marker = window.__stopMarkers[index];
+      if (!marker) return;
+      map.setView(marker.getLatLng(), 17);
+      marker.openPopup();
+    };
+
+    L.control.attribution({prefix: false}).addTo(map);
+    const info = L.control({position: 'bottomleft'});
+    info.onAdd = function() {
+      const div = L.DomUtil.create('div');
+      div.style.background = 'white';
+      div.style.padding = '8px 10px';
+      div.style.borderRadius = '8px';
+      div.style.boxShadow = '0 1px 4px rgba(0,0,0,0.2)';
+      div.innerHTML = '<b>Distance:</b> $distance km';
+      return div;
+    };
+    info.addTo(map);
+  </script>
+</body>
+</html>
+''';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: RoleAppBar(title: 'Employee Route', auth: widget.auth),
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const PgLoadingState();
+          }
+          if (snapshot.hasError) {
+            return PgErrorState(
+              message: errorMessage(snapshot.error),
+              onRetry: () async {
+                setState(() => _future = _load());
+                await _future;
+              },
+            );
+          }
+
+          final data = snapshot.data!;
+          if (data['has_route'] != true || _controller == null) {
+            return const PgEmptyState(
+              message: 'Route data not available for this attendance.',
+              icon: Icon(Icons.map_outlined),
+            );
+          }
+
+          final employee = _asMap(data['employee']);
+          final attendance = _asMap(data['attendance']);
+          final summary = _asMap(data['summary']);
+          final punchIn = _asMap(attendance['punch_in']);
+          final punchOut = _asMap(attendance['punch_out']);
+          final distance = attendance['total_route_distance_km'] ??
+              summary['total_distance_km'];
+          final stopCount = int.tryParse(
+                '${summary['stop_count'] ?? _stops.length}',
+              ) ??
+              _stops.length;
+          final stoppageMinutes = int.tryParse(
+                '${summary['stoppage_time_minutes'] ?? ''}',
+              ) ??
+              _stops.fold<int>(
+                0,
+                (sum, s) =>
+                    sum + (int.tryParse('${s['duration_minutes'] ?? 0}') ?? 0),
+              );
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenPadding,
+                  AppSpacing.screenPadding,
+                  AppSpacing.screenPadding,
+                  AppSpacing.sm,
+                ),
+                child: PgCard(
+                  child: Column(
+                    children: [
+                      PgInvoiceRow(
+                        label: 'Employee',
+                        value: employee['full_name']?.toString() ?? '-',
+                      ),
+                      PgInvoiceRow(
+                        label: 'Date',
+                        value: attendance['attendance_date']?.toString() ?? '-',
+                      ),
+                      PgInvoiceRow(
+                        label: 'Punch In',
+                        value: _formatTime(punchIn['time']),
+                      ),
+                      PgInvoiceRow(
+                        label: 'Punch Out',
+                        value: _formatTime(punchOut['time']),
+                      ),
+                      PgInvoiceRow(
+                        label: 'Distance',
+                        value: distance == null
+                            ? '-'
+                            : '${double.tryParse('$distance')?.toStringAsFixed(1) ?? distance} km',
+                      ),
+                      PgInvoiceRow(
+                        label: 'Total Stoppages',
+                        value: '$stopCount',
+                      ),
+                      PgInvoiceRow(
+                        label: 'Total Stoppage Time',
+                        value: stopCount == 0 ? '—' : '$stoppageMinutes min',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(flex: 3, child: WebViewWidget(controller: _controller!)),
+              if (_stops.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(AppSpacing.md),
+                  child: Text(
+                    'No stoppages detected',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                )
+              else
+                SizedBox(
+                  height: (_stops.length * 58.0).clamp(90.0, 180.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                        child: Text(
+                          'Stoppages',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          itemCount: _stops.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 6),
+                          itemBuilder: (context, index) {
+                            final stop = _stops[index];
+                            final duration =
+                                int.tryParse('${stop['duration_minutes'] ?? 0}') ??
+                                    0;
+                            return Material(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(10),
+                                onTap: () => _focusStoppage(index),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 28,
+                                        height: 28,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEA580C)
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          'S${index + 1}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFFEA580C),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${_formatTime(stop['start_time'])} – ${_formatTime(stop['end_time'])}',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                            ),
+                                            Text(
+                                              '$duration min',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.my_location_outlined,
+                                        size: 18,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
