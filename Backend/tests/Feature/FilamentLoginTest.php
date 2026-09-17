@@ -113,3 +113,99 @@ it('blocks a center manager from project administration', function () {
     $this->actingAs($centerManager)->get('/admin/centers/create')->assertForbidden();
     $this->actingAs($centerManager)->get('/admin/directors')->assertForbidden();
 });
+
+it('shows a profile menu with logout for every web admin role', function (string $loginId) {
+    $user = User::query()->where('login_id', $loginId)->firstOrFail();
+
+    $this->actingAs($user)
+        ->get('/admin')
+        ->assertOk()
+        ->assertSee('ft-topbar-profile-trigger', false)
+        ->assertSee('>Profile</a>', false)
+        ->assertSee('>Change Password</a>', false)
+        ->assertSee('>Logout</button>', false)
+        ->assertSee('/admin/logout', false)
+        ->assertSee('/admin/profile', false)
+        ->assertSee('/admin/change-password', false);
+})->with([
+    'admin' => 'director',
+    'director' => 'fielddirector',
+    'project head' => 'projecthead',
+    'center manager' => 'centermgr',
+]);
+
+it('logs every web admin role out through filament and blocks returning to admin pages', function (string $loginId) {
+    $user = User::query()->where('login_id', $loginId)->firstOrFail();
+
+    $dashboard = $this->actingAs($user)->get('/admin');
+    $dashboard->assertOk();
+    expect((string) $dashboard->headers->get('Cache-Control'))->toContain('no-store');
+
+    $this->actingAs($user)
+        ->post('/admin/logout')
+        ->assertRedirect('/admin/login');
+
+    $this->app['auth']->forgetGuards();
+
+    $this->assertGuest();
+
+    $this->get('/admin')->assertRedirect('/admin/login');
+    $this->get('/admin/profile')->assertRedirect('/admin/login');
+    $this->get('/admin/change-password')->assertRedirect('/admin/login');
+})->with([
+    'admin' => 'director',
+    'director' => 'fielddirector',
+    'project head' => 'projecthead',
+    'center manager' => 'centermgr',
+]);
+
+it('lets a web admin open profile and change password pages', function () {
+    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+
+    $this->actingAs($admin)->get('/admin/profile')->assertOk();
+    $this->actingAs($admin)->get('/admin/change-password')->assertOk()->assertSee('Change Password');
+});
+
+it('keeps punch photos and locations on the attendance view instead of the list', function () {
+    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $employee = \App\Models\Employee::query()->where('mobile', '9876543210')->firstOrFail();
+    $attendance = \App\Models\Attendance::create([
+        'employee_id' => $employee->id,
+        'attendance_date' => \App\Support\AttendanceCalendar::today()->toDateString(),
+        'punch_in_time' => '09:00:00',
+        'punch_out_time' => '18:00:00',
+        'punch_in_location' => 'Pune HQ',
+        'punch_out_location' => 'Pune Field',
+        'punch_in_latitude' => 18.5204,
+        'punch_in_longitude' => 73.8567,
+        'punch_out_latitude' => 18.5310,
+        'punch_out_longitude' => 73.8440,
+        'attendance_status' => 'Present',
+        'approval_status' => 'Pending',
+    ]);
+
+    $this->actingAs($admin)
+        ->get('/admin/attendances')
+        ->assertOk()
+        ->assertSee('Employee', false)
+        ->assertSee('Scheme / Project', false)
+        ->assertSee('Center', false)
+        ->assertSee('Attendance Date', false)
+        ->assertSee('Punch In Time', false)
+        ->assertSee('Punch Out Time', false)
+        ->assertDontSee('Punch In Photo', false)
+        ->assertDontSee('Punch Out Photo', false)
+        ->assertDontSee('Punch in location', false)
+        ->assertDontSee('Punch out location', false)
+        ->assertDontSee('Open in Google Maps', false);
+
+    $this->actingAs($admin)
+        ->get('/admin/attendances/'.$attendance->id)
+        ->assertOk()
+        ->assertSee('Punch In Photo', false)
+        ->assertSee('Punch Out Photo', false)
+        ->assertSee('Pune HQ', false)
+        ->assertSee('Pune Field', false)
+        ->assertSee('Open in Google Maps', false)
+        ->assertSee('https://www.google.com/maps?q=', false);
+});

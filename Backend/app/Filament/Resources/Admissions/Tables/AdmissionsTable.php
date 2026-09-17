@@ -90,6 +90,17 @@ class AdmissionsTable
                     ->searchable(),
                 SelectFilter::make('status')
                     ->options(AdmissionStatus::options()),
+                Filter::make('confirmed_range')
+                    ->label('Confirmed date')
+                    ->schema([
+                        DatePicker::make('from')->label('Confirmed from'),
+                        DatePicker::make('until')->label('Confirmed to'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when($data['from'] ?? null, fn (Builder $inner, $date) => $inner->whereDate('confirmed_at', '>=', $date))
+                            ->when($data['until'] ?? null, fn (Builder $inner, $date) => $inner->whereDate('confirmed_at', '<=', $date));
+                    }),
                 Filter::make('date_range')
                     ->schema([
                         DatePicker::make('from')->label('From'),

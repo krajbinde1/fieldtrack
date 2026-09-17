@@ -116,12 +116,23 @@ class AdmissionApi {
     String prefix, {
     String? status,
     int? centerId,
+    int? schemeId,
+    int? employeeId,
+    String? confirmedFrom,
+    String? confirmedTo,
   }) =>
       _list(
         '/$prefix/admissions',
         query: {
           if (status != null && status.isNotEmpty) 'status': status,
           'center_id': ?centerId,
+          'scheme_id': ?schemeId,
+          'employee_id': ?employeeId,
+          if (confirmedFrom != null && confirmedFrom.isNotEmpty)
+            'confirmed_from': confirmedFrom,
+          if (confirmedTo != null && confirmedTo.isNotEmpty)
+            'confirmed_to': confirmedTo,
+          if (status == 'confirmed') 'sort': 'confirmed_at',
         },
       );
 

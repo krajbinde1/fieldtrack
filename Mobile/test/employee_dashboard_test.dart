@@ -47,6 +47,15 @@ void main() {
     expect(find.text('My Targets'), findsOneWidget);
     expect(find.text('View targets & performance'), findsOneWidget);
 
+    await tester.scrollUntilVisible(
+      find.text('Field Activity'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Field Activity'), findsOneWidget);
+    expect(find.text('Add and view field work'), findsOneWidget);
+    expect(find.text('View targets & performance'), findsOneWidget);
+
     await tester.tap(find.byIcon(Icons.expand_more_rounded));
     await tester.pumpAndSettle();
     expect(find.text('Last Week'), findsOneWidget);

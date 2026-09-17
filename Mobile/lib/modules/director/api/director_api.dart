@@ -51,6 +51,7 @@ class DirectorApi {
     String? date,
     String? search,
     int? centerId,
+    bool activeOnly = false,
   }) async {
     try {
       final response = await _dio.get(
@@ -59,6 +60,7 @@ class DirectorApi {
           'date': ?date,
           if (search != null && search.isNotEmpty) 'search': search,
           'center_id': ?centerId,
+          if (activeOnly) 'active_only': 1,
         },
       );
       final raw = response.data;
@@ -102,4 +104,79 @@ class DirectorApi {
       throw mapApiError(error);
     }
   }
+
+  Future<DirectorWorkforceResult> listWorkforce({
+    int? centerId,
+    int? schemeId,
+    String? role,
+    String? attendanceStatus,
+    String? search,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/director/employees',
+        queryParameters: {
+          'center_id': ?centerId,
+          'scheme_id': ?schemeId,
+          if (role != null && role.isNotEmpty) 'role': role,
+          if (attendanceStatus != null && attendanceStatus.isNotEmpty)
+            'attendance_status': attendanceStatus,
+          if (search != null && search.isNotEmpty) 'search': search,
+        },
+      );
+      final body = response.data as Map;
+      final rows = (body['data'] as List?)
+              ?.whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList() ??
+          const <Map<String, dynamic>>[];
+      final metaRaw = body['meta'];
+      return DirectorWorkforceResult(
+        rows: rows,
+        meta: metaRaw is Map
+            ? Map<String, dynamic>.from(metaRaw)
+            : <String, dynamic>{},
+      );
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listConfirmedByCenter({
+    int? schemeId,
+    int? centerId,
+    int? employeeId,
+    String? confirmedFrom,
+    String? confirmedTo,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/director/admissions/confirmed-by-center',
+        queryParameters: {
+          'scheme_id': ?schemeId,
+          'center_id': ?centerId,
+          'employee_id': ?employeeId,
+          if (confirmedFrom != null && confirmedFrom.isNotEmpty)
+            'confirmed_from': confirmedFrom,
+          if (confirmedTo != null && confirmedTo.isNotEmpty)
+            'confirmed_to': confirmedTo,
+        },
+      );
+      final rows = (response.data as Map)['data'];
+      if (rows is! List) return const [];
+      return rows
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+}
+
+class DirectorWorkforceResult {
+  const DirectorWorkforceResult({required this.rows, required this.meta});
+
+  final List<Map<String, dynamic>> rows;
+  final Map<String, dynamic> meta;
 }

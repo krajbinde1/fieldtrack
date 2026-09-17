@@ -39,7 +39,8 @@ class _SupervisorAdmissionDetailScreenState
   late Future<AdmissionRecord> _future;
   bool _busy = false;
 
-  bool get _canAct => widget.auth.userRole.isCenterManager;
+  bool get _canAct =>
+      widget.auth.userRole.isCenterManager && widget.apiPrefix != 'director';
 
   @override
   void initState() {
@@ -215,6 +216,13 @@ class _SupervisorAdmissionDetailScreenState
                 'Submitted',
                 item.submittedAt == null ? '—' : _fmt(item.submittedAt!),
               ),
+              if (item.confirmedAt != null)
+                (
+                  'Confirmed Date',
+                  _fmt(item.confirmedAt!),
+                ),
+              if ((item.confirmedByName ?? '').trim().isNotEmpty)
+                ('Confirmed By', item.confirmedByName!),
               if ((item.reviewReason ?? '').trim().isNotEmpty)
                 (
                   item.isRejected ? 'Reject reason' : 'Revert reason',

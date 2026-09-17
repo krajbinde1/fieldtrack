@@ -6,8 +6,7 @@ import '../../../core/auth/user_role.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
 import '../../auth/providers/auth_controller.dart';
-import '../../dashboard/screens/supervisor_dashboard_screen.dart';
-import '../../manager/api/manager_api.dart';
+import 'director_dashboard_screen.dart';
 
 class DirectorCenterDashboardScreen extends StatefulWidget {
   const DirectorCenterDashboardScreen({
@@ -28,7 +27,7 @@ class DirectorCenterDashboardScreen extends StatefulWidget {
 
 class _DirectorCenterDashboardScreenState
     extends State<DirectorCenterDashboardScreen> {
-  late Future<_CenterDashboardSnapshot> _future;
+  late Future<Map<String, dynamic>> _future;
 
   @override
   void initState() {
@@ -36,13 +35,11 @@ class _DirectorCenterDashboardScreenState
     _future = _load();
   }
 
-  Future<_CenterDashboardSnapshot> _load() async {
+  Future<Map<String, dynamic>> _load() async {
     final dio = ApiClient(
       SessionStore(),
       onUnauthorized: widget.auth.sessionExpired,
     ).dio;
-    final api = ManagerApi(dio, prefix: 'director');
-    Map<String, dynamic> data = const {};
     try {
       final response = await dio.get(
         '/dashboard',
@@ -50,17 +47,10 @@ class _DirectorCenterDashboardScreenState
       );
       final body = response.data;
       if (body is Map && body['data'] is Map) {
-        data = Map<String, dynamic>.from(body['data'] as Map);
+        return Map<String, dynamic>.from(body['data'] as Map);
       }
     } catch (_) {}
-
-    TeamAttendancePulse? pulse;
-    try {
-      final result = await api.listTeamAttendance(centerId: widget.centerId);
-      pulse = TeamAttendancePulse.fromRows(result.rows, result.meta);
-    } catch (_) {}
-
-    return _CenterDashboardSnapshot(data: data, pulse: pulse);
+    return const {};
   }
 
   Future<void> _refresh() async {
@@ -88,25 +78,26 @@ class _DirectorCenterDashboardScreenState
     return PgPageScaffold(
       title: 'Center Dashboard',
       showBack: true,
-      body: FutureBuilder<_CenterDashboardSnapshot>(
+      body: FutureBuilder<Map<String, dynamic>>(
         future: _future,
         builder: (context, snapshot) {
-          final data = snapshot.data?.data ?? const <String, dynamic>{};
+          final data = snapshot.data ?? const <String, dynamic>{};
           final center = _centerMeta(data);
-          final centerName = '${center['name'] ?? widget.initialCenter?['name'] ?? 'Center'}';
+          final centerName =
+              '${center['name'] ?? widget.initialCenter?['name'] ?? 'Center'}';
           return RefreshIndicator(
             onRefresh: _refresh,
-            child: SupervisorDashboardView(
-              name: widget.auth.session?.displayName ?? widget.auth.userRole.label,
+            child: DirectorDashboardView(
+              name: widget.auth.session?.displayName ??
+                  widget.auth.userRole.label,
               role: widget.auth.userRole.isAdmin
                   ? UserRole.admin
                   : UserRole.director,
               data: data,
-              pulse: snapshot.data?.pulse,
-              directorCenterView: true,
               centerId: widget.centerId,
               centerName: centerName,
-              schemeName: '${center['scheme_name'] ?? center['project_name'] ?? ''}',
+              schemeName:
+                  '${center['scheme_name'] ?? center['project_name'] ?? ''}',
               centerManagerName: '${center['center_manager_name'] ?? ''}',
               onOpen: _open,
             ),
@@ -115,11 +106,4 @@ class _DirectorCenterDashboardScreenState
       ),
     );
   }
-}
-
-class _CenterDashboardSnapshot {
-  const _CenterDashboardSnapshot({required this.data, this.pulse});
-
-  final Map<String, dynamic> data;
-  final TeamAttendancePulse? pulse;
 }

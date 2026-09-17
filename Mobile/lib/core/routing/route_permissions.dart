@@ -23,6 +23,10 @@ class RoutePermissions {
       return role.isEmployee;
     }
 
+    if (path.startsWith('/field-activities')) {
+      return role.isEmployee;
+    }
+
     if (path.startsWith('/manager')) {
       return role.isProjectHead || role.isCenterManager;
     }

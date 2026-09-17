@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\LeaveStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
+use App\Services\DirectorWorkforceService;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,7 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, OrganizationAccessService $access): JsonResponse
+    public function __invoke(Request $request, OrganizationAccessService $access, DirectorWorkforceService $workforce): JsonResponse
     {
         $user = $request->user();
         $centerId = $access->requestedCenterId($request);
@@ -22,8 +23,12 @@ class DashboardController extends Controller
             $employeeQuery->where('center_id', $centerId);
         }
         $employeeIds = (clone $employeeQuery)->pluck('id');
+        $directorOrgDashboard = $user->isAdminOrDirector() && $centerId === null;
+        $workforceSummary = $directorOrgDashboard
+            ? $workforce->summarize($user)
+            : null;
 
-        $punchedIn = Attendance::query()
+        $punchedIn = $workforceSummary['punched_in_today'] ?? Attendance::query()
             ->whereIn('employee_id', $employeeIds)
             ->whereDate('attendance_date', $today)
             ->whereNotNull('punch_in_time')
@@ -43,7 +48,13 @@ class DashboardController extends Controller
             ->count();
 
         $admissionCounts = $access->admissionStatusCounts($user, $centerId);
-        $leaveQuery = $access->leaveQuery($user)->where('status', LeaveStatus::Pending->value);
+        $fieldActivityQuery = $access->fieldActivityQuery($user);
+        if ($centerId !== null) {
+            $fieldActivityQuery->where('center_id', $centerId);
+        }
+        $leaveQuery = $directorOrgDashboard
+            ? $access->projectHeadLeaveQuery($user)->where('status', LeaveStatus::Pending->value)
+            : $access->leaveQuery($user)->where('status', LeaveStatus::Pending->value);
         $targetQuery = $access->admissionTargetQuery($user)->whereNull('parent_id');
         $centerQuery = $access->centerQuery($user);
         if ($centerId !== null) {
@@ -80,15 +91,23 @@ class DashboardController extends Controller
                 'projects' => $access->schemeQuery($user)->count(),
                 'centers' => $centerQuery->count(),
                 'active_centers' => (clone $centerQuery)->where('is_active', true)->count(),
-                'employees' => $employeeIds->count(),
+                'employees' => $workforceSummary['total'] ?? $employeeIds->count(),
                 'today' => $today,
                 'punched_in_today' => $punchedIn,
-                'punched_out_today' => $punchedOut,
+                'punched_out_today' => $workforceSummary['punched_out_today'] ?? $punchedOut,
                 'active_routes' => $activeRoutes,
-                'not_punched_in_today' => max(0, $employeeIds->count() - $punchedIn),
+                'not_punched_in_today' => $workforceSummary['not_punched_in_today']
+                    ?? max(0, $employeeIds->count() - $punchedIn),
                 'admissions' => $admissionCounts['submitted'],
                 'admission_counts' => $admissionCounts,
+                'confirmed_admissions' => $admissionCounts['confirmed'],
                 'pending_leaves' => $leaveQuery->count(),
+                'field_activities_today' => (clone $fieldActivityQuery)
+                    ->whereDate('activity_at', $today)
+                    ->count(),
+                'pending_project_head_leaves' => $directorOrgDashboard
+                    ? $leaveQuery->count()
+                    : $access->projectHeadLeaveQuery($user)->where('status', LeaveStatus::Pending->value)->count(),
                 'admission_targets' => $targetQuery->count(),
                 'center' => $centerPayload,
             ],

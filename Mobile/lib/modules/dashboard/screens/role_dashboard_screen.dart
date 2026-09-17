@@ -3,6 +3,7 @@ import '../../../core/auth/user_role.dart';
 import '../../auth/providers/auth_controller.dart';
 import 'employee_dashboard_screen.dart';
 import 'supervisor_dashboard_screen.dart';
+import '../../director/screens/director_dashboard_screen.dart';
 
 class RoleDashboardScreen extends StatelessWidget {
   const RoleDashboardScreen({super.key, required this.auth});
@@ -17,7 +18,7 @@ class RoleDashboardScreen extends StatelessWidget {
         SupervisorDashboardScreen(auth: auth),
       UserRole.director ||
       UserRole.admin =>
-        SupervisorDashboardScreen(auth: auth),
+        DirectorDashboardScreen(auth: auth),
     };
   }
 }

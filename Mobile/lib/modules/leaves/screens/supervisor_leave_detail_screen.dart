@@ -39,7 +39,10 @@ class _SupervisorLeaveDetailScreenState
   late Future<LeaveRecord> _future;
   bool _busy = false;
 
-  bool get _canAct => widget.auth.userRole.isCenterManager;
+  bool get _canAct =>
+      widget.auth.userRole.isCenterManager ||
+      ((widget.auth.userRole.isDirector || widget.auth.userRole.isAdmin) &&
+          widget.apiPrefix == 'director');
 
   @override
   void initState() {
@@ -57,7 +60,11 @@ class _SupervisorLeaveDetailScreenState
     if (remark == null) return;
     setState(() => _busy = true);
     try {
-      await _api!.approve(record.id, remark: remark.isEmpty ? null : remark);
+      await _api!.approve(
+        record.id,
+        remark: remark.isEmpty ? null : remark,
+        prefix: widget.apiPrefix,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Leave approved.')),
@@ -85,7 +92,7 @@ class _SupervisorLeaveDetailScreenState
     }
     setState(() => _busy = true);
     try {
-      await _api!.reject(record.id, remark.trim());
+      await _api!.reject(record.id, remark.trim(), prefix: widget.apiPrefix);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Leave rejected.')),

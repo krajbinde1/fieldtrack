@@ -22,6 +22,10 @@ class SupervisorLeaveController extends Controller
         $query = $this->access->leaveQuery($request->user())
             ->with($this->leaves->relations());
 
+        if ($request->user()->isAdminOrDirector()) {
+            $this->access->constrainToProjectHeadLeaves($query);
+        }
+
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
         }

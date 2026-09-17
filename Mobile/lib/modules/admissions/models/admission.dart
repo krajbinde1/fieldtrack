@@ -83,12 +83,14 @@ class AdmissionRecord {
     this.projectName,
     this.centerName,
     this.employeeName,
+    this.employeeId,
     this.submittedAt,
     this.updatedAt,
     this.reviewReason,
     this.reviewedAt,
     this.confirmedAt,
     this.confirmedBy,
+    this.confirmedByName,
     this.reviewedByUserId,
     this.canConfirm = false,
     this.canRevert = false,
@@ -119,12 +121,14 @@ class AdmissionRecord {
   final String? projectName;
   final String? centerName;
   final String? employeeName;
+  final int? employeeId;
   final String? submittedAt;
   final String? updatedAt;
   final String? reviewReason;
   final String? reviewedAt;
   final String? confirmedAt;
   final int? confirmedBy;
+  final String? confirmedByName;
   final int? reviewedByUserId;
   final bool canConfirm;
   final bool canRevert;
@@ -216,12 +220,14 @@ class AdmissionRecord {
       projectName: project is Map ? project['name']?.toString() : null,
       centerName: center is Map ? center['name']?.toString() : null,
       employeeName: employee is Map ? employee['full_name']?.toString() : null,
+      employeeId: employee is Map ? _asNullableInt(employee['id']) : null,
       submittedAt: json['submitted_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
       reviewReason: json['review_reason']?.toString(),
       reviewedAt: json['reviewed_at']?.toString(),
       confirmedAt: json['confirmed_at']?.toString(),
       confirmedBy: _asNullableInt(json['confirmed_by']),
+      confirmedByName: json['confirmed_by_name']?.toString(),
       reviewedByUserId: _asNullableInt(json['reviewed_by_user_id']),
       canConfirm: json['can_confirm'] == true,
       canRevert: json['can_revert'] == true,

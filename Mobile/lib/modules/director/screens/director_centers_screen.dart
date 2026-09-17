@@ -218,76 +218,16 @@ class _CenterListCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _StatChip(
-                      label: 'Employees',
-                      value: _count('employees'),
-                      background: const Color(0xFFE8F1FF),
-                    ),
-                    const SizedBox(width: 8),
-                    _StatChip(
-                      label: 'Punched In',
-                      value: _count('punched_in_today'),
-                      background: const Color(0xFFE6F7F1),
-                    ),
-                    const SizedBox(width: 8),
-                    _StatChip(
-                      label: 'Active Routes',
-                      value: _count('active_routes'),
-                      background: const Color(0xFFF0E9FF),
-                    ),
-                  ],
+                const SizedBox(height: 4),
+                Text(
+                  'Total Employees: ${_count('employees')}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  const _StatChip({
-    required this.label,
-    required this.value,
-    required this.background,
-  });
-
-  final String label;
-  final String value;
-  final Color background;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontSize: 10,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-          ],
         ),
       ),
     );

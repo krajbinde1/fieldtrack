@@ -2,10 +2,14 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\EditProfile;
 use App\Filament\Auth\Login;
 use App\Filament\Auth\LoginResponse;
+use App\Filament\Auth\LogoutResponse;
 use App\Filament\Pages\Dashboard;
+use App\Http\Middleware\PreventAdminPageCache;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
+use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -31,6 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(Login::class)
+            ->profile(EditProfile::class, isSimple: false)
             ->brandName('Param FieldTrack')
             ->maxContentWidth(Width::Full)
             ->colors([
@@ -70,6 +75,7 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                PreventAdminPageCache::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
@@ -85,6 +91,7 @@ class AdminPanelProvider extends PanelProvider
         parent::register();
 
         $this->app->bind(LoginResponseContract::class, LoginResponse::class);
+        $this->app->bind(LogoutResponseContract::class, LogoutResponse::class);
     }
 
     private function applyOptionalPanelMethods(Panel $panel): Panel

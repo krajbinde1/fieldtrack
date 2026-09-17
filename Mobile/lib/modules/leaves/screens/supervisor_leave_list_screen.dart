@@ -16,12 +16,14 @@ class SupervisorLeaveListScreen extends StatefulWidget {
     super.key,
     required this.auth,
     required this.apiPrefix,
+    this.title = 'Leave Requests',
     this.statusFilter,
     this.centerId,
   });
 
   final AuthController auth;
   final String apiPrefix;
+  final String title;
   final String? statusFilter;
   final int? centerId;
 
@@ -55,7 +57,7 @@ class _SupervisorLeaveListScreenState extends State<SupervisorLeaveListScreen> {
   @override
   Widget build(BuildContext context) {
     return PgPageScaffold(
-      title: 'Leave Requests',
+      title: widget.title,
       showBack: true,
       body: RefreshIndicator(
         onRefresh: _refresh,
@@ -80,8 +82,12 @@ class _SupervisorLeaveListScreenState extends State<SupervisorLeaveListScreen> {
                   PgEmptyState(
                     icon: const Icon(Icons.event_available_outlined),
                     message: widget.statusFilter == 'pending'
-                        ? 'No pending leave requests in your scope.'
-                        : 'No leave requests in your scope.',
+                        ? (widget.apiPrefix == 'director'
+                            ? 'No pending Project Head leave requests.'
+                            : 'No pending leave requests in your scope.')
+                        : (widget.apiPrefix == 'director'
+                            ? 'No Project Head leave requests.'
+                            : 'No leave requests in your scope.'),
                   ),
                 ],
               );

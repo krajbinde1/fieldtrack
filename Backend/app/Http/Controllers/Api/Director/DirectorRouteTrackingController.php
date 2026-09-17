@@ -35,6 +35,7 @@ class DirectorRouteTrackingController extends Controller
             'date' => ['nullable', 'date'],
             'search' => ['nullable', 'string', 'max:100'],
             'center_id' => ['nullable', 'integer'],
+            'active_only' => ['nullable', 'boolean'],
         ]);
 
         $date = $validated['date'] ?? AttendanceCalendar::today()->toDateString();
@@ -42,7 +43,7 @@ class DirectorRouteTrackingController extends Controller
 
         try {
             $employees = $this->access->employeeQuery($request->user())
-                ->with('user')
+                ->with(['user', 'center:id,name'])
                 ->where('status', true)
                 ->when($centerId !== null, fn ($q) => $q->where('center_id', $centerId))
                 ->whereHas(
@@ -57,7 +58,7 @@ class DirectorRouteTrackingController extends Controller
                     });
                 })
                 ->orderBy('full_name')
-                ->get(['id', 'full_name', 'employee_code']);
+                ->get(['id', 'full_name', 'employee_code', 'center_id', 'staff_role']);
 
             $employeeIds = $employees->pluck('id')->all();
 
@@ -71,7 +72,9 @@ class DirectorRouteTrackingController extends Controller
 
             $rows = $employees->map(function (Employee $employee) use ($attendances, $date): array {
                 $role = (string) ($employee->user?->role ?? UserRole::Employee->value);
-                $roleLabel = UserRole::tryFromMixed($role)->label();
+                $roleLabel = $employee->staff_role
+                    ? $employee->staffRoleEnum()->label()
+                    : UserRole::tryFromMixed($role)->label();
                 $attendance = $attendances->get($employee->id);
 
                 if ($attendance === null) {
@@ -82,6 +85,8 @@ class DirectorRouteTrackingController extends Controller
                         'employee_code' => $employee->employee_code,
                         'role' => $role,
                         'role_label' => $roleLabel,
+                        'center_id' => $employee->center_id,
+                        'center_name' => $employee->center?->name,
                         'attendance_date' => $date,
                         'attendance_status' => 'Not Punched In',
                         'attendance_status_label' => 'Not Punched In',
@@ -99,7 +104,15 @@ class DirectorRouteTrackingController extends Controller
                 }
 
                 return $this->listItem($attendance, $employee, $role, $roleLabel);
-            })->values();
+            });
+
+            if ($request->boolean('active_only')) {
+                $rows = $rows->filter(
+                    fn (array $row): bool => $row['has_attendance'] === true && blank($row['punch_out_time'] ?? null),
+                );
+            }
+
+            $rows = $rows->values();
 
             return response()->json([
                 'data' => $rows,
@@ -193,6 +206,8 @@ class DirectorRouteTrackingController extends Controller
             'employee_code' => $employee->employee_code,
             'role' => $role,
             'role_label' => $roleLabel,
+            'center_id' => $employee->center_id,
+            'center_name' => $employee->center?->name,
             'attendance_date' => $attendance->attendance_date->toDateString(),
             'attendance_status' => $attendance->attendance_status,
             'attendance_status_label' => $this->attendanceStatusLabel($attendance),

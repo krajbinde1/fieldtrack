@@ -127,6 +127,11 @@ class Employee extends Authenticatable
         return $this->hasMany(LeaveRequest::class);
     }
 
+    public function fieldActivities(): HasMany
+    {
+        return $this->hasMany(FieldActivity::class);
+    }
+
     public function admissionTargets(): HasMany
     {
         return $this->hasMany(AdmissionTarget::class);

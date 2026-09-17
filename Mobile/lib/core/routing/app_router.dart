@@ -22,8 +22,15 @@ import '../../modules/auth/screens/splash_screen.dart';
 import '../../modules/dashboard/screens/role_dashboard_screen.dart';
 import '../../modules/director/screens/director_center_dashboard_screen.dart';
 import '../../modules/director/screens/director_centers_screen.dart';
+import '../../modules/director/screens/director_confirmed_admissions_screen.dart';
+import '../../modules/director/screens/director_employees_screen.dart';
 import '../../modules/director/screens/director_route_tracking_screen.dart';
-import '../../modules/director/screens/director_team_attendance_screen.dart';
+import '../../modules/director/screens/director_today_attendance_screen.dart';
+import '../../modules/field_activities/screens/field_activity_detail_screen.dart';
+import '../../modules/field_activities/screens/field_activity_form_screen.dart';
+import '../../modules/field_activities/screens/field_activity_hub_screen.dart';
+import '../../modules/field_activities/screens/field_activity_list_screen.dart';
+import '../../modules/field_activities/screens/supervisor_field_activity_list_screen.dart';
 import '../../modules/leaves/screens/leave_detail_screen.dart';
 import '../../modules/leaves/screens/leave_form_screen.dart';
 import '../../modules/leaves/screens/leave_hub_screen.dart';
@@ -179,6 +186,24 @@ GoRouter createRouter(
           ),
         ),
         GoRoute(
+          path: '/field-activities',
+          builder: (_, _) => const FieldActivityHubScreen(),
+        ),
+        GoRoute(
+          path: '/field-activities/new',
+          builder: (_, _) => const FieldActivityFormScreen(),
+        ),
+        GoRoute(
+          path: '/field-activities/mine',
+          builder: (_, _) => const FieldActivityListScreen(),
+        ),
+        GoRoute(
+          path: '/field-activities/:id',
+          builder: (_, state) => FieldActivityDetailScreen(
+            activityId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
           path: '/manager/team-attendance',
           builder: (_, state) => ManagerTeamAttendanceScreen(
             auth: auth,
@@ -256,19 +281,26 @@ GoRouter createRouter(
           ),
         ),
         GoRoute(
+          path: '/manager/field-activities',
+          builder: (_, state) => SupervisorFieldActivityListScreen(
+            auth: auth,
+            apiPrefix: 'manager',
+            initialPeriod: state.uri.queryParameters['period'] ?? 'today',
+          ),
+        ),
+        GoRoute(
+          path: '/manager/field-activities/:id',
+          builder: (_, state) => FieldActivityDetailScreen(
+            activityId: int.parse(state.pathParameters['id']!),
+            apiPrefix: 'manager',
+          ),
+        ),
+        GoRoute(
           path: '/director/team-attendance',
-          builder: (_, state) {
-            final centerId = parseCenterId(state.uri.queryParameters['center_id']);
-            if (centerId != null) {
-              return ManagerTeamAttendanceScreen(
-                auth: auth,
-                statusFilter: state.uri.queryParameters['status'],
-                centerId: centerId,
-                apiPrefix: 'director',
-              );
-            }
-            return DirectorTeamAttendanceScreen(auth: auth);
-          },
+          builder: (_, state) => DirectorTodayAttendanceScreen(
+            auth: auth,
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
+          ),
         ),
         GoRoute(
           path: '/director/team-attendance/:id',
@@ -282,7 +314,9 @@ GoRouter createRouter(
           path: '/director/route-tracking',
           builder: (_, state) => DirectorRouteTrackingScreen(
             auth: auth,
+            title: 'Active Routes',
             centerId: parseCenterId(state.uri.queryParameters['center_id']),
+            activeOnly: state.uri.queryParameters['active'] != '0',
           ),
         ),
         GoRoute(
@@ -294,12 +328,20 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/director/admissions',
-          builder: (_, state) => SupervisorAdmissionListScreen(
-            auth: auth,
-            apiPrefix: 'director',
-            initialStatus: state.uri.queryParameters['status'] ?? 'submitted',
-            centerId: parseCenterId(state.uri.queryParameters['center_id']),
-          ),
+          builder: (_, state) {
+            final centerId = parseCenterId(state.uri.queryParameters['center_id']);
+            final extra = state.extra;
+            final extraMap = extra is Map ? Map<String, dynamic>.from(extra) : null;
+            if (centerId != null) {
+              return DirectorConfirmedAdmissionsListScreen(
+                auth: auth,
+                centerId: centerId,
+                centerName: extraMap?['center_name']?.toString(),
+                schemeId: int.tryParse('${extraMap?['scheme_id'] ?? ''}'),
+              );
+            }
+            return DirectorConfirmedAdmissionsSummaryScreen(auth: auth);
+          },
         ),
         GoRoute(
           path: '/director/admissions/:id',
@@ -314,8 +356,8 @@ GoRouter createRouter(
           builder: (_, state) => SupervisorLeaveListScreen(
             auth: auth,
             apiPrefix: 'director',
+            title: 'Project Head Leave',
             statusFilter: state.uri.queryParameters['status'],
-            centerId: parseCenterId(state.uri.queryParameters['center_id']),
           ),
         ),
         GoRoute(
@@ -324,6 +366,22 @@ GoRouter createRouter(
             auth: auth,
             apiPrefix: 'director',
             leaveId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: '/director/field-activities',
+          builder: (_, state) => SupervisorFieldActivityListScreen(
+            auth: auth,
+            apiPrefix: 'director',
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
+            initialPeriod: state.uri.queryParameters['period'] ?? 'today',
+          ),
+        ),
+        GoRoute(
+          path: '/director/field-activities/:id',
+          builder: (_, state) => FieldActivityDetailScreen(
+            activityId: int.parse(state.pathParameters['id']!),
+            apiPrefix: 'director',
           ),
         ),
         GoRoute(
@@ -345,9 +403,8 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/director/employees',
-          builder: (_, state) => ManagerEmployeesScreen(
+          builder: (_, state) => DirectorEmployeesScreen(
             auth: auth,
-            apiPrefix: 'director',
             centerId: parseCenterId(state.uri.queryParameters['center_id']),
           ),
         ),

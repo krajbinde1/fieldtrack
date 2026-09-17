@@ -11,8 +11,18 @@
         if (!document.body) {
             document.addEventListener('DOMContentLoaded', applyBody);
         }
+        if (!window.__ftAdminBackGuard) {
+            window.__ftAdminBackGuard = true;
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted) {
+                    window.location.reload();
+                }
+            });
+        }
     })();
 </script>
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+<meta http-equiv="Pragma" content="no-cache" />
 <style>
     /*
      * Param FieldTrack admin design system.
@@ -281,6 +291,7 @@
         gap: 0.65rem;
         margin-left: auto;
         padding: 0.15rem 0.15rem 0.15rem 0.15rem;
+        position: relative;
     }
 
     .ft-topbar-bell {
@@ -340,8 +351,81 @@
         white-space: nowrap;
     }
 
+    .ft-topbar-profile {
+        position: relative;
+    }
+
+    .ft-topbar-profile-trigger {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        list-style: none;
+        cursor: pointer;
+        border-radius: 999px;
+        padding: 0.1rem 0.25rem 0.1rem 0.1rem;
+    }
+
+    .ft-topbar-profile-trigger::-webkit-details-marker {
+        display: none;
+    }
+
+    .ft-topbar-profile-trigger::marker {
+        content: '';
+        display: none;
+    }
+
+    .ft-topbar-profile[open] .ft-topbar-profile-trigger {
+        background: #f8fafc;
+    }
+
+    .ft-topbar-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 0.45rem);
+        z-index: 80;
+        min-width: 12.5rem;
+        padding: 0.4rem;
+        border-radius: 0.9rem;
+        background: #fff;
+        border: 1px solid var(--ft-border);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+
+    .ft-topbar-menu-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 0;
+        background: transparent;
+        color: var(--ft-text);
+        font-size: 0.84rem;
+        font-weight: 600;
+        line-height: 1.2;
+        padding: 0.62rem 0.75rem;
+        border-radius: 0.65rem;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .ft-topbar-menu-item:hover {
+        background: #f4f6fb;
+        color: var(--ft-text);
+    }
+
+    .ft-topbar-menu-logout {
+        color: #b42318;
+    }
+
+    .ft-topbar-menu-logout:hover {
+        background: #fef2f2;
+        color: #b42318;
+    }
+
     html.fieldtrack-admin .fi-user-menu {
-        margin-left: 0.1rem;
+        display: none !important;
     }
 
     html.fieldtrack-admin .fi-topbar .fi-user-menu .fi-avatar {

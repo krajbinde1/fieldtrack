@@ -9,6 +9,7 @@ use App\Models\AdmissionTarget;
 use App\Models\Attendance;
 use App\Models\Center;
 use App\Models\Employee;
+use App\Models\FieldActivity;
 use App\Models\LeaveRequest;
 use App\Models\Scheme;
 use App\Models\User;
@@ -257,6 +258,24 @@ final class OrganizationAccessService
         return $query->whereIn('employee_id', $ids);
     }
 
+    public function fieldActivityQuery(User $user): Builder
+    {
+        $query = FieldActivity::query();
+
+        if ($user->isEmployeeUser()) {
+            return $user->employee_id
+                ? $query->where('employee_id', (int) $user->employee_id)
+                : $query->whereRaw('1 = 0');
+        }
+
+        $ids = $this->visibleEmployeeIds($user);
+        if ($ids === null) {
+            return $query;
+        }
+
+        return $query->whereIn('employee_id', $ids);
+    }
+
     public function canViewEmployee(User $user, Employee $employee): bool
     {
         $ids = $this->visibleEmployeeIds($user);
@@ -293,16 +312,62 @@ final class OrganizationAccessService
         return $ids === null || in_array((int) $leave->employee_id, $ids, true);
     }
 
+    public function canViewFieldActivity(User $user, FieldActivity $activity): bool
+    {
+        if ($user->isEmployeeUser()) {
+            return $user->employee_id !== null
+                && (int) $activity->employee_id === (int) $user->employee_id;
+        }
+
+        $ids = $this->visibleEmployeeIds($user);
+
+        return $ids === null || in_array((int) $activity->employee_id, $ids, true);
+    }
+
     public function canApproveLeave(User $user, LeaveRequest $leave): bool
     {
-        if (! $user->isCenterManager() || ! $leave->isPending()) {
+        if (! $leave->isPending()) {
             return false;
         }
 
-        $centerIds = $this->visibleCenterIds($user) ?? [];
+        if ($user->isCenterManager()) {
+            $centerIds = $this->visibleCenterIds($user) ?? [];
 
-        return in_array((int) $leave->center_id, $centerIds, true)
-            && $this->canViewLeave($user, $leave);
+            return in_array((int) $leave->center_id, $centerIds, true)
+                && $this->canViewLeave($user, $leave);
+        }
+
+        if ($user->isAdminOrDirector()) {
+            return $this->isProjectHeadLeave($leave);
+        }
+
+        return false;
+    }
+
+    public function isProjectHeadLeave(LeaveRequest $leave): bool
+    {
+        $leave->loadMissing(['employee.user', 'createdBy']);
+
+        return $leave->employee?->user?->isProjectHead() === true
+            || $leave->createdBy?->isProjectHead() === true;
+    }
+
+    public function constrainToProjectHeadLeaves(Builder $query): Builder
+    {
+        return $query->where(function (Builder $inner): void {
+            $inner->whereHas(
+                'employee.user',
+                fn (Builder $user) => $user->where('role', UserRole::ProjectHead->value),
+            )->orWhereHas(
+                'createdBy',
+                fn (Builder $user) => $user->where('role', UserRole::ProjectHead->value),
+            );
+        });
+    }
+
+    public function projectHeadLeaveQuery(User $user): Builder
+    {
+        return $this->constrainToProjectHeadLeaves($this->leaveQuery($user));
     }
 
     public function canReviewAdmission(User $user, Admission $admission): bool
@@ -388,9 +453,24 @@ final class OrganizationAccessService
         abort_unless($this->canViewLeave($user, $leave), 403, 'You are not authorized to view this leave request.');
     }
 
+    public function assertCanViewFieldActivity(User $user, FieldActivity $activity): void
+    {
+        abort_unless(
+            $this->canViewFieldActivity($user, $activity),
+            403,
+            'You are not authorized to view this field activity.',
+        );
+    }
+
     public function assertCanApproveLeave(User $user, LeaveRequest $leave): void
     {
-        abort_unless($this->canApproveLeave($user, $leave), 403, 'Only the assigned Center Manager can approve or reject this leave.');
+        abort_unless(
+            $this->canApproveLeave($user, $leave),
+            403,
+            $user->isAdminOrDirector()
+                ? 'Directors can only approve or reject Project Head leave requests.'
+                : 'Only the assigned Center Manager can approve or reject this leave.',
+        );
     }
 
     public function assertCanReviewAdmission(User $user, Admission $admission): void

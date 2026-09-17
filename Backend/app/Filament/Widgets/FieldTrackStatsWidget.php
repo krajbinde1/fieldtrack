@@ -12,6 +12,13 @@ class FieldTrackStatsWidget extends StatsOverviewWidget
 {
     protected static ?int $sort = 2;
 
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        return (bool) ($user?->isProjectHead() || $user?->isCenterManager());
+    }
+
     protected function getStats(): array
     {
         $user = auth()->user();

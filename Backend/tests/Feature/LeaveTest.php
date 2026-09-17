@@ -138,12 +138,12 @@ it('lets project head view assigned project leave but not approve, director view
     Sanctum::actingAs($org['director']);
     $this->getJson('/api/director/leaves/'.$ownId)->assertOk();
     $this->getJson('/api/director/leaves/'.$otherId)->assertOk();
-    $this->postJson('/api/director/leaves/'.$ownId.'/approve')->assertNotFound();
+    $this->postJson('/api/director/leaves/'.$ownId.'/approve')->assertForbidden();
 
     Sanctum::actingAs($org['admin']);
     $this->getJson('/api/director/leaves/'.$ownId)->assertOk();
     $this->getJson('/api/director/leaves/'.$otherId)->assertOk();
-    $this->postJson('/api/director/leaves/'.$ownId.'/approve')->assertNotFound();
+    $this->postJson('/api/director/leaves/'.$ownId.'/approve')->assertForbidden();
 });
 
 it('keeps punch in working after leave tables exist', function () {

@@ -127,10 +127,14 @@ class LeaveApi {
     return LeaveRecord.fromJson(_map(data));
   }
 
-  Future<LeaveRecord> approve(int id, {String? remark}) async {
+  Future<LeaveRecord> approve(
+    int id, {
+    String? remark,
+    String prefix = 'manager',
+  }) async {
     try {
       final response = await _dio.post(
-        '/manager/leaves/$id/approve',
+        '/$prefix/leaves/$id/approve',
         data: {'approval_remark': remark},
       );
       return LeaveRecord.fromJson(_map(response.data['data']));
@@ -139,10 +143,14 @@ class LeaveApi {
     }
   }
 
-  Future<LeaveRecord> reject(int id, String remark) async {
+  Future<LeaveRecord> reject(
+    int id,
+    String remark, {
+    String prefix = 'manager',
+  }) async {
     try {
       final response = await _dio.post(
-        '/manager/leaves/$id/reject',
+        '/$prefix/leaves/$id/reject',
         data: {'rejection_remark': remark},
       );
       return LeaveRecord.fromJson(_map(response.data['data']));

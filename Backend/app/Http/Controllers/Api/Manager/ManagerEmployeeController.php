@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Center;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\DirectorWorkforceService;
 use App\Services\OrganizationAccessService;
 use App\Support\LoginId;
 use Illuminate\Http\JsonResponse;
@@ -18,11 +19,23 @@ use Illuminate\Validation\Rule;
 
 class ManagerEmployeeController extends Controller
 {
-    public function __construct(private readonly OrganizationAccessService $access) {}
+    public function __construct(
+        private readonly OrganizationAccessService $access,
+        private readonly DirectorWorkforceService $workforce,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+        if ($user->isAdminOrDirector()) {
+            $payload = $this->workforce->index($request);
+
+            return response()->json([
+                'success' => true,
+                'data' => $payload['data'],
+                'meta' => $payload['meta'],
+            ]);
+        }
         $employees = $this->access->employeeQuery($user)
             ->with(['center:id,name', 'user:id,employee_id,login_id'])
             ->when($this->access->requestedCenterId($request), function ($query, int $centerId): void {

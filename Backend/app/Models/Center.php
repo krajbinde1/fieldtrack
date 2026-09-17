@@ -46,6 +46,11 @@ class Center extends Model
         return $this->hasMany(Employee::class);
     }
 
+    public function admissions(): HasMany
+    {
+        return $this->hasMany(Admission::class);
+    }
+
     public function displayLabel(): string
     {
         return filled($this->code) ? "{$this->code} — {$this->name}" : $this->name;

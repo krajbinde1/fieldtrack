@@ -10,8 +10,10 @@ use App\Http\Controllers\Api\Director\DirectorRouteTrackingController;
 use App\Http\Controllers\Api\EmployeeAdmissionController;
 use App\Http\Controllers\Api\EmployeeAdmissionTargetController;
 use App\Http\Controllers\Api\EmployeeAuthController;
+use App\Http\Controllers\Api\EmployeeFieldActivityController;
 use App\Http\Controllers\Api\EmployeeLeaveController;
 use App\Http\Controllers\Api\EmployeeRoutePointController;
+use App\Http\Controllers\Api\SupervisorFieldActivityController;
 use App\Http\Controllers\Api\Manager\ManagerAdmissionTargetController;
 use App\Http\Controllers\Api\Manager\ManagerEmployeeController;
 use App\Http\Controllers\Api\Manager\ManagerRouteTrackingController;
@@ -74,6 +76,9 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
         Route::get('route-tracking', [ManagerRouteTrackingController::class, 'index']);
         Route::get('route-tracking/{attendance}', [ManagerRouteTrackingController::class, 'show'])
             ->whereNumber('attendance');
+        Route::get('field-activities', [SupervisorFieldActivityController::class, 'index']);
+        Route::get('field-activities/{fieldActivity}', [SupervisorFieldActivityController::class, 'show'])
+            ->whereNumber('fieldActivity');
     });
 
     Route::middleware('role:admin,director')->prefix('director')->group(function () {
@@ -91,11 +96,19 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
         Route::get('team-attendance/{attendance}', [ManagerTeamAttendanceController::class, 'show']);
         Route::get('admissions', [SupervisorAdmissionController::class, 'index']);
         Route::get('admissions/summary', [SupervisorAdmissionController::class, 'summary']);
+        Route::get('admissions/confirmed-by-center', [SupervisorAdmissionController::class, 'confirmedByCenter']);
         Route::get('admissions/{admission}', [SupervisorAdmissionController::class, 'show']);
         Route::get('admissions/{admission}/documents/{document}', [SupervisorAdmissionController::class, 'downloadDocument']);
         Route::get('leaves', [SupervisorLeaveController::class, 'index']);
         Route::get('leaves/{leave}', [SupervisorLeaveController::class, 'show']);
+        Route::post('leaves/{leave}/approve', [SupervisorLeaveController::class, 'approve'])
+            ->whereNumber('leave');
+        Route::post('leaves/{leave}/reject', [SupervisorLeaveController::class, 'reject'])
+            ->whereNumber('leave');
         Route::get('leaves/{leave}/document', [SupervisorLeaveController::class, 'downloadDocument']);
+        Route::get('field-activities', [SupervisorFieldActivityController::class, 'index']);
+        Route::get('field-activities/{fieldActivity}', [SupervisorFieldActivityController::class, 'show'])
+            ->whereNumber('fieldActivity');
     });
 });
 
@@ -124,6 +137,14 @@ Route::middleware(['auth:sanctum', 'role:employee'])->prefix('admissions')->grou
     Route::delete('{admission}/documents/{document}', [EmployeeAdmissionController::class, 'removeDocument']);
     Route::get('{admission}/documents/{document}', [EmployeeAdmissionController::class, 'downloadDocument']);
     Route::get('{admission}', [EmployeeAdmissionController::class, 'show']);
+});
+
+Route::middleware(['auth:sanctum', 'role:employee'])->prefix('field-activities')->group(function () {
+    Route::get('types', [EmployeeFieldActivityController::class, 'types']);
+    Route::get('/', [EmployeeFieldActivityController::class, 'index']);
+    Route::post('/', [EmployeeFieldActivityController::class, 'store']);
+    Route::get('{fieldActivity}', [EmployeeFieldActivityController::class, 'show'])
+        ->whereNumber('fieldActivity');
 });
 
 Route::middleware(['auth:sanctum', 'role:employee'])->prefix('leaves')->group(function () {

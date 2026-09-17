@@ -207,6 +207,15 @@ class SupervisorDashboardView extends StatelessWidget {
         color: const Color(0xFFEA580C),
         background: const Color(0xFFFFF6E5),
       ),
+      if (role.isCenterManager)
+        _DashboardTile(
+          icon: const Icon(Icons.photo_camera_outlined),
+          label: 'Field Activities Today',
+          value: '${_count('field_activities_today')}',
+          path: '/manager/field-activities?period=today',
+          color: const Color(0xFF0F766E),
+          background: const Color(0xFFE6F7F1),
+        ),
       _DashboardTile(
         icon: const Icon(Icons.flag_rounded),
         label: 'Targets',
@@ -308,6 +317,19 @@ class SupervisorDashboardView extends StatelessWidget {
         color: const Color(0xFFEA580C),
         background: const Color(0xFFFFF6E5),
       ),
+      if (role.isCenterManager || role.isProjectHead || _centerScopedDirector)
+        _DashboardTile(
+          icon: const Icon(Icons.photo_camera_outlined),
+          label: 'Field Activities',
+          subtitle: _centerScopedDirector
+              ? 'Activities in this center'
+              : 'Mobilizer/employee field work',
+          path: _centerScopedDirector
+              ? _path('/director/field-activities?period=today')
+              : '/manager/field-activities?period=today',
+          color: const Color(0xFF0F766E),
+          background: const Color(0xFFE6F7F1),
+        ),
       if (role.isCenterManager || role.isProjectHead || _centerScopedDirector)
         _DashboardTile(
           icon: const Icon(Icons.analytics_rounded),

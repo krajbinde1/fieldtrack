@@ -167,6 +167,13 @@ class EmployeeDashboardView extends StatelessWidget {
       color: Color(0xFF7C3AED),
       path: '/admissions/targets',
     ),
+    _EmployeeModule(
+      icon: Icon(Icons.photo_camera_outlined),
+      label: 'Field Activity',
+      subtitle: 'Add and view field work',
+      color: Color(0xFF0F766E),
+      path: '/field-activities',
+    ),
   ];
 
   @override

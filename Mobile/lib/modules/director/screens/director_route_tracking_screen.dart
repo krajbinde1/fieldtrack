@@ -30,6 +30,7 @@ class DirectorRouteTrackingScreen extends StatefulWidget {
     this.detailPathPrefix = '/director/route-tracking',
     this.listLoader,
     this.centerId,
+    this.activeOnly = false,
   });
 
   final AuthController auth;
@@ -37,6 +38,7 @@ class DirectorRouteTrackingScreen extends StatefulWidget {
   final String detailPathPrefix;
   final RouteTrackingListLoader? listLoader;
   final int? centerId;
+  final bool activeOnly;
 
   @override
   State<DirectorRouteTrackingScreen> createState() =>
@@ -68,6 +70,7 @@ class _DirectorRouteTrackingScreenState
     return _directorApi.listRouteTracking(
       date: _dateParam,
       centerId: widget.centerId,
+      activeOnly: widget.activeOnly,
     );
   }
 
@@ -182,8 +185,8 @@ class _DirectorRouteTrackingScreenState
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
                   SizedBox(height: MediaQuery.sizeOf(context).height * 0.25),
-                  const PgEmptyState(
-                    message: 'No route tracking data for this date',
+                      const PgEmptyState(
+                    message: 'No active employee routes',
                   ),
                 ],
               );
@@ -253,6 +256,10 @@ class _DirectorRouteTrackingScreenState
                         ],
                       ),
                       const SizedBox(height: 8),
+                      Text(
+                        'Center: ${row['center_name']?.toString() ?? '—'}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                       Text(
                         'Punch In: ${_formatTime(row['punch_in_time'])}',
                         style: Theme.of(context).textTheme.bodySmall,
