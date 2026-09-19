@@ -77,7 +77,9 @@ it('shows director admin management summary without scheme count or admission ta
     Livewire::actingAs($org['director'])
         ->test(DirectorTodayTeamActivityWidget::class)
         ->assertSee('Today Team Activity')
-        ->assertSee('Emp A');
+        ->assertSee('Emp A')
+        ->assertSee('Working Hours')
+        ->assertSee('Status');
 });
 
 it('keeps scheme count and admission targets on the center manager dashboard', function () {

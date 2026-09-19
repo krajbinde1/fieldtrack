@@ -16,21 +16,34 @@ use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Services\DirectorWorkforceService;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
-use Filament\Widgets\StatsOverviewWidget;
-use Filament\Widgets\StatsOverviewWidget\Stat;
+use Filament\Widgets\Widget;
 
-class DirectorAdminStatsWidget extends StatsOverviewWidget
+class DirectorAdminStatsWidget extends Widget
 {
+    protected string $view = 'filament.widgets.director-admin-stats-widget';
+
+    protected int|string|array $columnSpan = 'full';
+
     protected static ?int $sort = 2;
 
-    protected int|array|null $columns = 4;
+    protected static bool $isLazy = false;
 
     public static function canView(): bool
     {
         return auth()->user()?->isAdminOrDirector() === true;
     }
 
-    protected function getStats(): array
+    /**
+     * @return list<array{
+     *     label: string,
+     *     value: string,
+     *     hint: ?string,
+     *     url: ?string,
+     *     tone: string,
+     *     icon: string
+     * }>
+     */
+    public function getCards(): array
     {
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
@@ -70,33 +83,79 @@ class DirectorAdminStatsWidget extends StatsOverviewWidget
         $todayDateFilter = ['attendance_date' => ['date' => $today]];
 
         return [
-            Stat::make('Total Centers', (string) $access->centerQuery($user)->count())
-                ->url(CenterResource::getUrl()),
-            Stat::make('Total Employees', (string) $employeeTotal)
-                ->url(OrgUserResource::getUrl()),
-            Stat::make('Punched In Today', $punchedIn.' / '.$employeeTotal)
-                ->description('Punched in / total employees')
-                ->url(FilamentFilterUrl::for(AttendanceResource::class, [
+            [
+                'label' => 'Total Centers',
+                'value' => (string) $access->centerQuery($user)->count(),
+                'hint' => null,
+                'url' => CenterResource::getUrl(),
+                'tone' => 'lavender',
+                'icon' => 'centers',
+            ],
+            [
+                'label' => 'Total Employees',
+                'value' => (string) $employeeTotal,
+                'hint' => null,
+                'url' => OrgUserResource::getUrl(),
+                'tone' => 'sky',
+                'icon' => 'employees',
+            ],
+            [
+                'label' => 'Punched In Today',
+                'value' => $punchedIn.' / '.$employeeTotal,
+                'hint' => 'Punched in / total employees',
+                'url' => FilamentFilterUrl::for(AttendanceResource::class, [
                     ...$todayDateFilter,
                     'punched_in' => ['isActive' => true],
-                ])),
-            Stat::make('Active Routes', (string) $activeRoutes)
-                ->url(FilamentFilterUrl::for(EmployeeRouteResource::class, [
+                ]),
+                'tone' => 'mint',
+                'icon' => 'punched',
+            ],
+            [
+                'label' => 'Active Routes',
+                'value' => (string) $activeRoutes,
+                'hint' => null,
+                'url' => FilamentFilterUrl::for(EmployeeRouteResource::class, [
                     ...$todayDateFilter,
                     'active_now' => ['isActive' => true],
-                ])),
-            Stat::make('Pending Project Head Leaves', (string) $pendingPhLeaves)
-                ->url(FilamentFilterUrl::for(LeaveRequestResource::class, [
+                ]),
+                'tone' => 'peach',
+                'icon' => 'routes',
+            ],
+            [
+                'label' => 'Pending Project Head Leaves',
+                'value' => (string) $pendingPhLeaves,
+                'hint' => null,
+                'url' => FilamentFilterUrl::for(LeaveRequestResource::class, [
                     'status' => ['value' => LeaveStatus::Pending->value],
                     'project_head_only' => ['isActive' => true],
-                ])),
-            Stat::make('Today Confirmed Admissions', (string) $confirmedToday)
-                ->url(self::confirmedAdmissionsUrl($today, $today)),
-            Stat::make('This Month Confirmed Admissions', (string) $confirmedMonth)
-                ->url(self::confirmedAdmissionsUrl($monthStart, $today)),
-            Stat::make('Attendance Today', $present.' / '.$halfDay.' / '.$absent)
-                ->description('Present / Half Day / Absent')
-                ->url(FilamentFilterUrl::for(AttendanceResource::class, $todayDateFilter)),
+                ]),
+                'tone' => 'amber',
+                'icon' => 'leaves',
+            ],
+            [
+                'label' => 'Today Confirmed Admissions',
+                'value' => (string) $confirmedToday,
+                'hint' => null,
+                'url' => self::confirmedAdmissionsUrl($today, $today),
+                'tone' => 'lilac',
+                'icon' => 'admissions-today',
+            ],
+            [
+                'label' => 'This Month Confirmed Admissions',
+                'value' => (string) $confirmedMonth,
+                'hint' => null,
+                'url' => self::confirmedAdmissionsUrl($monthStart, $today),
+                'tone' => 'blue',
+                'icon' => 'admissions-month',
+            ],
+            [
+                'label' => 'Attendance Today',
+                'value' => $present.' / '.$halfDay.' / '.$absent,
+                'hint' => 'Present / Half Day / Absent',
+                'url' => FilamentFilterUrl::for(AttendanceResource::class, $todayDateFilter),
+                'tone' => 'sage',
+                'icon' => 'attendance',
+            ],
         ];
     }
 

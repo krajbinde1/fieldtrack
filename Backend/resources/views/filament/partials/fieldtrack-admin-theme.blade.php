@@ -605,8 +605,7 @@
     html.fieldtrack-admin .fi-wi-widget .fi-sc-section,
     html.fieldtrack-admin .fi-ta-ctn,
     html.fieldtrack-admin .fi-wi-stats-overview-stat,
-    html.fieldtrack-admin .fi-wi-stats-overview .fi-section,
-    html.fieldtrack-admin .ft-welcome-card {
+    html.fieldtrack-admin .fi-wi-stats-overview .fi-section {
         background: var(--ft-card) !important;
         border: 1px solid var(--ft-border) !important;
         border-radius: var(--ft-radius) !important;
@@ -628,11 +627,11 @@
     }
 
     html.fieldtrack-admin .fi-wi-stats-overview {
-        gap: 0.85rem;
+        gap: 0.75rem;
     }
 
     html.fieldtrack-admin .fi-wi-stats-overview-stat {
-        padding: 1rem 1.1rem;
+        padding: 0.85rem 0.95rem;
     }
 
     html.fieldtrack-admin .fi-wi-stats-overview-stat-value,
@@ -650,43 +649,269 @@
         text-transform: none;
     }
 
-    .ft-welcome-widget {
+    /* -------------------------------------------------------------------------
+     * Dashboard — compact premium layout (scoped to the dashboard page)
+     * ------------------------------------------------------------------------- */
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-page-header-main-ctn {
+        padding-top: 0.4rem !important;
+        padding-bottom: 0.2rem !important;
+        row-gap: 0.4rem !important;
+    }
+
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-header-heading,
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-header h1 {
+        font-size: 1.2rem;
+        font-weight: 750;
+        letter-spacing: -0.025em;
+    }
+
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-page-main,
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-header-widgets,
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-page-content {
+        gap: 0.65rem !important;
+        row-gap: 0.65rem !important;
+    }
+
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta .fi-ta-header-heading {
+        font-size: 0.88rem;
+        padding: 0.55rem 0.85rem 0.15rem;
+    }
+
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta .fi-ta-header-toolbar {
+        padding: 0.4rem 0.85rem 0.5rem;
+    }
+
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta .fi-ta-header-cell,
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta thead th {
+        height: 2.1rem;
+        padding: 0.32rem 0.7rem;
+        font-size: 0.68rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: #64748b;
+        background: #f6f7fb !important;
+    }
+
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta .fi-ta-cell,
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta tbody td {
+        min-height: 2.15rem;
+        padding: 0.32rem 0.7rem;
+        font-size: 0.8rem;
+    }
+
+    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-pagination {
+        padding: 0.4rem 0.85rem;
+    }
+
+    html.fieldtrack-admin .ft-welcome-widget {
         width: 100%;
     }
 
-    .ft-welcome-card {
-        padding: 1.15rem 1.25rem;
+    html.fieldtrack-admin .ft-welcome-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.85rem;
+        padding: 0.7rem 1rem;
+        background: linear-gradient(90deg, #ffffff 0%, #f7f6ff 100%) !important;
+        border: 1px solid var(--ft-border) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+    }
+
+    .ft-welcome-main {
+        display: flex;
+        flex-direction: column;
+        gap: 0.08rem;
+        min-width: 0;
+        flex: 1 1 auto;
     }
 
     .ft-welcome-kicker {
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
+        font-size: 0.64rem;
+        font-weight: 750;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: var(--ft-primary-2);
-        margin-bottom: 0.35rem;
+        color: #6d5ef6;
+        margin: 0;
     }
 
     .ft-welcome-title {
         margin: 0;
-        font-size: 1.35rem;
-        font-weight: 800;
+        font-size: 1.05rem;
+        font-weight: 750;
         letter-spacing: -0.02em;
         color: var(--ft-text);
+        line-height: 1.25;
     }
 
     .ft-welcome-role {
-        margin: 0.3rem 0 0;
-        font-size: 0.85rem;
-        color: var(--ft-muted);
-        font-weight: 600;
+        margin: 0;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #5b3aa8;
+        background: #eee9ff;
+        border: 1px solid #ddd6fe;
+        border-radius: 999px;
+        padding: 0.18rem 0.55rem;
+        line-height: 1.2;
+        white-space: nowrap;
     }
 
     .ft-welcome-copy {
-        margin: 0.65rem 0 0;
-        font-size: 0.9rem;
+        flex: 1 1 100%;
+        margin: 0;
+        font-size: 0.78rem;
+        line-height: 1.35;
+        color: #64748b;
+        max-width: none;
+    }
+
+    .ft-dash-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.7rem;
+        width: 100%;
+        align-items: stretch;
+    }
+
+    html.fieldtrack-admin .ft-dash-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.7rem;
+        min-height: 6.15rem;
+        height: 100%;
+        padding: 0.8rem 0.85rem;
+        border-radius: 14px;
+        border: 1px solid #e8ecf4;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        text-decoration: none;
+        color: inherit;
+        box-sizing: border-box;
+        transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+
+    html.fieldtrack-admin .ft-dash-card.is-link {
+        cursor: pointer;
+    }
+
+    html.fieldtrack-admin .ft-dash-card.is-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        border-color: rgba(91, 58, 168, 0.18);
+    }
+
+    .ft-dash-card-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.15rem;
+        height: 2.15rem;
+        border-radius: 0.7rem;
+        flex: 0 0 auto;
+        background: rgba(255, 255, 255, 0.72);
+    }
+
+    .ft-dash-card-icon svg {
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+
+    .ft-dash-card-copy {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        flex: 1 1 auto;
+        gap: 0.12rem;
+    }
+
+    .ft-dash-card-title {
+        font-size: 0.72rem;
+        font-weight: 700;
         color: #475569;
-        max-width: 46rem;
+        line-height: 1.25;
+    }
+
+    .ft-dash-card-value {
+        font-size: 1.28rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        color: #0f172a;
+        line-height: 1.15;
+    }
+
+    .ft-dash-card-hint {
+        font-size: 0.68rem;
+        font-weight: 550;
+        color: #64748b;
+        line-height: 1.25;
+    }
+
+    html.fieldtrack-admin .ft-dash-card--lavender { background: #eee9fe; border-color: #ddd6fe; }
+    html.fieldtrack-admin .ft-dash-card--lavender .ft-dash-card-icon { color: #6d28d9; }
+    html.fieldtrack-admin .ft-dash-card--sky { background: #e8f3fe; border-color: #d7e9fd; }
+    html.fieldtrack-admin .ft-dash-card--sky .ft-dash-card-icon { color: #2563eb; }
+    html.fieldtrack-admin .ft-dash-card--mint { background: #e9f8f1; border-color: #d5f0e3; }
+    html.fieldtrack-admin .ft-dash-card--mint .ft-dash-card-icon { color: #059669; }
+    html.fieldtrack-admin .ft-dash-card--peach { background: #fff1e8; border-color: #fde4d4; }
+    html.fieldtrack-admin .ft-dash-card--peach .ft-dash-card-icon { color: #ea580c; }
+    html.fieldtrack-admin .ft-dash-card--amber { background: #fef6e4; border-color: #fdecc8; }
+    html.fieldtrack-admin .ft-dash-card--amber .ft-dash-card-icon { color: #d97706; }
+    html.fieldtrack-admin .ft-dash-card--lilac { background: #f3eaff; border-color: #e7d7fe; }
+    html.fieldtrack-admin .ft-dash-card--lilac .ft-dash-card-icon { color: #7c3aed; }
+    html.fieldtrack-admin .ft-dash-card--blue { background: #eaf2ff; border-color: #d9e6ff; }
+    html.fieldtrack-admin .ft-dash-card--blue .ft-dash-card-icon { color: #3b82f6; }
+    html.fieldtrack-admin .ft-dash-card--sage { background: #eef6ee; border-color: #dceadc; }
+    html.fieldtrack-admin .ft-dash-card--sage .ft-dash-card-icon { color: #16a34a; }
+
+    html.fieldtrack-admin .ft-dash-card-value {
+        color: #0f172a;
+    }
+
+    .ft-dash-confirmed {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        min-width: 6.75rem;
+    }
+
+    .ft-dash-confirmed-n {
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        min-width: 1.35rem;
+        color: #0f172a;
+    }
+
+    .ft-dash-confirmed-bar {
+        display: block;
+        flex: 1 1 auto;
+        height: 0.38rem;
+        border-radius: 999px;
+        background: #e8ecf4;
+        overflow: hidden;
+    }
+
+    .ft-dash-confirmed-bar > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #8b7cf6 0%, #6d8dff 100%);
+    }
+
+    @media (max-width: 1199px) {
+        .ft-dash-stats {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 639px) {
+        .ft-dash-stats {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .ft-welcome-role {
+            margin-left: 0;
+        }
     }
 
     /* -------------------------------------------------------------------------
@@ -1044,6 +1269,10 @@
 
         html.fieldtrack-admin .fi-wi-stats-overview-stat {
             width: 100%;
+        }
+
+        html.fieldtrack-admin .ft-dash-stats {
+            grid-template-columns: minmax(0, 1fr);
         }
     }
 

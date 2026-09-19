@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Attendances\AttendanceResource;
 use App\Models\Attendance;
+use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Filament\Tables\Columns\TextColumn;
@@ -50,10 +51,21 @@ class DirectorTodayTeamActivityWidget extends TableWidget
                     ->label('Punch Out')
                     ->formatStateUsing(fn (Attendance $record): string => $record->punchOutAt()?->timezone(AttendanceCalendar::TIMEZONE)->format('h:i A') ?? '-')
                     ->placeholder('-'),
+                TextColumn::make('working_hours')
+                    ->label('Working Hours')
+                    ->state(fn (Attendance $record): string => app(AttendanceStatusCalculator::class)->formatWorkingHoursLabel($record)),
                 TextColumn::make('attendance_status')
                     ->label('Status')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => Attendance::ATTENDANCE_STATUS_LABELS[$state] ?? $state),
+                    ->formatStateUsing(fn (string $state): string => Attendance::ATTENDANCE_STATUS_LABELS[$state] ?? $state)
+                    ->color(fn (string $state): string => match ($state) {
+                        AttendanceStatusCalculator::STATUS_PRESENT => 'success',
+                        AttendanceStatusCalculator::STATUS_ABSENT => 'danger',
+                        AttendanceStatusCalculator::STATUS_HALF_DAY => 'warning',
+                        AttendanceStatusCalculator::STATUS_PUNCHED_IN => 'info',
+                        AttendanceStatusCalculator::STATUS_LEAVE => 'warning',
+                        default => 'gray',
+                    }),
             ])
             ->recordUrl(fn (Attendance $record): string => AttendanceResource::getUrl('view', ['record' => $record]))
             ->emptyStateHeading('No team activity today')
