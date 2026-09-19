@@ -48,7 +48,10 @@ it('shows director admin management summary without scheme count or admission ta
         ->assertSee(DirectorConfirmedAdmissionsByCenterWidget::class, false)
         ->assertSee(DirectorTodayTeamActivityWidget::class, false)
         ->assertDontSee(FieldTrackStatsWidget::class, false)
-        ->assertDontSee(AdmissionTargetPerformanceWidget::class, false);
+        ->assertDontSee(AdmissionTargetPerformanceWidget::class, false)
+        ->assertDontSee('Welcome,')
+        ->assertDontSee('Attendance, punch photos, GPS')
+        ->assertDontSee('ft-welcome-widget');
 
     Livewire::actingAs($org['director'])
         ->test(DirectorAdminStatsWidget::class)
@@ -99,7 +102,10 @@ it('keeps scheme count and admission targets on the center manager dashboard', f
         ->assertSee(AdmissionTargetPerformanceWidget::class, false)
         ->assertDontSee(DirectorAdminStatsWidget::class, false)
         ->assertDontSee(DirectorConfirmedAdmissionsByCenterWidget::class, false)
-        ->assertDontSee(DirectorTodayTeamActivityWidget::class, false);
+        ->assertDontSee(DirectorTodayTeamActivityWidget::class, false)
+        ->assertDontSee('Welcome,')
+        ->assertDontSee('Attendance, punch photos, GPS')
+        ->assertDontSee('ft-welcome-widget');
 
     Livewire::actingAs($org['centerManager'])
         ->test(FieldTrackStatsWidget::class)

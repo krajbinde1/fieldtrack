@@ -652,37 +652,52 @@
     /* -------------------------------------------------------------------------
      * Dashboard — compact premium layout (scoped to the dashboard page)
      * ------------------------------------------------------------------------- */
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-page-header-main-ctn {
+    html.fieldtrack-admin body.ft-dashboard-page .fi-page-header-main-ctn {
         padding-top: 0.4rem !important;
-        padding-bottom: 0.2rem !important;
-        row-gap: 0.4rem !important;
+        padding-bottom: 0 !important;
+        row-gap: 0.2rem !important;
+        margin-bottom: 0 !important;
     }
 
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-header-heading,
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-header h1 {
+    html.fieldtrack-admin body.ft-dashboard-page .fi-header-heading,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-header h1 {
         font-size: 1.2rem;
         font-weight: 750;
         letter-spacing: -0.025em;
+        margin-bottom: 0 !important;
     }
 
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-page-main,
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-header-widgets,
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-page-content {
+    html.fieldtrack-admin body.ft-dashboard-page .fi-header-subheading:empty,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-header-widgets:empty,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-header-widgets:not(:has(.fi-wi-widget)) {
+        display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        height: 0 !important;
+        overflow: hidden;
+    }
+
+    html.fieldtrack-admin body.ft-dashboard-page .fi-page-main,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-header-widgets,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-page-content {
         gap: 0.65rem !important;
         row-gap: 0.65rem !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
     }
 
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta .fi-ta-header-heading {
+    html.fieldtrack-admin body.ft-dashboard-page .fi-ta .fi-ta-header-heading {
         font-size: 0.88rem;
         padding: 0.55rem 0.85rem 0.15rem;
     }
 
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta .fi-ta-header-toolbar {
+    html.fieldtrack-admin body.ft-dashboard-page .fi-ta .fi-ta-header-toolbar {
         padding: 0.4rem 0.85rem 0.5rem;
     }
 
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta .fi-ta-header-cell,
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta thead th {
+    html.fieldtrack-admin body.ft-dashboard-page .fi-ta .fi-ta-header-cell,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-ta thead th {
         height: 2.1rem;
         padding: 0.32rem 0.7rem;
         font-size: 0.68rem;
@@ -692,79 +707,15 @@
         background: #f6f7fb !important;
     }
 
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta .fi-ta-cell,
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-ta tbody td {
+    html.fieldtrack-admin body.ft-dashboard-page .fi-ta .fi-ta-cell,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-ta tbody td {
         min-height: 2.15rem;
         padding: 0.32rem 0.7rem;
         font-size: 0.8rem;
     }
 
-    html.fieldtrack-admin .fi-page:has(.ft-welcome-widget) .fi-pagination {
+    html.fieldtrack-admin body.ft-dashboard-page .fi-pagination {
         padding: 0.4rem 0.85rem;
-    }
-
-    html.fieldtrack-admin .ft-welcome-widget {
-        width: 100%;
-    }
-
-    html.fieldtrack-admin .ft-welcome-card {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.35rem 0.85rem;
-        padding: 0.7rem 1rem;
-        background: linear-gradient(90deg, #ffffff 0%, #f7f6ff 100%) !important;
-        border: 1px solid var(--ft-border) !important;
-        border-radius: 12px !important;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
-    }
-
-    .ft-welcome-main {
-        display: flex;
-        flex-direction: column;
-        gap: 0.08rem;
-        min-width: 0;
-        flex: 1 1 auto;
-    }
-
-    .ft-welcome-kicker {
-        font-size: 0.64rem;
-        font-weight: 750;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: #6d5ef6;
-        margin: 0;
-    }
-
-    .ft-welcome-title {
-        margin: 0;
-        font-size: 1.05rem;
-        font-weight: 750;
-        letter-spacing: -0.02em;
-        color: var(--ft-text);
-        line-height: 1.25;
-    }
-
-    .ft-welcome-role {
-        margin: 0;
-        font-size: 0.68rem;
-        font-weight: 700;
-        color: #5b3aa8;
-        background: #eee9ff;
-        border: 1px solid #ddd6fe;
-        border-radius: 999px;
-        padding: 0.18rem 0.55rem;
-        line-height: 1.2;
-        white-space: nowrap;
-    }
-
-    .ft-welcome-copy {
-        flex: 1 1 100%;
-        margin: 0;
-        font-size: 0.78rem;
-        line-height: 1.35;
-        color: #64748b;
-        max-width: none;
     }
 
     .ft-dash-stats {
@@ -907,10 +858,6 @@
     @media (max-width: 639px) {
         .ft-dash-stats {
             grid-template-columns: minmax(0, 1fr);
-        }
-
-        .ft-welcome-role {
-            margin-left: 0;
         }
     }
 
