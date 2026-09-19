@@ -11,7 +11,7 @@ final class CenterManagerAttendanceProfile
 {
     public function employeeFor(User $user): Employee
     {
-        if (! $user->isCenterManager()) {
+        if (! $user->isCenterManager() && ! $user->isProjectHead()) {
             throw ValidationException::withMessages([
                 'employee' => 'Employee profile is not linked to this account.',
             ]);
@@ -25,16 +25,22 @@ final class CenterManagerAttendanceProfile
                 return $existing;
             }
 
-            $centerId = $fresh->managedCenters()->orderBy('centers.id')->value('centers.id');
+            $isProjectHead = $fresh->isProjectHead();
+            $centerId = $isProjectHead
+                ? $fresh->headedCenters()->orderBy('centers.id')->value('centers.id')
+                : $fresh->managedCenters()->orderBy('centers.id')->value('centers.id');
             if ($centerId === null) {
                 throw ValidationException::withMessages([
-                    'employee' => 'No assigned center found for this Center Manager.',
+                    'employee' => $isProjectHead
+                        ? 'No assigned center found for this Project Head.'
+                        : 'No assigned center found for this Center Manager.',
                 ]);
             }
 
+            $roleLabel = $isProjectHead ? 'Project Head' : 'Center Manager';
             $name = trim((string) $fresh->name);
             if ($name === '' || str_contains($name, '@')) {
-                $name = 'Center Manager';
+                $name = $roleLabel;
             }
 
             $employee = Employee::query()->create([
@@ -42,7 +48,7 @@ final class CenterManagerAttendanceProfile
                 'full_name' => $name,
                 'mobile' => $this->uniqueMobile((int) $fresh->id),
                 'department' => 'Field',
-                'designation' => 'Center Manager',
+                'designation' => $roleLabel,
                 'joining_date' => now()->toDateString(),
                 'status' => true,
                 'created_by_user_id' => $fresh->id,

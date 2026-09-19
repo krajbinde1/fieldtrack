@@ -32,7 +32,7 @@ class RoutePermissions {
     }
 
     if (path.startsWith('/director')) {
-      return role.isAdmin || role.isDirector;
+      return role.canAccessDirectorRoutes();
     }
 
     return true;

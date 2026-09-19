@@ -24,19 +24,29 @@ class AppVersionLabel extends StatelessWidget {
         if (info == null) return const SizedBox.shrink();
         final version = info.version.trim();
         final build = info.buildNumber.trim();
-        if (version.isEmpty) return const SizedBox.shrink();
-        final text = build.isEmpty
-            ? 'Version $version'
-            : 'Version $version (Build $build)';
-        return Text(
-          text,
-          textAlign: textAlign,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: color ?? AppColors.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                height: 1.2,
+        if (version.isEmpty && build.isEmpty) return const SizedBox.shrink();
+        final style = Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: color ?? AppColors.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
+            );
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (version.isNotEmpty)
+              Text(
+                'Version $version',
+                textAlign: textAlign,
+                style: style,
               ),
+            if (build.isNotEmpty)
+              Text(
+                'Build $build',
+                textAlign: textAlign,
+                style: style,
+              ),
+          ],
         );
       },
     );

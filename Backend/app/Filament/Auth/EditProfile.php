@@ -2,6 +2,8 @@
 
 namespace App\Filament\Auth;
 
+use App\Filament\Pages\AccountSettings;
+use Filament\Actions\Action;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
@@ -12,6 +14,22 @@ class EditProfile extends BaseEditProfile
     protected static ?string $title = 'Profile';
 
     protected static bool $isDiscovered = false;
+
+    /**
+     * @return array<Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        if (! AccountSettings::canAccess()) {
+            return [];
+        }
+
+        return [
+            Action::make('accountSettings')
+                ->label('Account Settings')
+                ->url(AccountSettings::getUrl()),
+        ];
+    }
 
     public function form(Schema $schema): Schema
     {

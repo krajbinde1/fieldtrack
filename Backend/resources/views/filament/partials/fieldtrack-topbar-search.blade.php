@@ -13,7 +13,7 @@
 </div>
 <script>
     (function () {
-        var root = document.querySelector('[data-ft-topbar-search]');
+        var root = document.querySelector('.ft-topbar-search');
         if (!root || root.dataset.ftBound === '1') {
             return;
         }

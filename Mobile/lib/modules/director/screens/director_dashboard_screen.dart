@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -10,18 +11,23 @@ import '../../../core/routing/center_scope.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
 import '../../../core/widgets/design/pg_welcome_card.dart';
+import '../../attendance/models/attendance.dart';
+import '../../attendance/providers/attendance_provider.dart';
+import '../../attendance/widgets/attendance_status_card.dart';
 import '../../auth/providers/auth_controller.dart';
 
-class DirectorDashboardScreen extends StatefulWidget {
+class DirectorDashboardScreen extends ConsumerStatefulWidget {
   const DirectorDashboardScreen({super.key, required this.auth});
 
   final AuthController auth;
 
   @override
-  State<DirectorDashboardScreen> createState() => _DirectorDashboardScreenState();
+  ConsumerState<DirectorDashboardScreen> createState() =>
+      _DirectorDashboardScreenState();
 }
 
-class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
+class _DirectorDashboardScreenState
+    extends ConsumerState<DirectorDashboardScreen> {
   late Future<Map<String, dynamic>> _future;
 
   @override
@@ -46,6 +52,9 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
   }
 
   Future<void> _refresh() async {
+    if (widget.auth.userRole.isProjectHead) {
+      ref.invalidate(todayAttendanceProvider);
+    }
     final next = _load();
     setState(() => _future = next);
     await next;
@@ -54,6 +63,9 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
   Future<void> _open(String path) async {
     await context.push(path);
     if (!mounted) return;
+    if (widget.auth.userRole.isProjectHead && path.startsWith('/attendance')) {
+      await ref.read(todayAttendanceProvider.notifier).refresh();
+    }
     await _refresh();
   }
 
@@ -62,6 +74,12 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
     final session = widget.auth.session;
     final displayName = session?.displayName.trim() ?? '';
     final name = displayName.isNotEmpty ? displayName : widget.auth.userRole.label;
+    final ownAttendance = widget.auth.userRole.isProjectHead
+        ? ref.watch(todayAttendanceProvider).maybeWhen(
+              data: (value) => value,
+              orElse: () => null,
+            )
+        : null;
 
     return PgPageScaffold(
       auth: widget.auth,
@@ -74,6 +92,7 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
               name: name,
               role: widget.auth.userRole,
               data: snapshot.data ?? const {},
+              ownAttendance: ownAttendance,
               onOpen: _open,
             ),
           );
@@ -90,6 +109,7 @@ class DirectorDashboardView extends StatelessWidget {
     required this.role,
     required this.data,
     required this.onOpen,
+    this.ownAttendance,
     this.centerId,
     this.centerName,
     this.centerManagerName,
@@ -99,6 +119,7 @@ class DirectorDashboardView extends StatelessWidget {
   final String name;
   final UserRole role;
   final Map<String, dynamic> data;
+  final Attendance? ownAttendance;
   final int? centerId;
   final String? centerName;
   final String? centerManagerName;
@@ -106,6 +127,8 @@ class DirectorDashboardView extends StatelessWidget {
   final ValueChanged<String> onOpen;
 
   bool get _centerScoped => centerId != null;
+
+  bool get _showSelfAttendance => role.isProjectHead && !_centerScoped;
 
   String _path(String path) => withCenterId(path, centerId);
 
@@ -165,7 +188,7 @@ class DirectorDashboardView extends StatelessWidget {
         color: const Color(0xFF7C3AED),
         background: const Color(0xFFF0E9FF),
       ),
-      if (!_centerScoped)
+      if (!_centerScoped && (role.isDirector || role.isAdmin))
         _DirectorTile(
           icon: const Icon(Icons.event_note_rounded),
           label: 'Project Head Leave',
@@ -226,6 +249,16 @@ class DirectorDashboardView extends StatelessWidget {
               avatarRadius: 36,
             ),
           const SizedBox(height: 12),
+          if (_showSelfAttendance) ...[
+            AttendanceStatusCard(
+              pulse: TeamAttendancePulse.fromOwn(ownAttendance),
+              ownAttendance: ownAttendance,
+              punchedIn: ownAttendance?.punchIn != null ? 1 : 0,
+              punchedOut: ownAttendance?.punchOut != null ? 1 : 0,
+              onDetails: () => onOpen('/attendance'),
+            ),
+            const SizedBox(height: 12),
+          ],
           _DirectorSummaryGrid(tiles: _tiles, onOpen: onOpen),
         ],
       ),

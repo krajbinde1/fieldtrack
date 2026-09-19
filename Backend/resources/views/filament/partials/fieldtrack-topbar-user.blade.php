@@ -1,6 +1,7 @@
 @php
-    use App\Filament\Pages\ChangePassword;
-    use Filament\Facades\Filament;
+use App\Filament\Pages\AccountSettings;
+use App\Filament\Pages\ChangePassword;
+use Filament\Facades\Filament;
 
     $user = Filament::auth()->user() ?? auth()->user();
     $name = $user?->name ?? 'User';
@@ -12,6 +13,7 @@
         mb_substr($first, 0, 1).(filled($second) ? mb_substr($second, 0, 1) : mb_substr($first, 1, 1))
     );
     $profileUrl = Filament::getProfileUrl();
+    $accountSettingsUrl = AccountSettings::canAccess() ? AccountSettings::getUrl() : null;
     $changePasswordUrl = ChangePassword::getUrl();
     $logoutUrl = Filament::getLogoutUrl();
 @endphp
@@ -38,6 +40,9 @@
         <div class="ft-topbar-menu" role="menu">
             @if (filled($profileUrl))
                 <a class="ft-topbar-menu-item" role="menuitem" href="{{ $profileUrl }}">Profile</a>
+            @endif
+            @if (filled($accountSettingsUrl))
+                <a class="ft-topbar-menu-item" role="menuitem" href="{{ $accountSettingsUrl }}">Account Settings</a>
             @endif
             <a class="ft-topbar-menu-item" role="menuitem" href="{{ $changePasswordUrl }}">Change Password</a>
             <form method="POST" action="{{ $logoutUrl }}">

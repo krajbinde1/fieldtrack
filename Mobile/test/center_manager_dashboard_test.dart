@@ -39,6 +39,23 @@ void main() {
     expect(RoutePermissions.canAccessPath('/manager/employees', role), isFalse);
   });
 
+  test('Project Head uses director monitoring routes plus self attendance', () {
+    const role = UserRole.projectHead;
+
+    expect(role.canAccessDirectorRoutes(), isTrue);
+    expect(role.canAccessOwnAttendance(), isTrue);
+    expect(role.canAccessManagerRoutes(), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/centers', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/centers/3', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/employees', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/admissions', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/route-tracking', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/field-activities', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/attendance', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/attendance/punch-in', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/admissions', role), isFalse);
+  });
+
   test('Director can open center drill-down routes and not manager create routes', () {
     const role = UserRole.director;
 
@@ -168,6 +185,61 @@ void main() {
     expect(find.text('Modules'), findsNothing);
     expect(find.text('Admission Targets'), findsNothing);
     expect(find.text('Users / Employees'), findsNothing);
+  });
+
+  testWidgets('Project Head dashboard matches Director monitoring plus self attendance', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DirectorDashboardView(
+            name: 'Rahul Patil',
+            role: UserRole.projectHead,
+            data: const {
+              'centers': 2,
+              'active_centers': 2,
+              'employees': 8,
+              'punched_in_today': 5,
+              'punched_out_today': 1,
+              'active_routes': 3,
+              'pending_leaves': 2,
+              'pending_project_head_leaves': 1,
+              'admission_targets': 5,
+              'confirmed_admissions': 4,
+              'field_activities_today': 2,
+            },
+            onOpen: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Rahul Patil'), findsOneWidget);
+    expect(find.text('Project Head'), findsWidgets);
+    expect(find.text('Attendance Status'), findsOneWidget);
+    expect(find.text('View Details'), findsOneWidget);
+    expect(find.text('Punch In'), findsOneWidget);
+    expect(find.text('Punch Out'), findsOneWidget);
+    expect(find.text('Duration'), findsOneWidget);
+    expect(find.text('Not Punched In'), findsOneWidget);
+    expect(find.text('Total Centers'), findsOneWidget);
+    expect(find.text('Employees'), findsOneWidget);
+    expect(find.text('Punched In Today'), findsOneWidget);
+    expect(find.text('5 / 8'), findsOneWidget);
+    expect(find.text('Active Routes'), findsOneWidget);
+    expect(find.text('Confirmed Admissions'), findsOneWidget);
+    expect(find.text('Total: 4'), findsOneWidget);
+    expect(find.text('Project Head Leave'), findsNothing);
+    expect(find.text('Modules'), findsNothing);
+    expect(find.text('Targets'), findsNothing);
+    expect(find.text('My Attendance'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Field Activities Today'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Field Activities Today'), findsOneWidget);
   });
 
   testWidgets('Director selected-center dashboard is monitoring only', (

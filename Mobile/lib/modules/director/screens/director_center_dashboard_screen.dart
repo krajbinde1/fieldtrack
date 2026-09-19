@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/auth/user_role.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
 import '../../auth/providers/auth_controller.dart';
@@ -90,9 +89,7 @@ class _DirectorCenterDashboardScreenState
             child: DirectorDashboardView(
               name: widget.auth.session?.displayName ??
                   widget.auth.userRole.label,
-              role: widget.auth.userRole.isAdmin
-                  ? UserRole.admin
-                  : UserRole.director,
+              role: widget.auth.userRole,
               data: data,
               centerId: widget.centerId,
               centerName: centerName,

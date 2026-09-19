@@ -59,6 +59,7 @@ class AdminPanelProvider extends PanelProvider
             ->topbar(fn (): bool => ! request()->routeIs('filament.admin.resources.employee-routes.view'))
             ->breadcrumbs(fn (): bool => ! request()->routeIs('filament.admin.resources.employee-routes.view'))
             ->homeUrl(fn (): string => Dashboard::getUrl())
+            ->globalSearch(false)
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -109,7 +110,7 @@ class AdminPanelProvider extends PanelProvider
 
     private function registerFieldTrackRenderHooks(Panel $panel): Panel
     {
-        $searchHook = $this->firstExistingRenderHook(['TOPBAR_LOGO_AFTER', 'TOPBAR_START', 'TOPBAR_END']);
+        $searchHook = $this->firstExistingRenderHook(['GLOBAL_SEARCH_BEFORE', 'TOPBAR_END']);
         $userHook = $this->firstExistingRenderHook(['USER_MENU_BEFORE', 'TOPBAR_END']);
 
         if ($this->renderHookExists('HEAD_END')) {

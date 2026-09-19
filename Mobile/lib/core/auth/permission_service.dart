@@ -20,6 +20,8 @@ class PermissionService {
   bool get canViewDirectorDashboard =>
       has('director_dashboard') ||
       has('admin_dashboard') ||
+      has('project_head_dashboard') ||
       role.isDirector ||
-      role.isAdmin;
+      role.isAdmin ||
+      role.isProjectHead;
 }

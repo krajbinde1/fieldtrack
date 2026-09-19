@@ -229,6 +229,14 @@
         align-items: center;
     }
 
+    html.fieldtrack-admin .fi-topbar-start {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+
     html.fieldtrack-admin .fi-topbar-open-sidebar-btn,
     html.fieldtrack-admin .fi-topbar-close-sidebar-btn,
     html.fieldtrack-admin .fi-topbar-open-collapse-sidebar-btn,
@@ -253,9 +261,9 @@
         align-items: center;
         gap: 0.55rem;
         flex: 1 1 18rem;
-        max-width: 36rem;
-        margin-inline: 0.5rem auto;
-        min-width: 12rem;
+        max-width: 32rem;
+        margin-inline: 0 0.75rem;
+        min-width: 10rem;
         height: 2.55rem;
         padding: 0 0.95rem;
         border-radius: 999px;
@@ -424,6 +432,26 @@
         color: #b42318;
     }
 
+    html.fieldtrack-admin .fi-global-search-ctn,
+    html.fieldtrack-admin .fi-global-search,
+    html.fieldtrack-admin .fi-topbar .fi-global-search-ctn,
+    html.fieldtrack-admin .fi-topbar .fi-global-search {
+        display: none !important;
+    }
+
+    html.fieldtrack-admin .fi-topbar .ft-topbar-search ~ .ft-topbar-search {
+        display: none !important;
+    }
+
+    html.fieldtrack-admin .fi-topbar-end {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 1 1 auto;
+        min-width: 0;
+        justify-content: flex-end;
+    }
+
     html.fieldtrack-admin .fi-user-menu {
         display: none !important;
     }
@@ -462,6 +490,8 @@
         margin-left: 0;
         margin-right: 0;
         background: var(--ft-bg);
+        padding-top: 0;
+        padding-bottom: 1rem;
         padding-left: 1rem;
         padding-right: 1rem;
         box-sizing: border-box;
@@ -485,17 +515,40 @@
         }
     }
 
+    html.fieldtrack-admin .fi-page,
+    html.fieldtrack-admin .fi-page-content,
     html.fieldtrack-admin .fi-page-main {
-        gap: 0.85rem;
+        margin-top: 0;
+        padding-top: 0;
+    }
+
+    html.fieldtrack-admin .fi-page-header-main-ctn {
+        padding-top: 0.75rem !important;
+        padding-bottom: 0.75rem !important;
+        row-gap: 0.75rem !important;
+        column-gap: 0.75rem !important;
+    }
+
+    html.fieldtrack-admin .fi-page-main {
+        gap: 0.75rem !important;
+        min-width: 0;
+    }
+
+    html.fieldtrack-admin .fi-page.fi-page-has-sub-navigation .fi-page-main {
+        gap: 0.75rem !important;
     }
 
     html.fieldtrack-admin .fi-header {
         display: flex;
         flex-wrap: wrap;
         align-items: flex-start;
-        gap: 0.65rem 1rem;
-        margin-bottom: 0.15rem;
-        padding-top: 0.35rem;
+        gap: 0.5rem 1rem;
+        margin: 0;
+        padding: 0;
+    }
+
+    html.fieldtrack-admin .fi-header.fi-header-has-breadcrumbs .fi-header-actions-ctn {
+        margin-top: 0 !important;
     }
 
     html.fieldtrack-admin .fi-breadcrumbs,
@@ -504,7 +557,7 @@
         width: 100%;
         font-size: 0.75rem;
         color: var(--ft-muted);
-        margin: 0 0 0.1rem;
+        margin: 0 !important;
         order: -1;
     }
 

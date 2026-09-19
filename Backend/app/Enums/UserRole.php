@@ -70,7 +70,7 @@ enum UserRole: string
 
     public function canPunch(): bool
     {
-        return $this === self::Employee || $this === self::CenterManager;
+        return $this === self::Employee || $this === self::CenterManager || $this === self::ProjectHead;
     }
 
     public function canAccessWeb(): bool
@@ -106,6 +106,7 @@ enum UserRole: string
             ],
             self::ProjectHead => [
                 'project_head_dashboard',
+                'attendance',
                 'attendance_view_project',
                 'route_tracking_view_project',
                 'leave_view_project',

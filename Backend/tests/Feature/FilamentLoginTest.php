@@ -28,10 +28,20 @@ it('lets the existing top-level login sign in as admin', function () {
 it('lets an admin open organization, people, and field-operation pages', function () {
     $admin = User::query()->where('login_id', 'director')->firstOrFail();
 
-    $this->actingAs($admin)
+    $dashboard = $this->actingAs($admin)
         ->get('/admin')
         ->assertOk()
         ->assertSee('Param FieldTrack');
+
+    $html = $dashboard->getContent();
+    expect(substr_count($html, 'class="ft-topbar-search"'))->toBe(1)
+        ->and($html)->not->toContain('class="fi-global-search-ctn')
+        ->and($html)->not->toContain('Filament\\Livewire\\GlobalSearch')
+        ->and($html)->toContain('fi-page-header-main-ctn')
+        ->and($html)->toContain('padding-top: 0.75rem !important');
+
+    $users = $this->actingAs($admin)->get('/admin/users')->assertOk();
+    expect(substr_count($users->getContent(), 'class="ft-topbar-search"'))->toBe(1);
 
     $this->actingAs($admin)->get('/admin/center-users')->assertForbidden();
 
@@ -117,7 +127,7 @@ it('blocks a center manager from project administration', function () {
 it('shows a profile menu with logout for every web admin role', function (string $loginId) {
     $user = User::query()->where('login_id', $loginId)->firstOrFail();
 
-    $this->actingAs($user)
+    $response = $this->actingAs($user)
         ->get('/admin')
         ->assertOk()
         ->assertSee('ft-topbar-profile-trigger', false)
@@ -127,6 +137,16 @@ it('shows a profile menu with logout for every web admin role', function (string
         ->assertSee('/admin/logout', false)
         ->assertSee('/admin/profile', false)
         ->assertSee('/admin/change-password', false);
+
+    if (in_array($loginId, ['director', 'fielddirector'], true)) {
+        $response
+            ->assertSee('>Account Settings</a>', false)
+            ->assertSee('/admin/account-settings', false);
+    } else {
+        $response
+            ->assertDontSee('>Account Settings</a>', false)
+            ->assertDontSee('/admin/account-settings', false);
+    }
 })->with([
     'admin' => 'director',
     'director' => 'fielddirector',
@@ -152,6 +172,7 @@ it('logs every web admin role out through filament and blocks returning to admin
     $this->get('/admin')->assertRedirect('/admin/login');
     $this->get('/admin/profile')->assertRedirect('/admin/login');
     $this->get('/admin/change-password')->assertRedirect('/admin/login');
+    $this->get('/admin/account-settings')->assertRedirect('/admin/login');
 })->with([
     'admin' => 'director',
     'director' => 'fielddirector',
@@ -162,8 +183,9 @@ it('logs every web admin role out through filament and blocks returning to admin
 it('lets a web admin open profile and change password pages', function () {
     $admin = User::query()->where('login_id', 'director')->firstOrFail();
 
-    $this->actingAs($admin)->get('/admin/profile')->assertOk();
+    $this->actingAs($admin)->get('/admin/profile')->assertOk()->assertSee('Account Settings');
     $this->actingAs($admin)->get('/admin/change-password')->assertOk()->assertSee('Change Password');
+    $this->actingAs($admin)->get('/admin/account-settings')->assertOk()->assertSee('Account Settings');
 });
 
 it('keeps punch photos and locations on the attendance view instead of the list', function () {

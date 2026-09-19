@@ -139,7 +139,7 @@ final class DirectorWorkforceService
     public function collect(User $viewer, ?int $centerId = null, ?int $schemeId = null): Collection
     {
         $today = AttendanceCalendar::today()->toDateString();
-        $orgUsers = $this->orgUsers($centerId, $schemeId);
+        $orgUsers = $this->orgUsers($viewer, $centerId, $schemeId);
         $linkedEmployeeIds = $orgUsers
             ->pluck('employee_id')
             ->filter()
@@ -179,11 +179,16 @@ final class DirectorWorkforceService
     /**
      * @return Collection<int, User>
      */
-    private function orgUsers(?int $centerId, ?int $schemeId): Collection
+    private function orgUsers(User $viewer, ?int $centerId, ?int $schemeId): Collection
     {
+        $visibleCenterIds = $this->access->visibleCenterIds($viewer);
+        $roles = $viewer->isProjectHead()
+            ? [UserRole::CenterManager->value]
+            : [UserRole::ProjectHead->value, UserRole::CenterManager->value];
+
         return User::query()
             ->where('is_active', true)
-            ->whereIn('role', [UserRole::ProjectHead->value, UserRole::CenterManager->value])
+            ->whereIn('role', $roles)
             ->with([
                 'employee:id,employee_code,center_id',
                 'headedCenters' => fn ($query) => $query->with('scheme:id,name')->orderBy('name'),
@@ -193,6 +198,12 @@ final class DirectorWorkforceService
                 $query->where(function ($inner) use ($centerId): void {
                     $inner->whereHas('headedCenters', fn ($centers) => $centers->where('centers.id', $centerId))
                         ->orWhereHas('managedCenters', fn ($centers) => $centers->where('centers.id', $centerId));
+                });
+            })
+            ->when($visibleCenterIds !== null, function ($query) use ($visibleCenterIds): void {
+                $query->where(function ($inner) use ($visibleCenterIds): void {
+                    $inner->whereHas('headedCenters', fn ($centers) => $centers->whereIn('centers.id', $visibleCenterIds))
+                        ->orWhereHas('managedCenters', fn ($centers) => $centers->whereIn('centers.id', $visibleCenterIds));
                 });
             })
             ->when($schemeId !== null, function ($query) use ($schemeId): void {
