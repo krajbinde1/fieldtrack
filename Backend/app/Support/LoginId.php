@@ -33,7 +33,19 @@ final class LoginId
         );
     }
 
-    public static function assertUnique(string $loginId, ?int $ignoreUserId = null): void
+    public static function defaultPasswordFromMobile(string $mobile): string
+    {
+        $digits = preg_replace('/\D+/', '', $mobile) ?? '';
+        if (strlen($digits) < 4) {
+            throw ValidationException::withMessages([
+                'mobile' => 'Mobile Number must have at least 4 digits to generate a password.',
+            ]);
+        }
+
+        return substr($digits, -4);
+    }
+
+    public static function assertUnique(string $loginId, ?int $ignoreUserId = null, string $attribute = 'login_id'): void
     {
         $query = User::query()->where('login_id', $loginId);
         if ($ignoreUserId !== null) {
@@ -42,7 +54,7 @@ final class LoginId
 
         if ($query->exists()) {
             throw ValidationException::withMessages([
-                'login_id' => 'This Login ID is already taken.',
+                $attribute => 'This Login ID is already taken.',
             ]);
         }
     }

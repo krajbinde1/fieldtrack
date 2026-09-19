@@ -401,6 +401,7 @@ it('registers the Center Manager mobile module API routes', function () {
         ->all();
 
     foreach ([
+        'api/manager/centers',
         'api/manager/employees',
         'api/manager/admissions',
         'api/manager/admission-targets',

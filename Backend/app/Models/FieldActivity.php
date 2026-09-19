@@ -61,11 +61,7 @@ class FieldActivity extends Model
 
     public function photoUrl(): ?string
     {
-        if (blank($this->photo_path)) {
-            return null;
-        }
-
-        return url('storage/'.str_replace('\\', '/', $this->photo_path));
+        return \App\Support\PublicStorage::url($this->photo_path);
     }
 
     /**

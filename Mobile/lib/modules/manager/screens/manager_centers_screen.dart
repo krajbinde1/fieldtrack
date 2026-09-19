@@ -1,0 +1,228 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/api/api_client.dart';
+import '../../../core/design/app_colors.dart';
+import '../../../core/design/app_spacing.dart';
+import '../../../core/storage/session_store.dart';
+import '../../../core/widgets/design/pg_empty_state.dart';
+import '../../../core/widgets/design/pg_scaffold.dart';
+import '../../auth/providers/auth_controller.dart';
+import '../api/manager_api.dart';
+
+class ManagerCentersScreen extends StatefulWidget {
+  const ManagerCentersScreen({super.key, required this.auth});
+
+  final AuthController auth;
+
+  @override
+  State<ManagerCentersScreen> createState() => _ManagerCentersScreenState();
+}
+
+class _ManagerCentersScreenState extends State<ManagerCentersScreen> {
+  late final ManagerApi _api;
+  late Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = ManagerApi(
+      ApiClient(SessionStore(), onUnauthorized: widget.auth.sessionExpired).dio,
+    );
+    _future = _api.listCenters();
+  }
+
+  Future<void> _reload() async {
+    final next = _api.listCenters();
+    setState(() => _future = next);
+    await next;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PgPageScaffold(
+      title: 'My Centers',
+      showBack: true,
+      body: RefreshIndicator(
+        onRefresh: _reload,
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const PgLoadingState();
+            }
+            if (snapshot.hasError) {
+              return PgErrorState(
+                message: '${snapshot.error}',
+                onRetry: _reload,
+              );
+            }
+            final items = snapshot.data ?? const <Map<String, dynamic>>[];
+            if (items.isEmpty) {
+              return ListView(
+                children: const [
+                  SizedBox(height: 80),
+                  PgEmptyState(
+                    icon: Icon(Icons.apartment_outlined),
+                    message: 'No assigned centers found.',
+                  ),
+                ],
+              );
+            }
+            return ListView.separated(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenPadding,
+                AppSpacing.sm,
+                AppSpacing.screenPadding,
+                AppSpacing.xl,
+              ),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return _AssignedCenterCard(
+                  item: item,
+                  onTap: () => context.pop(int.tryParse('${item['id'] ?? ''}')),
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _AssignedCenterCard extends StatelessWidget {
+  const _AssignedCenterCard({required this.item, required this.onTap});
+
+  final Map<String, dynamic> item;
+  final VoidCallback onTap;
+
+  String _text(String key, {String fallback = '—'}) {
+    final value = '${item[key] ?? ''}'.trim();
+    return value.isEmpty ? fallback : value;
+  }
+
+  String _count(String key) => '${item[key] ?? 0}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: const Color(0xFFE0F2FE),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0369A1).withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0369A1),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.apartment_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _text('name', fallback: 'Center'),
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          Text(
+                            _text('scheme_name', fallback: _text('project_name')),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _StatChip(label: 'Employees', value: _count('employees')),
+                    _StatChip(label: 'Punched In Today', value: _count('punched_in_today')),
+                    _StatChip(label: 'Active Routes', value: _count('active_routes')),
+                    _StatChip(
+                      label: 'Today Field Activities',
+                      value: _count('field_activities_today'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -6,7 +6,6 @@ use App\Enums\CenterStaffRole;
 use App\Filament\Resources\Employees\EmployeeResource;
 use App\Models\Center;
 use App\Services\OrganizationAccessService;
-use App\Support\LoginId;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -18,7 +17,6 @@ class EditEmployee extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $employee = $this->record;
-        $data['login_id'] = $employee->user?->login_id;
         $data['scheme_name'] = $employee->center?->scheme?->name ?: '—';
         $data['center_manager_name'] = $employee->createdByUser?->name
             ?: $employee->center?->centerManagers->pluck('name')->join(', ')
@@ -69,12 +67,6 @@ class EditEmployee extends EditRecord
 
         if (filled($employee->email)) {
             $payload['email'] = $employee->email;
-        }
-
-        $loginId = trim((string) ($this->data['login_id'] ?? ''));
-        if ($loginId !== '') {
-            LoginId::assertUnique($loginId, $user->id);
-            $payload['login_id'] = $loginId;
         }
 
         $password = $this->data['login_password'] ?? null;

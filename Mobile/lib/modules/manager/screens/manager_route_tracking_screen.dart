@@ -9,9 +9,14 @@ import '../api/manager_api.dart';
 
 /// Manager team-scoped route tracking — reuses Director route UI.
 class ManagerRouteTrackingScreen extends StatelessWidget {
-  const ManagerRouteTrackingScreen({super.key, required this.auth});
+  const ManagerRouteTrackingScreen({
+    super.key,
+    required this.auth,
+    this.centerId,
+  });
 
   final AuthController auth;
+  final int? centerId;
 
   @override
   Widget build(BuildContext context) {
@@ -23,8 +28,12 @@ class ManagerRouteTrackingScreen extends StatelessWidget {
       auth: auth,
       title: 'Employee Route Tracking',
       detailPathPrefix: '/manager/route-tracking',
+      centerId: centerId,
       listLoader: ({required String date}) async {
-        final result = await api.listRouteTracking(date: date);
+        final result = await api.listRouteTracking(
+          date: date,
+          centerId: centerId,
+        );
         return DirectorRouteTrackingListResult(
           rows: result.rows,
           meta: result.meta,

@@ -170,6 +170,25 @@ class ManagerApi {
     }
   }
 
+  Future<List<Map<String, dynamic>>> listCenters({String? search}) async {
+    try {
+      final response = await _dio.get(
+        '/$prefix/centers',
+        queryParameters: {
+          if (search != null && search.isNotEmpty) 'search': search,
+        },
+      );
+      final rows = (response.data as Map)['data'];
+      if (rows is! List) return const [];
+      return rows
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
   Future<List<Map<String, dynamic>>> listEmployees({
     String? search,
     int? centerId,
@@ -206,11 +225,9 @@ class ManagerApi {
   Future<Map<String, dynamic>> createEmployee({
     required String fullName,
     required String mobile,
-    required String password,
     required String staffRole,
     int? centerId,
     String? email,
-    String? loginId,
   }) async {
     try {
       final response = await _dio.post(
@@ -218,11 +235,9 @@ class ManagerApi {
         data: {
           'full_name': fullName,
           'mobile': mobile,
-          'login_password': password,
           'staff_role': staffRole,
           'center_id': ?centerId,
           if (email != null && email.isNotEmpty) 'email': email,
-          if (loginId != null && loginId.isNotEmpty) 'login_id': loginId,
         },
       );
       return Map<String, dynamic>.from(

@@ -31,6 +31,7 @@ class SupervisorDashboardScreen extends ConsumerStatefulWidget {
 class _SupervisorDashboardScreenState
     extends ConsumerState<SupervisorDashboardScreen> {
   late Future<_DashboardSnapshot> _future;
+  int? _selectedCenterId;
 
   @override
   void initState() {
@@ -45,8 +46,27 @@ class _SupervisorDashboardScreenState
     ).dio;
     final api = ManagerApi(dio);
     Map<String, dynamic> data = const {};
+    var centers = const <Map<String, dynamic>>[];
+
+    if (widget.auth.userRole.isCenterManager) {
+      try {
+        centers = await api.listCenters();
+        if (_selectedCenterId != null &&
+            !centers.any(
+              (center) => int.tryParse('${center['id'] ?? ''}') == _selectedCenterId,
+            )) {
+          _selectedCenterId = null;
+        }
+      } catch (_) {}
+    }
+
     try {
-      final response = await dio.get('/dashboard');
+      final response = await dio.get(
+        '/dashboard',
+        queryParameters: {
+          if (_selectedCenterId != null) 'center_id': _selectedCenterId,
+        },
+      );
       final body = response.data;
       if (body is Map && body['data'] is Map) {
         data = Map<String, dynamic>.from(body['data'] as Map);
@@ -61,11 +81,11 @@ class _SupervisorDashboardScreenState
       } catch (_) {}
     }
 
-    return _DashboardSnapshot(data: data, pulse: pulse);
+    return _DashboardSnapshot(data: data, pulse: pulse, centers: centers);
   }
 
-  Future<void> _refresh() async {
-    if (widget.auth.userRole.isCenterManager) {
+  Future<void> _refresh({bool refreshOwnAttendance = true}) async {
+    if (widget.auth.userRole.isCenterManager && refreshOwnAttendance) {
       ref.invalidate(todayAttendanceProvider);
     }
     final next = _load();
@@ -73,14 +93,24 @@ class _SupervisorDashboardScreenState
     await next;
   }
 
+  void _selectCenter(int? centerId) {
+    if (_selectedCenterId == centerId) return;
+    setState(() => _selectedCenterId = centerId);
+    _refresh(refreshOwnAttendance: false);
+  }
+
   Future<void> _open(String path) async {
-    await context.push(path);
+    final result = await context.push(path);
     if (!mounted) return;
+    if (path == '/manager/centers' && result is int) {
+      _selectCenter(result);
+      return;
+    }
     if (widget.auth.userRole.isCenterManager &&
         path.startsWith('/attendance')) {
       await ref.read(todayAttendanceProvider.notifier).refresh();
     }
-    await _refresh();
+    await _refresh(refreshOwnAttendance: false);
   }
 
   @override
@@ -109,6 +139,9 @@ class _SupervisorDashboardScreenState
               data: snapshot.data?.data ?? const {},
               pulse: snapshot.data?.pulse,
               ownAttendance: ownAttendance,
+              centers: snapshot.data?.centers ?? const [],
+              centerId: role.isCenterManager ? _selectedCenterId : null,
+              onSelectCenter: role.isCenterManager ? _selectCenter : null,
               onOpen: _open,
             ),
           );
@@ -127,11 +160,13 @@ class SupervisorDashboardView extends StatelessWidget {
     required this.onOpen,
     this.pulse,
     this.ownAttendance,
+    this.centers = const [],
     this.centerId,
     this.centerName,
     this.centerManagerName,
     this.schemeName,
     this.directorCenterView = false,
+    this.onSelectCenter,
   });
 
   final String name;
@@ -139,17 +174,25 @@ class SupervisorDashboardView extends StatelessWidget {
   final Map<String, dynamic> data;
   final TeamAttendancePulse? pulse;
   final Attendance? ownAttendance;
+  final List<Map<String, dynamic>> centers;
   final int? centerId;
   final String? centerName;
   final String? centerManagerName;
   final String? schemeName;
   final bool directorCenterView;
   final ValueChanged<String> onOpen;
+  final ValueChanged<int?>? onSelectCenter;
 
   String get _prefix =>
       role.isAdmin || role.isDirector ? '/director' : '/manager';
 
   bool get _centerScopedDirector => directorCenterView && centerId != null;
+
+  bool get _showCenterSelector =>
+      role.isCenterManager && !directorCenterView && centers.isNotEmpty;
+
+  bool get _centerScopedCm =>
+      role.isCenterManager && !directorCenterView && centerId != null;
 
   String _path(String path) => withCenterId(path, centerId);
 
@@ -178,7 +221,7 @@ class SupervisorDashboardView extends StatelessWidget {
         path: _centerScopedDirector
             ? _path('/director/employees')
             : (role.isCenterManager || role.isProjectHead
-                ? '/manager/employees'
+                ? _path('/manager/employees')
                 : '$_prefix/team-attendance'),
         color: const Color(0xFF2563EB),
         background: const Color(0xFFE8F1FF),
@@ -212,7 +255,7 @@ class SupervisorDashboardView extends StatelessWidget {
           icon: const Icon(Icons.photo_camera_outlined),
           label: 'Field Activities Today',
           value: '${_count('field_activities_today')}',
-          path: '/manager/field-activities?period=today',
+          path: _path('/manager/field-activities?period=today'),
           color: const Color(0xFF0F766E),
           background: const Color(0xFFE6F7F1),
         ),
@@ -223,7 +266,7 @@ class SupervisorDashboardView extends StatelessWidget {
         path: _centerScopedDirector
             ? _path('/director/admission-targets')
             : (role.isCenterManager || role.isProjectHead
-                ? '/manager/admission-targets'
+                ? _path('/manager/admission-targets')
                 : '$_prefix/admissions'),
         color: const Color(0xFFDB2777),
         background: const Color(0xFFFDE8F0),
@@ -258,16 +301,25 @@ class SupervisorDashboardView extends StatelessWidget {
 
   List<_DashboardTile> get _modules {
     return [
+      if (role.isCenterManager && !directorCenterView)
+        _DashboardTile(
+          icon: const Icon(Icons.apartment_rounded),
+          label: 'My Centers',
+          subtitle: 'Assigned centers overview',
+          path: '/manager/centers',
+          color: const Color(0xFF0369A1),
+          background: const Color(0xFFE0F2FE),
+        ),
       if (role.isCenterManager || _centerScopedDirector)
         _DashboardTile(
           icon: const Icon(Icons.groups_rounded),
           label: 'Users / Employees',
-          subtitle: _centerScopedDirector
+          subtitle: _centerScopedDirector || _centerScopedCm
               ? 'Staff in this center'
               : 'Staff in assigned center(s)',
           path: _centerScopedDirector
               ? _path('/director/employees')
-              : '/manager/employees',
+              : _path('/manager/employees'),
           color: const Color(0xFF2563EB),
           background: const Color(0xFFE8F1FF),
         ),
@@ -283,24 +335,23 @@ class SupervisorDashboardView extends StatelessWidget {
         _DashboardTile(
           icon: const Icon(Icons.flag_rounded),
           label: 'Admission Targets',
-          subtitle: _centerScopedDirector
+          subtitle: _centerScopedDirector || _centerScopedCm
               ? 'Targets for this center'
               : 'Set employee/Mobilizer targets',
           path: _centerScopedDirector
               ? _path('/director/admission-targets')
-              : '/manager/admission-targets',
+              : _path('/manager/admission-targets'),
           color: const Color(0xFFDB2777),
           background: const Color(0xFFFDE8F0),
         ),
-      if (!role.isCenterManager)
-        _DashboardTile(
-          icon: const Icon(Icons.event_available_rounded),
-          label: 'Attendance',
-          subtitle: 'Daily team attendance',
-          path: _path('$_prefix/team-attendance'),
-          color: const Color(0xFF0F766E),
-          background: const Color(0xFFE6F7F1),
-        ),
+      _DashboardTile(
+        icon: const Icon(Icons.event_available_rounded),
+        label: 'Attendance',
+        subtitle: 'Daily team attendance',
+        path: _path('$_prefix/team-attendance'),
+        color: const Color(0xFF0F766E),
+        background: const Color(0xFFE6F7F1),
+      ),
       _DashboardTile(
         icon: const Icon(Icons.route_rounded),
         label: 'Employee Routes',
@@ -321,12 +372,12 @@ class SupervisorDashboardView extends StatelessWidget {
         _DashboardTile(
           icon: const Icon(Icons.photo_camera_outlined),
           label: 'Field Activities',
-          subtitle: _centerScopedDirector
+          subtitle: _centerScopedDirector || _centerScopedCm
               ? 'Activities in this center'
               : 'Mobilizer/employee field work',
           path: _centerScopedDirector
               ? _path('/director/field-activities?period=today')
-              : '/manager/field-activities?period=today',
+              : _path('/manager/field-activities?period=today'),
           color: const Color(0xFF0F766E),
           background: const Color(0xFFE6F7F1),
         ),
@@ -334,12 +385,12 @@ class SupervisorDashboardView extends StatelessWidget {
         _DashboardTile(
           icon: const Icon(Icons.analytics_rounded),
           label: 'Reports',
-          subtitle: _centerScopedDirector
+          subtitle: _centerScopedDirector || _centerScopedCm
               ? 'Reports for this center'
               : 'Assigned-center reports',
           path: _centerScopedDirector
               ? _path('/director/reports')
-              : '/manager/reports',
+              : _path('/manager/reports'),
           color: const Color(0xFF4F46E5),
           background: const Color(0xFFEEF2FF),
         ),
@@ -376,6 +427,14 @@ class SupervisorDashboardView extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
             avatarRadius: 36,
           ),
+        if (_showCenterSelector) ...[
+          const SizedBox(height: 12),
+          _AssignedCenterSelector(
+            centers: centers,
+            selectedCenterId: centerId,
+            onSelected: onSelectCenter ?? (_) {},
+          ),
+        ],
         const SizedBox(height: 12),
         _AttendanceStatusCard(
           pulse: role.isCenterManager
@@ -408,10 +467,85 @@ class SupervisorDashboardView extends StatelessWidget {
 }
 
 class _DashboardSnapshot {
-  const _DashboardSnapshot({required this.data, this.pulse});
+  const _DashboardSnapshot({
+    required this.data,
+    this.pulse,
+    this.centers = const [],
+  });
 
   final Map<String, dynamic> data;
   final TeamAttendancePulse? pulse;
+  final List<Map<String, dynamic>> centers;
+}
+
+class _AssignedCenterSelector extends StatelessWidget {
+  const _AssignedCenterSelector({
+    required this.centers,
+    required this.selectedCenterId,
+    required this.onSelected,
+  });
+
+  final List<Map<String, dynamic>> centers;
+  final int? selectedCenterId;
+  final ValueChanged<int?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _CenterFilterChip(
+            label: 'All Centers',
+            selected: selectedCenterId == null,
+            onTap: () => onSelected(null),
+          ),
+          for (final center in centers)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: _CenterFilterChip(
+                label: '${center['name'] ?? 'Center'}',
+                selected: selectedCenterId == int.tryParse('${center['id'] ?? ''}'),
+                onTap: () => onSelected(int.tryParse('${center['id'] ?? ''}')),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CenterFilterChip extends StatelessWidget {
+  const _CenterFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) => onTap(),
+      selectedColor: AppColors.primary.withValues(alpha: 0.12),
+      labelStyle: TextStyle(
+        color: selected ? AppColors.primary : AppColors.textSecondary,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      ),
+      side: BorderSide(
+        color: selected ? AppColors.primary : AppColors.border,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      ),
+    );
+  }
 }
 
 class _SelectedCenterHeader extends StatelessWidget {

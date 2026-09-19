@@ -285,11 +285,7 @@ class AttendanceController extends Controller
 
     private function photoUrl(?string $path): ?string
     {
-        if (blank($path)) {
-            return null;
-        }
-
-        return url('storage/'.str_replace('\\', '/', $path));
+        return \App\Support\PublicStorage::url($path);
     }
 
     private function formatIstDateTime(?\Illuminate\Support\Carbon $value): ?string

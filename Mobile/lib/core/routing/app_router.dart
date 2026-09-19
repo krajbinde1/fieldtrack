@@ -38,6 +38,7 @@ import '../../modules/leaves/screens/leave_list_screen.dart';
 import '../../modules/leaves/screens/supervisor_leave_detail_screen.dart';
 import '../../modules/leaves/screens/supervisor_leave_list_screen.dart';
 import '../../modules/manager/screens/manager_admission_targets_screen.dart';
+import '../../modules/manager/screens/manager_centers_screen.dart';
 import '../../modules/manager/screens/manager_create_admission_target_screen.dart';
 import '../../modules/manager/screens/manager_create_employee_screen.dart';
 import '../../modules/manager/screens/manager_employees_screen.dart';
@@ -208,6 +209,7 @@ GoRouter createRouter(
           builder: (_, state) => ManagerTeamAttendanceScreen(
             auth: auth,
             statusFilter: state.uri.queryParameters['status'],
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
           ),
         ),
         GoRoute(
@@ -219,7 +221,10 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/manager/route-tracking',
-          builder: (_, _) => ManagerRouteTrackingScreen(auth: auth),
+          builder: (_, state) => ManagerRouteTrackingScreen(
+            auth: auth,
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
+          ),
         ),
         GoRoute(
           path: '/manager/route-tracking/:id',
@@ -234,7 +239,14 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/manager/employees',
-          builder: (_, _) => ManagerEmployeesScreen(auth: auth),
+          builder: (_, state) => ManagerEmployeesScreen(
+            auth: auth,
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
+          ),
+        ),
+        GoRoute(
+          path: '/manager/centers',
+          builder: (_, _) => ManagerCentersScreen(auth: auth),
         ),
         GoRoute(
           path: '/manager/admissions',
@@ -242,6 +254,7 @@ GoRouter createRouter(
             auth: auth,
             apiPrefix: 'manager',
             initialStatus: state.uri.queryParameters['status'] ?? 'submitted',
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
           ),
         ),
         GoRoute(
@@ -258,11 +271,17 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/manager/admission-targets',
-          builder: (_, _) => ManagerAdmissionTargetsScreen(auth: auth),
+          builder: (_, state) => ManagerAdmissionTargetsScreen(
+            auth: auth,
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
+          ),
         ),
         GoRoute(
           path: '/manager/reports',
-          builder: (_, _) => ManagerReportsScreen(auth: auth),
+          builder: (_, state) => ManagerReportsScreen(
+            auth: auth,
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
+          ),
         ),
         GoRoute(
           path: '/manager/leaves',
@@ -270,6 +289,7 @@ GoRouter createRouter(
             auth: auth,
             apiPrefix: 'manager',
             statusFilter: state.uri.queryParameters['status'],
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
           ),
         ),
         GoRoute(
@@ -286,6 +306,7 @@ GoRouter createRouter(
             auth: auth,
             apiPrefix: 'manager',
             initialPeriod: state.uri.queryParameters['period'] ?? 'today',
+            centerId: parseCenterId(state.uri.queryParameters['center_id']),
           ),
         ),
         GoRoute(

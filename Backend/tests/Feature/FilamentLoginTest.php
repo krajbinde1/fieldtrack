@@ -191,6 +191,9 @@ it('lets a web admin open profile and change password pages', function () {
 it('keeps punch photos and locations on the attendance view instead of the list', function () {
     $admin = User::query()->where('login_id', 'director')->firstOrFail();
     $employee = \App\Models\Employee::query()->where('mobile', '9876543210')->firstOrFail();
+    \Illuminate\Support\Facades\Storage::fake('public');
+    \Illuminate\Support\Facades\Storage::disk('public')->put('attendance/in.jpg', 'in-photo');
+    \Illuminate\Support\Facades\Storage::disk('public')->put('attendance/out.jpg', 'out-photo');
     $attendance = \App\Models\Attendance::create([
         'employee_id' => $employee->id,
         'attendance_date' => \App\Support\AttendanceCalendar::today()->toDateString(),
@@ -202,9 +205,14 @@ it('keeps punch photos and locations on the attendance view instead of the list'
         'punch_in_longitude' => 73.8567,
         'punch_out_latitude' => 18.5310,
         'punch_out_longitude' => 73.8440,
+        'punch_in_photo' => 'attendance/in.jpg',
+        'punch_out_photo' => 'attendance/out.jpg',
         'attendance_status' => 'Present',
         'approval_status' => 'Pending',
     ]);
+
+    $inUrl = \App\Support\PublicStorage::url('attendance/in.jpg');
+    $outUrl = \App\Support\PublicStorage::url('attendance/out.jpg');
 
     $this->actingAs($admin)
         ->get('/admin/attendances')
@@ -229,5 +237,11 @@ it('keeps punch photos and locations on the attendance view instead of the list'
         ->assertSee('Pune HQ', false)
         ->assertSee('Pune Field', false)
         ->assertSee('Open in Google Maps', false)
-        ->assertSee('https://www.google.com/maps?q=', false);
+        ->assertSee('https://www.google.com/maps?q=', false)
+        ->assertSee($inUrl, false)
+        ->assertSee($outUrl, false)
+        ->assertSee('target="_blank"', false);
+
+    $this->get('/storage/attendance/in.jpg')->assertOk();
+    $this->get('/storage/attendance/out.jpg')->assertOk();
 });

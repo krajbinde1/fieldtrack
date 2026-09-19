@@ -7,7 +7,6 @@ use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\Employees\Pages\CreateEmployee;
 use App\Filament\Resources\Employees\Pages\EditEmployee;
 use App\Filament\Resources\Employees\Pages\ListEmployees;
-use App\Filament\Support\LoginIdInput;
 use App\Models\Employee;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
@@ -90,18 +89,18 @@ class EmployeeResource extends Resource
                 ->required()
                 ->length(10)
                 ->regex('/^[6-9][0-9]{9}$/')
-                ->unique(ignoreRecord: true),
+                ->unique(ignoreRecord: true)
+                ->helperText(fn (string $operation): ?string => $operation === 'create'
+                    ? 'Login ID will be this number. Default password is the last 4 digits.'
+                    : null),
             TextInput::make('email')->label('Email')->email()->nullable(),
-            LoginIdInput::make(),
             TextInput::make('login_password')
                 ->label('Password')
                 ->password()
                 ->revealable()
                 ->dehydrated(false)
-                ->required(fn (string $operation): bool => $operation === 'create')
-                ->helperText(fn (string $operation): string => $operation === 'edit'
-                    ? 'Leave blank to keep the current password.'
-                    : 'Required. The Center User will sign in with Login ID and this password.'),
+                ->visibleOn('edit')
+                ->helperText('Leave blank to keep the current password.'),
             Select::make('staff_role')
                 ->label('Login Role')
                 ->options(CenterStaffRole::options())

@@ -6,26 +6,27 @@ use App\Filament\Resources\Employees\Pages\CreateEmployee;
 use App\Filament\Resources\OrgUsers\Pages\CreateOrgUser;
 use App\Models\Employee;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed();
 });
 
-it('lets a center manager create a user only for their own center', function () {
+it('lets a center manager create a user with login id and password from mobile', function () {
     $manager = User::query()->where('login_id', 'centermgr')->firstOrFail();
     $centerId = $manager->managedCenters()->first()?->id;
     expect($centerId)->not->toBeNull();
 
     Livewire::actingAs($manager)
         ->test(CreateEmployee::class)
+        ->assertFormFieldDoesNotExist('login_id')
+        ->assertFormFieldIsHidden('login_password')
         ->fillForm([
             'center_id' => $centerId,
             'full_name' => 'New Mobilizer',
             'mobile' => '9123456780',
             'email' => 'mobilizer@fieldtrack.local',
-            'login_id' => 'field.mob-1',
-            'login_password' => 'Mobilizer@123',
             'staff_role' => CenterStaffRole::Mobilizer->value,
             'status' => true,
         ])
@@ -37,19 +38,22 @@ it('lets a center manager create a user only for their own center', function () 
         ->and($employee->center_id)->toBe($centerId)
         ->and($employee->staff_role)->toBe(CenterStaffRole::Mobilizer->value)
         ->and($employee->created_by_user_id)->toBe($manager->id)
-        ->and($employee->user?->login_id)->toBe('field.mob-1')
-        ->and($employee->user?->role)->toBe(UserRole::Employee->value);
+        ->and($employee->user?->login_id)->toBe('9123456780')
+        ->and($employee->user?->role)->toBe(UserRole::Employee->value)
+        ->and(Hash::check('6780', $employee->user?->password))->toBeTrue()
+        ->and($employee->user?->getRawOriginal('password'))->not->toBe('6780');
 
     $this->postJson('/api/login', [
-        'login_id' => 'field.mob-1',
-        'password' => 'Mobilizer@123',
+        'login_id' => '9123456780',
+        'password' => '6780',
         'device_id' => 'device-staff',
     ])->assertOk()
         ->assertJsonPath('employee.staff_role', CenterStaffRole::Mobilizer->value)
-        ->assertJsonPath('user.role', UserRole::Employee->value);
+        ->assertJsonPath('user.role', UserRole::Employee->value)
+        ->assertJsonPath('user.login_id', '9123456780');
 });
 
-it('uses mobile as login id when center user login id is blank', function () {
+it('ignores a submitted custom login id and password when creating a center user', function () {
     $manager = User::query()->where('login_id', 'centermgr')->firstOrFail();
     $centerId = $manager->managedCenters()->first()?->id;
 
@@ -60,15 +64,59 @@ it('uses mobile as login id when center user login id is blank', function () {
             'full_name' => 'Housekeeper One',
             'mobile' => '9123456781',
             'email' => null,
-            'login_id' => null,
-            'login_password' => 'House@1234',
             'staff_role' => CenterStaffRole::Housekeeper->value,
             'status' => true,
         ])
+        ->set('data.login_id', 'field.mob-1')
+        ->set('data.login_password', 'House@1234')
         ->call('create')
         ->assertHasNoFormErrors();
 
-    expect(User::query()->where('login_id', '9123456781')->exists())->toBeTrue();
+    $user = User::query()->where('login_id', '9123456781')->first();
+    expect($user)->not->toBeNull()
+        ->and(User::query()->where('login_id', 'field.mob-1')->exists())->toBeFalse()
+        ->and(Hash::check('6781', $user->password))->toBeTrue();
+
+    $this->postJson('/api/login', [
+        'login_id' => '9123456781',
+        'password' => 'House@1234',
+        'device_id' => 'device-ignored-password',
+    ])->assertUnprocessable();
+
+    $this->postJson('/api/login', [
+        'login_id' => '9123456781',
+        'password' => '6781',
+        'device_id' => 'device-house',
+    ])->assertOk()->assertJsonPath('user.login_id', '9123456781');
+});
+
+it('lets a center manager create a user from the mobile api with the same credentials', function () {
+    $manager = User::query()->where('login_id', 'centermgr')->firstOrFail();
+    $centerId = $manager->managedCenters()->first()?->id;
+
+    $this->actingAs($manager, 'sanctum')
+        ->postJson('/api/manager/employees', [
+            'center_id' => $centerId,
+            'full_name' => 'Api Mobilizer',
+            'mobile' => '9876543219',
+            'staff_role' => CenterStaffRole::Mobilizer->value,
+            'login_id' => 'custom.api',
+            'login_password' => 'ShouldIgnore@1',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.login_id', '9876543219')
+        ->assertJsonPath('data.mobile', '9876543219');
+
+    $created = User::query()->where('login_id', '9876543219')->first();
+    expect($created)->not->toBeNull()
+        ->and(Hash::check('3219', $created->password))->toBeTrue()
+        ->and($created->getRawOriginal('password'))->not->toBe('3219');
+
+    $this->postJson('/api/login', [
+        'login_id' => '9876543219',
+        'password' => '3219',
+        'device_id' => 'device-api-staff',
+    ])->assertOk()->assertJsonPath('user.login_id', '9876543219');
 });
 
 it('does not let a center manager see or edit another center user', function () {

@@ -21,6 +21,11 @@ it('requires email when org user login id is blank', function () {
     LoginId::resolveFromEmail('  ', '');
 })->throws(ValidationException::class);
 
+it('builds a default password from the last 4 digits of a mobile number', function () {
+    expect(LoginId::defaultPasswordFromMobile('9876543210'))->toBe('3210')
+        ->and(LoginId::defaultPasswordFromMobile('  9123456780  '))->toBe('6780');
+});
+
 it('rejects a duplicate login id', function () {
     seedOrg();
     LoginId::assertUnique('director');

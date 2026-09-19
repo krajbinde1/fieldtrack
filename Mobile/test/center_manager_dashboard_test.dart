@@ -14,6 +14,7 @@ void main() {
     expect(role.canAccessEmployeeWorkflow(), isFalse);
     expect(RoutePermissions.canAccessPath('/dashboard', role), isTrue);
     expect(RoutePermissions.canAccessPath('/manager/employees', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/manager/centers', role), isTrue);
     expect(RoutePermissions.canAccessPath('/manager/employees/create', role), isTrue);
     expect(RoutePermissions.canAccessPath('/manager/admissions', role), isTrue);
     expect(RoutePermissions.canAccessPath('/manager/admission-targets', role), isTrue);
@@ -67,6 +68,7 @@ void main() {
     expect(RoutePermissions.canAccessPath('/director/reports', role), isTrue);
     expect(RoutePermissions.canAccessPath('/director/field-activities', role), isTrue);
     expect(RoutePermissions.canAccessPath('/manager/employees', role), isFalse);
+    expect(RoutePermissions.canAccessPath('/manager/centers', role), isFalse);
     expect(RoutePermissions.canAccessPath('/manager/admission-targets/create', role), isFalse);
   });
 
@@ -106,6 +108,7 @@ void main() {
     expect(find.text('My Attendance'), findsOneWidget);
     expect(find.text('Attendance Status'), findsOneWidget);
     expect(find.text('View Details'), findsOneWidget);
+    expect(find.text('All Centers'), findsNothing);
     expect(find.text('Param FieldTrack'), findsNothing);
     expect(find.text('Submitted'), findsNothing);
     expect(find.text('Confirmed'), findsNothing);
@@ -118,9 +121,11 @@ void main() {
     expect(find.text('Total Centers'), findsNothing);
 
     for (final label in [
+      'My Centers',
       'Users / Employees',
       'Admissions',
       'Admission Targets',
+      'Attendance',
       'Employee Routes',
       'Leave Requests',
       'Field Activities',
@@ -133,6 +138,78 @@ void main() {
       );
       expect(find.text(label), findsWidgets);
     }
+  });
+
+  testWidgets('Center Manager dashboard shows assigned-center selector', (
+    tester,
+  ) async {
+    int? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SupervisorDashboardView(
+            name: 'Anita Sharma',
+            role: UserRole.centerManager,
+            data: const {
+              'employees': 4,
+              'punched_in_today': 2,
+              'punched_out_today': 0,
+              'active_routes': 1,
+              'pending_leaves': 0,
+              'admission_targets': 4,
+              'field_activities_today': 3,
+            },
+            centers: const [
+              {'id': 1, 'name': 'Center 1'},
+              {'id': 2, 'name': 'Center 2'},
+            ],
+            onSelectCenter: (value) => selected = value,
+            onOpen: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('All Centers'), findsOneWidget);
+    expect(find.text('Center 1'), findsOneWidget);
+    expect(find.text('Center 2'), findsOneWidget);
+    expect(find.text('My Attendance'), findsOneWidget);
+
+    await tester.tap(find.text('Center 2'));
+    await tester.pump();
+    expect(selected, 2);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SupervisorDashboardView(
+            name: 'Anita Sharma',
+            role: UserRole.centerManager,
+            centerId: 2,
+            data: const {
+              'employees': 1,
+              'punched_in_today': 1,
+              'punched_out_today': 0,
+              'active_routes': 1,
+              'pending_leaves': 0,
+              'admission_targets': 1,
+              'field_activities_today': 0,
+            },
+            centers: const [
+              {'id': 1, 'name': 'Center 1'},
+              {'id': 2, 'name': 'Center 2'},
+            ],
+            onSelectCenter: (value) => selected = value,
+            onOpen: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('All Centers'));
+    await tester.pump();
+    expect(selected, isNull);
   });
 
   testWidgets('Director dashboard shows monitoring cards only', (tester) async {

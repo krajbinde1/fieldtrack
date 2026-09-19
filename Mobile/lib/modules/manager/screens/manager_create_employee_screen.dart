@@ -27,8 +27,6 @@ class _ManagerCreateEmployeeScreenState
   final _name = TextEditingController();
   final _mobile = TextEditingController();
   final _email = TextEditingController();
-  final _loginId = TextEditingController();
-  final _password = TextEditingController();
 
   late final ManagerApi _api;
   bool _loading = true;
@@ -58,8 +56,6 @@ class _ManagerCreateEmployeeScreenState
     _name.dispose();
     _mobile.dispose();
     _email.dispose();
-    _loginId.dispose();
-    _password.dispose();
     super.dispose();
   }
 
@@ -109,11 +105,9 @@ class _ManagerCreateEmployeeScreenState
       await _api.createEmployee(
         fullName: _name.text.trim(),
         mobile: _mobile.text.trim(),
-        password: _password.text,
         staffRole: _staffRole,
         centerId: _centerId,
         email: _email.text.trim(),
-        loginId: _loginId.text.trim(),
       );
       if (!mounted) return;
       context.pop(true);
@@ -179,6 +173,8 @@ class _ManagerCreateEmployeeScreenState
                           maxLength: 10,
                           decoration: const InputDecoration(
                             labelText: 'Mobile Number',
+                            helperText:
+                                'Login ID is this number. Default password is the last 4 digits.',
                             counterText: '',
                           ),
                           validator: (value) {
@@ -194,24 +190,6 @@ class _ManagerCreateEmployeeScreenState
                           controller: _email,
                           keyboardType: TextInputType.emailAddress,
                           decoration: const InputDecoration(labelText: 'Email (optional)'),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        TextFormField(
-                          controller: _loginId,
-                          decoration: const InputDecoration(
-                            labelText: 'Login ID (optional)',
-                            helperText: 'Blank uses the mobile number.',
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        TextFormField(
-                          controller: _password,
-                          obscureText: true,
-                          decoration: const InputDecoration(labelText: 'Password'),
-                          validator: (value) =>
-                              (value == null || value.length < 8)
-                                  ? 'Minimum 8 characters'
-                                  : null,
                         ),
                         const SizedBox(height: AppSpacing.md),
                         DropdownButtonFormField<String>(

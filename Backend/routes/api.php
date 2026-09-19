@@ -40,6 +40,7 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
     });
 
     Route::middleware('role:project_head,center_manager')->prefix('manager')->group(function () {
+        Route::get('centers', [DirectorCenterController::class, 'index']);
         Route::get('employees', [ManagerEmployeeController::class, 'index']);
         Route::post('employees', [ManagerEmployeeController::class, 'store']);
         Route::get('admission-targets', [ManagerAdmissionTargetController::class, 'index']);

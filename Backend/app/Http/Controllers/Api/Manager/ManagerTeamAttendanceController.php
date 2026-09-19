@@ -275,10 +275,6 @@ class ManagerTeamAttendanceController extends Controller
 
     private function photoUrl(?string $path): ?string
     {
-        if (blank($path)) {
-            return null;
-        }
-
-        return url('storage/'.ltrim(str_replace('\\', '/', $path), '/'));
+        return \App\Support\PublicStorage::url($path);
     }
 }

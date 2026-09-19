@@ -5,12 +5,12 @@ namespace App\Filament\Resources\Attendances\Schemas;
 use App\Models\Attendance;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Support\AttendanceCalendar;
+use App\Support\PublicStorage;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Facades\Storage;
 
 class AttendanceInfolist
 {
@@ -102,11 +102,14 @@ class AttendanceInfolist
         return Section::make($title)->schema([
             ImageEntry::make($photoField)
                 ->label($photoLabel)
-                ->disk('public')
-                ->visibility('public')
+                ->state(fn (Attendance $record): ?string => PublicStorage::url($record->{$photoField} ?? null))
+                ->url(fn (?string $state): ?string => $state, shouldOpenInNewTab: true)
                 ->imageHeight(240)
-                ->url(fn (?string $state): ?string => filled($state) ? Storage::disk('public')->url($state) : null)
-                ->openUrlInNewTab()
+                ->checkFileExistence(false)
+                ->extraImgAttributes([
+                    'alt' => $photoLabel,
+                    'class' => 'cursor-pointer',
+                ])
                 ->placeholder('No photo'),
             TextEntry::make($photoField.'_at')
                 ->label($timeLabel)

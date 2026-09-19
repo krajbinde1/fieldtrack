@@ -231,7 +231,10 @@ class EmployeeAuthController extends Controller
             return null;
         }
 
-        $url = Storage::disk('public')->url($employee->profile_photo_path);
+        $url = \App\Support\PublicStorage::url($employee->profile_photo_path);
+        if ($url === null) {
+            return null;
+        }
         $version = $employee->updated_at?->getTimestamp() ?? time();
 
         return $url.(str_contains($url, '?') ? '&' : '?').'v='.$version;

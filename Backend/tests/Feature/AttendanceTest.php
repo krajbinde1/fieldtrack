@@ -326,5 +326,10 @@ it('stores punch in and punch out photos separately and returns public urls', fu
 
     Storage::disk('public')->assertExists($attendance->punch_in_photo);
     Storage::disk('public')->assertExists($attendance->punch_out_photo);
+
+    $this->get('/storage/'.$attendance->punch_in_photo)->assertOk();
+    $this->get('/storage/'.$attendance->punch_out_photo)->assertOk();
+    $this->get('/storage/admissions/secret.jpg')->assertNotFound();
+    $this->get('/storage/../.env')->assertNotFound();
 });
 

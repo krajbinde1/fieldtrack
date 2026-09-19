@@ -86,8 +86,6 @@ class ManagerEmployeeController extends Controller
             'full_name' => ['required', 'string', 'max:255'],
             'mobile' => ['required', 'regex:/^[6-9][0-9]{9}$/', Employee::uniqueAmongActive('mobile')],
             'email' => ['nullable', 'email', 'max:255'],
-            'login_id' => ['nullable', 'string', 'max:255'],
-            'login_password' => ['required', 'string', 'min:8'],
             'staff_role' => ['required', Rule::in(CenterStaffRole::values())],
             'status' => ['sometimes', 'boolean'],
         ]);
@@ -103,11 +101,11 @@ class ManagerEmployeeController extends Controller
             'You can only create users for your own Center.',
         );
 
-        $loginId = LoginId::resolve($data['login_id'] ?? null, $data['mobile'] ?? null);
-        LoginId::assertUnique($loginId);
+        $loginId = trim((string) $data['mobile']);
+        LoginId::assertUnique($loginId, attribute: 'mobile');
 
         $role = CenterStaffRole::tryFromMixed($data['staff_role'] ?? null);
-        $password = $data['login_password'];
+        $password = LoginId::defaultPasswordFromMobile($loginId);
 
         $employee = DB::transaction(function () use ($actor, $center, $data, $role, $loginId, $password): Employee {
             $employee = Employee::query()->create([

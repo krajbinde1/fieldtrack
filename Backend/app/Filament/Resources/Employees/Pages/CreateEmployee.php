@@ -37,7 +37,13 @@ class CreateEmployee extends CreateRecord
             'You can only create users for your own Center.',
         );
 
-        LoginId::assertUnique(LoginId::resolve($this->data['login_id'] ?? null, $data['mobile'] ?? null));
+        $loginId = trim((string) ($data['mobile'] ?? ''));
+        if ($loginId === '') {
+            throw ValidationException::withMessages([
+                'mobile' => 'Mobile Number is required.',
+            ]);
+        }
+        LoginId::assertUnique($loginId, attribute: 'mobile');
 
         $role = CenterStaffRole::tryFromMixed($data['staff_role'] ?? null);
         $data['staff_role'] = $role->value;
@@ -48,13 +54,6 @@ class CreateEmployee extends CreateRecord
 
         unset($data['login_password'], $data['login_id'], $data['scheme_name'], $data['project_name'], $data['center_manager_name']);
 
-        $password = $this->data['login_password'] ?? null;
-        if (! filled($password)) {
-            throw ValidationException::withMessages([
-                'login_password' => 'Password is required.',
-            ]);
-        }
-
         return $data;
     }
 
@@ -62,8 +61,8 @@ class CreateEmployee extends CreateRecord
     {
         /** @var Employee $employee */
         $employee = $this->record;
-        $password = $this->data['login_password'];
-        $loginId = LoginId::resolve($this->data['login_id'] ?? null, $employee->mobile);
+        $loginId = trim((string) $employee->mobile);
+        $password = LoginId::defaultPasswordFromMobile($loginId);
         $email = $employee->email ?: $employee->mobile.'@fieldtrack.local';
 
         DB::transaction(function () use ($employee, $password, $loginId, $email): void {
