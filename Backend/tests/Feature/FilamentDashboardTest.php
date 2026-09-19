@@ -72,6 +72,13 @@ it('shows director admin management summary without scheme count or admission ta
         ->assertSee('/admin/leave-requests')
         ->assertSee('/admin/admissions');
 
+    $statsHtml = Livewire::actingAs($org['director'])
+        ->test(DirectorAdminStatsWidget::class)
+        ->html();
+    expect(substr_count($statsHtml, 'ft-dash-card '))->toBe(8)
+        ->and($statsHtml)->toContain('ft-dash-stats')
+        ->and($statsHtml)->toContain('fi-grid-col');
+
     Livewire::actingAs($org['director'])
         ->test(DirectorConfirmedAdmissionsByCenterWidget::class)
         ->assertSee('Center-wise Confirmed Admissions')

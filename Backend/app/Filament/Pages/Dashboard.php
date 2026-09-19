@@ -21,6 +21,14 @@ class Dashboard extends BaseDashboard
         ];
     }
 
+    /**
+     * @return int | array<string, ?int>
+     */
+    public function getColumns(): int | array
+    {
+        return 1;
+    }
+
     public function getWidgets(): array
     {
         return [

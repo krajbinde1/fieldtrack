@@ -685,6 +685,32 @@
         row-gap: 0.65rem !important;
         margin-top: 0 !important;
         padding-top: 0 !important;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    html.fieldtrack-admin body.ft-dashboard-page .fi-header,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-page-content .fi-sc,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-page-content .fi-grid,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-wi-widget,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-wi-table {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    html.fieldtrack-admin body.ft-dashboard-page .fi-page-content .fi-grid {
+        --cols-default: repeat(1, minmax(0, 1fr)) !important;
+        --cols-lg: repeat(1, minmax(0, 1fr)) !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    html.fieldtrack-admin body.ft-dashboard-page .fi-wi-widget:has(.ft-dash-stats),
+    html.fieldtrack-admin body.ft-dashboard-page .ft-dash-stats {
+        grid-column: 1 / -1;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
     }
 
     html.fieldtrack-admin body.ft-dashboard-page .fi-ta .fi-ta-header-heading {
@@ -723,7 +749,9 @@
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 0.7rem;
         width: 100%;
+        max-width: 100%;
         align-items: stretch;
+        box-sizing: border-box;
     }
 
     html.fieldtrack-admin .ft-dash-card {
@@ -732,6 +760,8 @@
         gap: 0.7rem;
         min-height: 6.15rem;
         height: 100%;
+        width: 100%;
+        min-width: 0;
         padding: 0.8rem 0.85rem;
         border-radius: 14px;
         border: 1px solid #e8ecf4;
@@ -1216,10 +1246,6 @@
 
         html.fieldtrack-admin .fi-wi-stats-overview-stat {
             width: 100%;
-        }
-
-        html.fieldtrack-admin .ft-dash-stats {
-            grid-template-columns: minmax(0, 1fr);
         }
     }
 
