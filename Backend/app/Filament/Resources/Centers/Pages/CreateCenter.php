@@ -11,7 +11,7 @@ class CreateCenter extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        unset($data['code'], $data['centerManagers']);
+        unset($data['code']);
 
         return $data;
     }

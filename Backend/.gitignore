@@ -17,6 +17,7 @@
 /public/hot
 /public/storage
 /public/apk/*.apk
+/storage/app/public/apk/*.apk
 /storage/*.key
 /storage/pail
 /vendor

@@ -5,6 +5,7 @@ namespace App\Services\MobileApp;
 use App\Models\MobileAppSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class MobileAppVersionService
@@ -41,28 +42,39 @@ class MobileAppVersionService
 
     public function defaultApkUrl(): string
     {
-        $appUrl = rtrim((string) config('app.url'), '/');
-        if ($appUrl !== '' && preg_match('/^https:\/\//i', $appUrl) === 1) {
-            return $appUrl.'/'.self::LATEST_APK_PUBLIC_PATH;
-        }
-
         return self::DEFAULT_APK_URL;
+    }
+
+    public function storedApkAbsolutePath(): string
+    {
+        return Storage::disk('public')->path(self::LATEST_APK_PUBLIC_PATH);
     }
 
     public function latestApkAbsolutePath(): string
     {
-        return public_path(self::LATEST_APK_PUBLIC_PATH);
+        foreach ($this->candidateApkPaths() as $path) {
+            if ($this->isReadyApk($path)) {
+                return $path;
+            }
+        }
+
+        return $this->storedApkAbsolutePath();
     }
 
     public function apkFileReady(): bool
     {
-        $path = $this->latestApkAbsolutePath();
+        foreach ($this->candidateApkPaths() as $path) {
+            if ($this->isReadyApk($path)) {
+                return true;
+            }
+        }
 
-        return is_file($path) && is_readable($path) && filesize($path) > 1024;
+        return false;
     }
 
     /**
-     * Copy an uploaded APK to the fixed public path and return the download URL.
+     * Copy an uploaded APK onto the public disk and return the download URL.
+     * Hostinger cannot rely on storage:link or static .apk files in public/.
      */
     public function storeLatestApk(string $sourcePath): string
     {
@@ -79,7 +91,7 @@ class MobileAppVersionService
             ]);
         }
 
-        $destination = $this->latestApkAbsolutePath();
+        $destination = $this->storedApkAbsolutePath();
         $directory = dirname($destination);
         if (! is_dir($directory) && ! mkdir($directory, 0755, true) && ! is_dir($directory)) {
             throw ValidationException::withMessages([
@@ -87,13 +99,47 @@ class MobileAppVersionService
             ]);
         }
 
-        if (! copy($sourcePath, $destination)) {
+        $temporary = $destination.'.uploading';
+        if (! copy($sourcePath, $temporary)) {
+            @unlink($temporary);
             throw ValidationException::withMessages([
                 'apk_file' => 'Unable to store the APK on the server.',
             ]);
         }
 
+        clearstatcache(true, $temporary);
+        if (! is_file($temporary) || filesize($temporary) <= 1024) {
+            @unlink($temporary);
+            throw ValidationException::withMessages([
+                'apk_file' => 'The uploaded APK is missing or too small to publish.',
+            ]);
+        }
+
+        if (is_file($destination) && ! @unlink($destination)) {
+            @unlink($temporary);
+            throw ValidationException::withMessages([
+                'apk_file' => 'Unable to replace the previous APK on the server.',
+            ]);
+        }
+
+        if (! @rename($temporary, $destination)) {
+            if (! copy($temporary, $destination)) {
+                @unlink($temporary);
+                throw ValidationException::withMessages([
+                    'apk_file' => 'Unable to store the APK on the server.',
+                ]);
+            }
+            @unlink($temporary);
+        }
+
         @chmod($destination, 0644);
+        clearstatcache(true, $destination);
+
+        if (! $this->isReadyApk($destination)) {
+            throw ValidationException::withMessages([
+                'apk_file' => 'The APK was not saved to a publicly downloadable location.',
+            ]);
+        }
 
         return $this->defaultApkUrl();
     }
@@ -111,19 +157,21 @@ class MobileAppVersionService
     {
         $latestVersion = trim((string) ($data['latest_version'] ?? ''));
         $latestBuild = (int) ($data['latest_build'] ?? 0);
-        $apkUrl = trim((string) ($data['apk_url'] ?? ''));
         $forceUpdate = (bool) ($data['force_update'] ?? false);
         $updateMessage = trim((string) ($data['update_message'] ?? ''));
 
         if ($uploadedApkPath !== null && $uploadedApkPath !== '') {
-            $apkUrl = $this->storeLatestApk($uploadedApkPath);
+            $this->storeLatestApk($uploadedApkPath);
         }
 
-        if ($apkUrl === '') {
-            $apkUrl = $this->defaultApkUrl();
-        }
-
+        $apkUrl = $this->defaultApkUrl();
         $this->assertValidPayload($latestVersion, $latestBuild, $apkUrl);
+
+        if (! $this->apkFileReady()) {
+            throw ValidationException::withMessages([
+                'apk_file' => 'Upload a valid APK before saving. The file is not available at /apk/paramfieldtrack-latest.apk.',
+            ]);
+        }
 
         return DB::transaction(function () use ($latestVersion, $latestBuild, $apkUrl, $forceUpdate, $updateMessage, $actor): MobileAppSetting {
             $row = MobileAppSetting::query()->lockForUpdate()->orderBy('id')->first();
@@ -174,11 +222,6 @@ class MobileAppVersionService
      */
     private function fromModel(MobileAppSetting $row): array
     {
-        $apkUrl = trim((string) $row->apk_url);
-        if ($apkUrl === '') {
-            $apkUrl = $this->defaultApkUrl();
-        }
-
         $message = trim((string) $row->update_message);
         if ($message === '') {
             $message = self::DEFAULT_MESSAGE;
@@ -187,7 +230,7 @@ class MobileAppVersionService
         return [
             'latest_version' => (string) $row->latest_version,
             'latest_build' => (int) $row->latest_build,
-            'apk_url' => $apkUrl,
+            'apk_url' => $this->defaultApkUrl(),
             'force_update' => (bool) $row->force_update,
             'message' => $message,
             'source' => 'database',
@@ -212,11 +255,6 @@ class MobileAppVersionService
      */
     private function fromConfig(): array
     {
-        $apkUrl = trim((string) config('mobile_app.apk_url', ''));
-        if ($apkUrl === '') {
-            $apkUrl = $this->defaultApkUrl();
-        }
-
         $message = trim((string) config('mobile_app.message', self::DEFAULT_MESSAGE));
         if ($message === '') {
             $message = self::DEFAULT_MESSAGE;
@@ -225,7 +263,7 @@ class MobileAppVersionService
         return [
             'latest_version' => (string) config('mobile_app.latest_version', '1.0.4'),
             'latest_build' => (int) config('mobile_app.latest_build', 5),
-            'apk_url' => $apkUrl,
+            'apk_url' => $this->defaultApkUrl(),
             'force_update' => (bool) config('mobile_app.force_update', false),
             'message' => $message,
             'source' => 'config',
@@ -257,5 +295,27 @@ class MobileAppVersionService
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function candidateApkPaths(): array
+    {
+        return array_values(array_unique([
+            $this->storedApkAbsolutePath(),
+            public_path(self::LATEST_APK_PUBLIC_PATH),
+        ]));
+    }
+
+    private function isReadyApk(string $path): bool
+    {
+        if ($path === '' || ! is_file($path) || ! is_readable($path)) {
+            return false;
+        }
+
+        clearstatcache(true, $path);
+
+        return filesize($path) > 1024;
     }
 }

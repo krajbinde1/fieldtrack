@@ -6,6 +6,7 @@ use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\Centers\Pages\CreateCenter;
 use App\Filament\Resources\Centers\Pages\EditCenter;
 use App\Filament\Resources\Centers\Pages\ListCenters;
+use App\Filament\Support\CenterManagerSelect;
 use App\Models\Center;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
@@ -73,6 +74,7 @@ class CenterResource extends Resource
                 ->disabled(fn (): bool => auth()->user()?->isCenterManager() ?? false),
             TextInput::make('name')->required()->maxLength(255),
             TextInput::make('address')->maxLength(255),
+            CenterManagerSelect::make(),
             Toggle::make('is_active')->default(true),
         ]);
     }

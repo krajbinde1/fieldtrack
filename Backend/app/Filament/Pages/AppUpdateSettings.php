@@ -116,20 +116,19 @@ class AppUpdateSettings extends Page implements HasForms
                                 'application/java-archive',
                             ])
                             ->maxSize(122880)
-                            ->disk('local')
+                            ->disk('public')
                             ->directory('apk-uploads')
                             ->visibility('private')
                             ->downloadable(false)
                             ->openable(false)
                             ->dehydrated(false)
-                            ->helperText('Replaces /apk/paramfieldtrack-latest.apk and sets APK URL to that file. Leave empty to keep the current APK.'),
+                            ->required(fn (): bool => ! ($this->currentSettings['apk_file_ready'] ?? false))
+                            ->helperText('Replaces the public file at /apk/paramfieldtrack-latest.apk. Leave empty only when that file is already on the server.'),
                         TextInput::make('apk_url')
                             ->label('APK URL')
-                            ->required()
-                            ->url()
-                            ->maxLength(2048)
-                            ->placeholder(app(MobileAppVersionService::class)->defaultApkUrl())
-                            ->helperText('Default is the fixed server path /apk/paramfieldtrack-latest.apk. Change only if hosting the APK elsewhere.'),
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText('Always https://fieldtrack.paramsocialfoundation.org/apk/paramfieldtrack-latest.apk'),
                         Textarea::make('update_message')
                             ->label('Update Message')
                             ->rows(3)
@@ -148,9 +147,10 @@ class AppUpdateSettings extends Page implements HasForms
         try {
             $state = $this->form->getState();
             $uploadedPath = $this->resolveUploadedApkPath($this->data['apk_file'] ?? null);
-            unset($state['apk_file']);
+            unset($state['apk_file'], $state['apk_url']);
 
             app(MobileAppVersionService::class)->save($state, auth()->user(), $uploadedPath);
+            $this->forgetStagedApkUpload($this->data['apk_file'] ?? null);
         } catch (ValidationException $e) {
             throw $e;
         }
@@ -167,7 +167,7 @@ class AppUpdateSettings extends Page implements HasForms
 
         Notification::make()
             ->title('App update settings saved')
-            ->body('GET /api/app-version now returns these values. Upload replaces /apk/paramfieldtrack-latest.apk.')
+            ->body('GET /api/app-version now returns these values. The APK is at /apk/paramfieldtrack-latest.apk.')
             ->success()
             ->send();
     }
@@ -186,12 +186,22 @@ class AppUpdateSettings extends Page implements HasForms
     {
         if ($uploaded instanceof TemporaryUploadedFile) {
             $path = $uploaded->getRealPath() ?: $uploaded->getPathname();
+            if (is_string($path) && is_file($path)) {
+                return $path;
+            }
 
-            return is_string($path) && $path !== '' ? $path : null;
+            return $this->resolveUploadedApkPath($uploaded->getFilename());
         }
 
         if (is_array($uploaded)) {
-            return $this->resolveUploadedApkPath($uploaded[0] ?? null);
+            foreach ($uploaded as $item) {
+                $resolved = $this->resolveUploadedApkPath($item);
+                if ($resolved !== null) {
+                    return $resolved;
+                }
+            }
+
+            return null;
         }
 
         if (! is_string($uploaded) || $uploaded === '') {
@@ -202,11 +212,35 @@ class AppUpdateSettings extends Page implements HasForms
             return $uploaded;
         }
 
-        $fromDisk = Storage::disk('local')->path($uploaded);
-        if (is_file($fromDisk)) {
-            return $fromDisk;
+        foreach (['public', 'local'] as $disk) {
+            if (! Storage::disk($disk)->exists($uploaded)) {
+                continue;
+            }
+
+            $fromDisk = Storage::disk($disk)->path($uploaded);
+            if (is_file($fromDisk)) {
+                return $fromDisk;
+            }
         }
 
         return null;
+    }
+
+    private function forgetStagedApkUpload(mixed $uploaded): void
+    {
+        if (is_array($uploaded)) {
+            foreach ($uploaded as $item) {
+                $this->forgetStagedApkUpload($item);
+            }
+
+            return;
+        }
+
+        if (! is_string($uploaded) || $uploaded === '' || ! str_starts_with(str_replace('\\', '/', $uploaded), 'apk-uploads/')) {
+            return;
+        }
+
+        Storage::disk('public')->delete($uploaded);
+        Storage::disk('local')->delete($uploaded);
     }
 }

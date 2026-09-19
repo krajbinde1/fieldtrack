@@ -5,7 +5,39 @@ use App\Filament\Pages\AppUpdateSettings;
 use App\Models\MobileAppSetting;
 use App\Models\User;
 use App\Services\MobileApp\MobileAppVersionService;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+
+afterEach(function () {
+    forgetLatestApkFixture();
+});
+
+function seedLatestApkFixture(?string $contents = null): string
+{
+    $destination = app(MobileAppVersionService::class)->storedApkAbsolutePath();
+    $directory = dirname($destination);
+    if (! is_dir($directory)) {
+        mkdir($directory, 0755, true);
+    }
+
+    file_put_contents($destination, $contents ?? str_repeat('A', 2048));
+
+    return $destination;
+}
+
+function forgetLatestApkFixture(): void
+{
+    $service = app(MobileAppVersionService::class);
+    foreach ([
+        $service->storedApkAbsolutePath(),
+        $service->storedApkAbsolutePath().'.uploading',
+        public_path(MobileAppVersionService::LATEST_APK_PUBLIC_PATH),
+    ] as $path) {
+        if (is_file($path)) {
+            unlink($path);
+        }
+    }
+}
 
 it('returns the public mobile app version payload from config when no settings row exists', function () {
     config([
@@ -54,6 +86,7 @@ it('prefers database settings over config once a row exists', function () {
         ->assertOk()
         ->assertJsonPath('latest_version', '1.0.5')
         ->assertJsonPath('latest_build', 6)
+        ->assertJsonPath('apk_url', 'https://fieldtrack.paramsocialfoundation.org/apk/paramfieldtrack-latest.apk')
         ->assertJsonPath('force_update', true)
         ->assertJsonPath('message', 'A new version of Param FieldTrack is available. Please update to continue.');
 });
@@ -62,6 +95,7 @@ it('updates the single settings row instead of inserting duplicates', function (
     $admin = User::factory()->create([
         'role' => UserRole::Admin->value,
     ]);
+    seedLatestApkFixture();
 
     $service = app(MobileAppVersionService::class);
 
@@ -69,7 +103,6 @@ it('updates the single settings row instead of inserting duplicates', function (
         'latest_version' => '1.0.5',
         'latest_build' => 6,
         'force_update' => true,
-        'apk_url' => 'https://fieldtrack.paramsocialfoundation.org/apk/paramfieldtrack-latest.apk',
         'update_message' => 'Update available.',
     ], $admin);
 
@@ -77,13 +110,13 @@ it('updates the single settings row instead of inserting duplicates', function (
         'latest_version' => '1.0.6',
         'latest_build' => 7,
         'force_update' => false,
-        'apk_url' => 'https://fieldtrack.paramsocialfoundation.org/apk/paramfieldtrack-latest.apk',
         'update_message' => 'Please update.',
     ], $admin);
 
     expect(MobileAppSetting::query()->count())->toBe(1)
         ->and(MobileAppSetting::query()->first()?->latest_build)->toBe(7)
         ->and(MobileAppSetting::query()->first()?->force_update)->toBeFalse()
+        ->and(MobileAppSetting::query()->first()?->apk_url)->toBe(MobileAppVersionService::DEFAULT_APK_URL)
         ->and(MobileAppSetting::query()->first()?->updated_by)->toBe($admin->id);
 });
 
@@ -91,12 +124,13 @@ it('does not allow latest build to be lowered', function () {
     $admin = User::factory()->create([
         'role' => UserRole::Admin->value,
     ]);
+    seedLatestApkFixture();
 
     MobileAppSetting::query()->create([
         'latest_version' => '1.0.5',
         'latest_build' => 6,
         'force_update' => true,
-        'apk_url' => 'https://fieldtrack.paramsocialfoundation.org/apk/paramfieldtrack-latest.apk',
+        'apk_url' => MobileAppVersionService::DEFAULT_APK_URL,
         'update_message' => 'Please update.',
         'updated_by' => $admin->id,
     ]);
@@ -105,59 +139,81 @@ it('does not allow latest build to be lowered', function () {
         'latest_version' => '1.0.4',
         'latest_build' => 5,
         'force_update' => true,
-        'apk_url' => 'https://fieldtrack.paramsocialfoundation.org/apk/paramfieldtrack-latest.apk',
         'update_message' => 'Please update.',
-    ], $admin))->toThrow(\Illuminate\Validation\ValidationException::class);
+    ], $admin))->toThrow(ValidationException::class);
 
     expect(MobileAppSetting::query()->first()?->latest_build)->toBe(6);
 });
 
-it('stores the uploaded apk at the fixed public path and sets apk url', function () {
-    config(['app.url' => 'https://fieldtrack.paramsocialfoundation.org']);
+it('refuses to publish update settings when the apk file is missing', function () {
+    forgetLatestApkFixture();
 
     $admin = User::factory()->create([
         'role' => UserRole::Admin->value,
     ]);
 
-    $source = sys_get_temp_dir().DIRECTORY_SEPARATOR.'paramfieldtrack-upload-'.uniqid().'.apk';
-    file_put_contents($source, str_repeat('A', 2048));
+    expect(fn () => app(MobileAppVersionService::class)->save([
+        'latest_version' => '1.0.5',
+        'latest_build' => 6,
+        'force_update' => true,
+        'update_message' => 'Please update.',
+    ], $admin))->toThrow(ValidationException::class);
 
-    $destination = app(MobileAppVersionService::class)->latestApkAbsolutePath();
-    $directory = dirname($destination);
-    if (! is_dir($directory)) {
-        mkdir($directory, 0755, true);
-    }
-    if (is_file($destination)) {
-        unlink($destination);
-    }
+    expect(MobileAppSetting::query()->count())->toBe(0);
+});
+
+it('stores the uploaded apk on the public disk, replaces the previous file, and serves it at the fixed url', function () {
+    forgetLatestApkFixture();
+
+    $admin = User::factory()->create([
+        'role' => UserRole::Admin->value,
+    ]);
+
+    $first = sys_get_temp_dir().DIRECTORY_SEPARATOR.'paramfieldtrack-upload-'.uniqid().'.apk';
+    $second = sys_get_temp_dir().DIRECTORY_SEPARATOR.'paramfieldtrack-upload-'.uniqid().'.apk';
+    file_put_contents($first, str_repeat('A', 2048));
+    file_put_contents($second, str_repeat('B', 4096));
+
+    $destination = app(MobileAppVersionService::class)->storedApkAbsolutePath();
 
     try {
         $saved = app(MobileAppVersionService::class)->save([
             'latest_version' => '1.0.5',
             'latest_build' => 6,
             'force_update' => true,
-            'apk_url' => '',
             'update_message' => 'Please update.',
-        ], $admin, $source);
+        ], $admin, $first);
 
-        expect($saved->apk_url)->toBe('https://fieldtrack.paramsocialfoundation.org/apk/paramfieldtrack-latest.apk')
+        expect($saved->apk_url)->toBe(MobileAppVersionService::DEFAULT_APK_URL)
             ->and(is_file($destination))->toBeTrue()
-            ->and(filesize($destination))->toBe(2048);
+            ->and(filesize($destination))->toBe(2048)
+            ->and(is_file(public_path(MobileAppVersionService::LATEST_APK_PUBLIC_PATH)))->toBeFalse();
 
         $this->get('/apk/paramfieldtrack-latest.apk')
             ->assertOk()
+            ->assertHeader('content-type', 'application/vnd.android.package-archive')
             ->assertHeader('content-disposition', 'attachment; filename="paramfieldtrack-latest.apk"');
+
+        app(MobileAppVersionService::class)->save([
+            'latest_version' => '1.0.6',
+            'latest_build' => 7,
+            'force_update' => false,
+            'update_message' => 'Please update.',
+        ], $admin, $second);
+
+        expect(filesize($destination))->toBe(4096)
+            ->and(file_get_contents($destination))->toBe(str_repeat('B', 4096));
+
+        $this->get('/apk/paramfieldtrack-latest.apk')->assertOk();
     } finally {
-        @unlink($source);
-        @unlink($destination);
+        @unlink($first);
+        @unlink($second);
+        forgetLatestApkFixture();
     }
 });
 
 it('returns 404 for the apk download when no file has been uploaded', function () {
-    $destination = app(MobileAppVersionService::class)->latestApkAbsolutePath();
-    if (is_file($destination)) {
-        unlink($destination);
-    }
+    forgetLatestApkFixture();
 
     $this->get('/apk/paramfieldtrack-latest.apk')->assertNotFound();
 });
