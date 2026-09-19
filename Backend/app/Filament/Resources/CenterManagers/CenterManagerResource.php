@@ -6,12 +6,12 @@ use App\Enums\UserRole;
 use App\Filament\Resources\CenterManagers\Pages\CreateCenterManager;
 use App\Filament\Resources\CenterManagers\Pages\EditCenterManager;
 use App\Filament\Resources\CenterManagers\Pages\ListCenterManagers;
+use App\Filament\Support\CenterAssignmentSelect;
 use App\Filament\Support\LoginIdInput;
 use App\Models\User;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
@@ -83,25 +83,13 @@ class CenterManagerResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        $access = app(OrganizationAccessService::class);
-        $user = auth()->user();
-
         return $schema->components([
             TextInput::make('name')->required()->maxLength(255),
             LoginIdInput::mobileFallback(),
             LoginIdInput::make(),
             TextInput::make('email')->email()->required()->unique(ignoreRecord: true),
             TextInput::make('password')->password()->revealable()->dehydrated(fn ($state) => filled($state))->required(fn (string $operation): bool => $operation === 'create')->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
-            Select::make('managedCenters')
-                ->label('Assigned Center(s)')
-                ->relationship(
-                    name: 'managedCenters',
-                    titleAttribute: 'name',
-                    modifyQueryUsing: fn ($query) => $user ? $access->centerQuery($user) : $query->whereRaw('1=0'),
-                )
-                ->multiple()
-                ->preload()
-                ->searchable(),
+            CenterAssignmentSelect::make('managedCenters'),
             Toggle::make('is_active')->default(true),
             Toggle::make('must_change_password')->default(true),
         ]);

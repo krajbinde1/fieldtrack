@@ -9,6 +9,13 @@ class CreateCenter extends CreateRecord
 {
     protected static string $resource = CenterResource::class;
 
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        unset($data['code'], $data['centerManagers']);
+
+        return $data;
+    }
+
     protected function afterCreate(): void
     {
         $user = auth()->user();

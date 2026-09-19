@@ -72,19 +72,7 @@ class CenterResource extends Resource
                 ->searchable()
                 ->disabled(fn (): bool => auth()->user()?->isCenterManager() ?? false),
             TextInput::make('name')->required()->maxLength(255),
-            TextInput::make('code')->required()->maxLength(32),
             TextInput::make('address')->maxLength(255),
-            Select::make('centerManagers')
-                ->label('Center Manager(s)')
-                ->relationship(
-                    name: 'centerManagers',
-                    titleAttribute: 'name',
-                    modifyQueryUsing: fn ($query) => $query->where('role', 'center_manager')->where('is_active', true),
-                )
-                ->multiple()
-                ->preload()
-                ->searchable()
-                ->visible(fn (): bool => ! (auth()->user()?->isCenterManager() ?? false)),
             Toggle::make('is_active')->default(true),
         ]);
     }
@@ -94,9 +82,9 @@ class CenterResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('scheme.name')->label('Scheme / Project')->searchable()->sortable(),
-                TextColumn::make('code')->searchable(),
+                TextColumn::make('code')->label('Center Code')->searchable(),
                 TextColumn::make('name')->searchable(),
-                TextColumn::make('centerManagers.name')->label('Managers')->badge(),
+                TextColumn::make('centerManagers.name')->label('Center Manager(s)')->badge()->placeholder('—'),
                 TextColumn::make('employees_count')->counts('employees')->label('Employees'),
                 IconColumn::make('is_active')->boolean(),
             ])

@@ -19,7 +19,7 @@ final class CenterAssignmentSelect
         return Select::make($name)
             ->label('Assigned Center(s)')
             ->relationship(
-                name: 'headedCenters',
+                name: $name,
                 titleAttribute: 'name',
                 modifyQueryUsing: function (Builder $query) use ($access, $user): Builder {
                     $query = $user ? $access->centerQuery($user) : $query->whereRaw('1 = 0');
@@ -37,24 +37,29 @@ final class CenterAssignmentSelect
             ->preload()
             ->searchable()
             ->required()
-            ->helperText('Project Head can access only the selected Centers, even when they belong to the same Scheme.')
-            ->saveRelationshipsUsing(function (User $record, $state) use ($access, $user): void {
+            ->helperText(
+                $name === 'managedCenters'
+                    ? 'Assign this Center Manager to one or more Centers. The Center list shows these assignments automatically.'
+                    : 'Project Head can access only the selected Centers, even when they belong to the same Scheme.',
+            )
+            ->saveRelationshipsUsing(function (User $record, $state) use ($access, $user, $name): void {
                 $selected = array_map('intval', $state ?? []);
                 $visible = $user ? $access->visibleCenterIds($user) : [];
+                $relation = $record->{$name}();
 
                 if ($visible === null) {
-                    $record->headedCenters()->sync($selected);
+                    $relation->sync($selected);
 
                     return;
                 }
 
                 $selected = array_values(array_intersect($selected, $visible));
-                $keep = $record->headedCenters()
+                $keep = $relation
                     ->whereNotIn('centers.id', $visible)
                     ->pluck('centers.id')
                     ->all();
 
-                $record->headedCenters()->sync(array_values(array_unique(array_merge($keep, $selected))));
+                $relation->sync(array_values(array_unique(array_merge($keep, $selected))));
             });
     }
 }

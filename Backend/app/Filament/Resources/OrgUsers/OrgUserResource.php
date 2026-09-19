@@ -113,17 +113,7 @@ class OrgUserResource extends Resource
                 ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
             CenterAssignmentSelect::make()
                 ->visible(fn ($get): bool => $get('role') === UserRole::ProjectHead->value),
-            Select::make('managedCenters')
-                ->label('Assigned Center(s)')
-                ->relationship(
-                    name: 'managedCenters',
-                    titleAttribute: 'name',
-                    modifyQueryUsing: fn ($query) => $user ? $access->centerQuery($user) : $query->whereRaw('1=0'),
-                )
-                ->multiple()
-                ->preload()
-                ->searchable()
-                ->required()
+            CenterAssignmentSelect::make('managedCenters')
                 ->visible(fn ($get): bool => $get('role') === UserRole::CenterManager->value),
             Toggle::make('is_active')->label('Active')->default(true),
             Toggle::make('must_change_password')->default(true),

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CenterCodeGenerator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -16,6 +17,23 @@ class Center extends Model
         'address',
         'is_active',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Center $center): void {
+            if (filled($center->code)) {
+                return;
+            }
+
+            $center->code = CenterCodeGenerator::generateNext();
+        });
+
+        static::updating(function (Center $center): void {
+            if ($center->isDirty('code') && filled($center->getOriginal('code'))) {
+                $center->code = $center->getOriginal('code');
+            }
+        });
+    }
 
     protected function casts(): array
     {
