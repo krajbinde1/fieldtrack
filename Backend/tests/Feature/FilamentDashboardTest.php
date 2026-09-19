@@ -51,7 +51,8 @@ it('shows director admin management summary without scheme count or admission ta
         ->assertDontSee(AdmissionTargetPerformanceWidget::class, false)
         ->assertDontSee('Welcome,')
         ->assertDontSee('Attendance, punch photos, GPS')
-        ->assertDontSee('ft-welcome-widget');
+        ->assertDontSee('ft-welcome-widget')
+        ->assertSee('padding-block-start: 14px !important', false);
 
     Livewire::actingAs($org['director'])
         ->test(DirectorAdminStatsWidget::class)

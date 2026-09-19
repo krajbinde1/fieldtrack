@@ -652,10 +652,21 @@
     /* -------------------------------------------------------------------------
      * Dashboard — compact premium layout (scoped to the dashboard page)
      * ------------------------------------------------------------------------- */
+    html.fieldtrack-admin body.ft-dashboard-page .fi-main,
+    html.fieldtrack-admin body.ft-dashboard-page .fi-page {
+        padding-top: 0 !important;
+        padding-block-start: 0 !important;
+        margin-top: 0 !important;
+    }
+
     html.fieldtrack-admin body.ft-dashboard-page .fi-page-header-main-ctn {
-        padding-top: 0.4rem !important;
+        padding-top: 14px !important;
         padding-bottom: 0 !important;
-        row-gap: 0.2rem !important;
+        padding-block: 14px 0 !important;
+        padding-block-start: 14px !important;
+        padding-block-end: 0 !important;
+        row-gap: 0.65rem !important;
+        margin-top: 0 !important;
         margin-bottom: 0 !important;
     }
 
