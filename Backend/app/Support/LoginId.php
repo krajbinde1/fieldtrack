@@ -45,6 +45,11 @@ final class LoginId
         return substr($digits, -4);
     }
 
+    public static function defaultPasswordResetMessage(string $password): string
+    {
+        return 'Password reset successfully. Default password: '.$password;
+    }
+
     public static function assertUnique(string $loginId, ?int $ignoreUserId = null, string $attribute = 'login_id'): void
     {
         $query = User::query()->where('login_id', $loginId);

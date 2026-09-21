@@ -7,7 +7,7 @@ use App\Filament\Resources\Employees\EmployeeResource;
 use App\Models\Center;
 use App\Services\OrganizationAccessService;
 use Filament\Resources\Pages\EditRecord;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 
 class EditEmployee extends EditRecord
@@ -52,6 +52,13 @@ class EditEmployee extends EditRecord
         return $data;
     }
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            EmployeeResource::resetPasswordAction(),
+        ];
+    }
+
     protected function afterSave(): void
     {
         $employee = $this->record->fresh(['user']);
@@ -69,15 +76,9 @@ class EditEmployee extends EditRecord
             $payload['email'] = $employee->email;
         }
 
-        $password = $this->data['login_password'] ?? null;
-        if (filled($password)) {
-            $payload['password'] = Hash::make($password);
-            $payload['must_change_password'] = true;
-        }
-
         try {
             $user->update($payload);
-        } catch (\Illuminate\Database\QueryException $exception) {
+        } catch (QueryException $exception) {
             throw ValidationException::withMessages([
                 'email' => 'Email must be unique.',
             ]);

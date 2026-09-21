@@ -468,7 +468,7 @@ final class OrganizationAccessService
             $this->canApproveLeave($user, $leave),
             403,
             $user->isAdminOrDirector()
-                ? 'Directors can only approve or reject Project Head leave requests.'
+                ? 'Directors can only approve or reject Project Manager leave requests.'
                 : 'Only the assigned Center Manager can approve or reject this leave.',
         );
     }

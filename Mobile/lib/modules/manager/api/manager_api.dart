@@ -248,6 +248,17 @@ class ManagerApi {
     }
   }
 
+  Future<Map<String, dynamic>> resetEmployeePassword(int employeeId) async {
+    try {
+      final response = await _dio.post(
+        '/manager/employees/$employeeId/reset-password',
+      );
+      return Map<String, dynamic>.from(response.data as Map? ?? const {});
+    } on DioException catch (error) {
+      throw mapApiError(error);
+    }
+  }
+
   Future<List<Map<String, dynamic>>> listAdmissionTargets({int? centerId}) async {
     try {
       final response = await _dio.get(

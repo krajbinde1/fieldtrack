@@ -10,12 +10,22 @@ beforeEach(function () {
 });
 
 it('lets the existing top-level login sign in as admin', function () {
-    $user = User::query()->where('login_id', 'director')->firstOrFail();
+    $user = User::query()->where('login_id', 'admin')->firstOrFail();
     expect($user->role)->toBe(UserRole::Admin->value);
 
     Livewire::test(Login::class)
         ->fillForm([
             'login_id' => 'director',
+            'password' => 'Director@123',
+        ])
+        ->call('authenticate')
+        ->assertHasFormErrors(['login_id']);
+
+    $this->assertGuest();
+
+    Livewire::test(Login::class)
+        ->fillForm([
+            'login_id' => 'admin',
             'password' => 'Director@123',
         ])
         ->call('authenticate')
@@ -26,7 +36,7 @@ it('lets the existing top-level login sign in as admin', function () {
 });
 
 it('lets an admin open organization, people, and field-operation pages', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     $dashboard = $this->actingAs($admin)
         ->get('/admin')
@@ -94,7 +104,7 @@ it('blocks a project head from project-head administration', function () {
 });
 
 it('lets an admin open a full employee route map', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
     $employee = \App\Models\Employee::query()->where('mobile', '9876543210')->firstOrFail();
     $attendance = \App\Models\Attendance::create([
         'employee_id' => $employee->id,
@@ -138,7 +148,7 @@ it('shows a profile menu with logout for every web admin role', function (string
         ->assertSee('/admin/profile', false)
         ->assertSee('/admin/change-password', false);
 
-    if (in_array($loginId, ['director', 'fielddirector'], true)) {
+    if (in_array($loginId, ['admin', 'fielddirector'], true)) {
         $response
             ->assertSee('>Account Settings</a>', false)
             ->assertSee('/admin/account-settings', false);
@@ -148,7 +158,7 @@ it('shows a profile menu with logout for every web admin role', function (string
             ->assertDontSee('/admin/account-settings', false);
     }
 })->with([
-    'admin' => 'director',
+    'admin' => 'admin',
     'director' => 'fielddirector',
     'project head' => 'projecthead',
     'center manager' => 'centermgr',
@@ -174,14 +184,14 @@ it('logs every web admin role out through filament and blocks returning to admin
     $this->get('/admin/change-password')->assertRedirect('/admin/login');
     $this->get('/admin/account-settings')->assertRedirect('/admin/login');
 })->with([
-    'admin' => 'director',
+    'admin' => 'admin',
     'director' => 'fielddirector',
     'project head' => 'projecthead',
     'center manager' => 'centermgr',
 ]);
 
 it('lets a web admin open profile and change password pages', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     $this->actingAs($admin)->get('/admin/profile')->assertOk()->assertSee('Account Settings');
     $this->actingAs($admin)->get('/admin/change-password')->assertOk()->assertSee('Change Password');
@@ -189,7 +199,7 @@ it('lets a web admin open profile and change password pages', function () {
 });
 
 it('keeps punch photos and locations on the attendance view instead of the list', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
     $employee = \App\Models\Employee::query()->where('mobile', '9876543210')->firstOrFail();
     \Illuminate\Support\Facades\Storage::fake('public');
     \Illuminate\Support\Facades\Storage::disk('public')->put('attendance/in.jpg', 'in-photo');

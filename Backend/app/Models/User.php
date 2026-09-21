@@ -140,6 +140,29 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
     }
 
     /**
+     * Center names already assigned to this user. Empty for Admin/Director.
+     *
+     * @return list<string>
+     */
+    public function assignedCenterNames(): array
+    {
+        $centers = match (true) {
+            $this->isProjectHead() => $this->headedCenters,
+            $this->isCenterManager() => $this->managedCenters,
+            $this->isEmployeeUser() => collect([$this->employee?->center])->filter(),
+            default => collect(),
+        };
+
+        return $centers
+            ->sortBy('name')
+            ->pluck('name')
+            ->filter(fn ($name) => filled($name))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Mobile roles that bind to a single registered device.
      * Admin web login is never device-locked.
      */

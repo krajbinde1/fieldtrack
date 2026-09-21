@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AdminEmployeeRouteController;
-use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AdmissionLookupController;
+use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\Director\DirectorCenterController;
@@ -13,12 +13,12 @@ use App\Http\Controllers\Api\EmployeeAuthController;
 use App\Http\Controllers\Api\EmployeeFieldActivityController;
 use App\Http\Controllers\Api\EmployeeLeaveController;
 use App\Http\Controllers\Api\EmployeeRoutePointController;
-use App\Http\Controllers\Api\SupervisorFieldActivityController;
 use App\Http\Controllers\Api\Manager\ManagerAdmissionTargetController;
 use App\Http\Controllers\Api\Manager\ManagerEmployeeController;
 use App\Http\Controllers\Api\Manager\ManagerRouteTrackingController;
 use App\Http\Controllers\Api\Manager\ManagerTeamAttendanceController;
 use App\Http\Controllers\Api\SupervisorAdmissionController;
+use App\Http\Controllers\Api\SupervisorFieldActivityController;
 use App\Http\Controllers\Api\SupervisorLeaveController;
 use Illuminate\Support\Facades\Route;
 
@@ -43,6 +43,8 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
         Route::get('centers', [DirectorCenterController::class, 'index']);
         Route::get('employees', [ManagerEmployeeController::class, 'index']);
         Route::post('employees', [ManagerEmployeeController::class, 'store']);
+        Route::post('employees/{employee}/reset-password', [ManagerEmployeeController::class, 'resetPassword'])
+            ->whereNumber('employee');
         Route::get('admission-targets', [ManagerAdmissionTargetController::class, 'index']);
         Route::post('admission-targets', [ManagerAdmissionTargetController::class, 'store']);
         Route::get('admission-targets/{admissionTarget}', [ManagerAdmissionTargetController::class, 'show'])

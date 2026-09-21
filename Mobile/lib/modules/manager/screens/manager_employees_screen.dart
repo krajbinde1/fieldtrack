@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/api_errors.dart';
 import '../../../core/design/app_spacing.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/widgets/design/pg_card.dart';
 import '../../../core/widgets/design/pg_empty_state.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
 import '../../../core/widgets/design/pg_status_badge.dart';
+import '../../../core/widgets/prompt_dialog.dart';
 import '../../auth/providers/auth_controller.dart';
 import '../api/manager_api.dart';
 
@@ -30,6 +32,7 @@ class ManagerEmployeesScreen extends StatefulWidget {
 class _ManagerEmployeesScreenState extends State<ManagerEmployeesScreen> {
   late final ManagerApi _api;
   late Future<List<Map<String, dynamic>>> _future;
+  int? _resettingId;
 
   @override
   void initState() {
@@ -44,6 +47,51 @@ class _ManagerEmployeesScreenState extends State<ManagerEmployeesScreen> {
   Future<void> _refresh() async {
     setState(() => _future = _api.listEmployees(centerId: widget.centerId));
     await _future;
+  }
+
+  Future<void> _resetPassword(Map<String, dynamic> row) async {
+    final id = int.tryParse('${row['id'] ?? ''}');
+    if (id == null || _resettingId != null) return;
+
+    final name = '${row['full_name'] ?? 'this user'}';
+    final confirmed = await confirmAction(
+      context,
+      title: 'Reset Password',
+      message:
+          'Reset the password for $name to the last 4 digits of the current mobile number?',
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _resettingId = id);
+    try {
+      final result = await _api.resetEmployeePassword(id);
+      if (!mounted) return;
+      final data = result['data'];
+      final defaultPassword = data is Map ? '${data['default_password'] ?? ''}' : '';
+      final message = '${result['message'] ?? ''}'.trim().isNotEmpty
+          ? '${result['message']}'
+          : 'Password reset successfully. Default password: $defaultPassword';
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Password reset'),
+          content: Text(message),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _resettingId = null);
+    }
   }
 
   @override
@@ -128,6 +176,24 @@ class _ManagerEmployeesScreenState extends State<ManagerEmployeesScreen> {
                           'Login ID: ${row['login_id']}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
+                      if (widget.auth.userRole.isCenterManager) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _resettingId ==
+                                  int.tryParse('${row['id'] ?? ''}')
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : TextButton.icon(
+                                  onPressed: () => _resetPassword(row),
+                                  icon: const Icon(Icons.lock_reset_rounded),
+                                  label: const Text('Reset Password'),
+                                ),
+                        ),
+                      ],
                     ],
                   ),
                 );

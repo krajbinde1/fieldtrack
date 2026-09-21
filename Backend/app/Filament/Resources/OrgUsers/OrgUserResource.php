@@ -66,7 +66,7 @@ class OrgUserResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->with(['headedCenters.scheme', 'managedCenters.scheme']);
+        $query = parent::getEloquentQuery()->with(['headedCenters', 'managedCenters', 'employee.center']);
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
 
@@ -122,6 +122,9 @@ class OrgUserResource extends Resource
 
     public static function table(Table $table): Table
     {
+        $access = app(OrganizationAccessService::class);
+        $user = auth()->user();
+
         return $table
             ->columns([
                 TextColumn::make('name')->searchable(),
@@ -129,25 +132,16 @@ class OrgUserResource extends Resource
                     ->label('Login Role')
                     ->formatStateUsing(fn (?string $state): string => UserRole::tryFromMixed($state)->label())
                     ->badge(),
+                TextColumn::make('assigned_centers')
+                    ->label('Center')
+                    ->badge()
+                    ->placeholder('—')
+                    ->state(fn (User $record): array => $record->assignedCenterNames())
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return self::constrainUsersByCenterName($query, $search);
+                    }),
                 TextColumn::make('login_id')->label('Login ID')->searchable(),
                 TextColumn::make('email')->toggleable(),
-                TextColumn::make('assignments')
-                    ->label('Assignment')
-                    ->state(function (User $record): string {
-                        if ($record->isDirector()) {
-                            return 'All organization';
-                        }
-                        if ($record->isProjectHead()) {
-                            return $record->headedCenters
-                                ->map(fn ($center) => $center->assignmentLabel())
-                                ->join(', ') ?: '—';
-                        }
-                        if ($record->isCenterManager()) {
-                            return $record->managedCenters->pluck('name')->join(', ') ?: '—';
-                        }
-
-                        return '—';
-                    }),
                 IconColumn::make('is_active')->boolean()->label('Active'),
             ])
             ->filters([
@@ -156,11 +150,53 @@ class OrgUserResource extends Resource
                     UserRole::ProjectHead->value => UserRole::ProjectHead->label(),
                     UserRole::CenterManager->value => UserRole::CenterManager->label(),
                 ]),
+                SelectFilter::make('center')
+                    ->label('Center')
+                    ->options(function () use ($access, $user): array {
+                        if ($user === null) {
+                            return [];
+                        }
+
+                        return $access->centerQuery($user)
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->all();
+                    })
+                    ->query(function (Builder $query, array $data): Builder {
+                        $centerId = (int) ($data['value'] ?? 0);
+                        if ($centerId < 1) {
+                            return $query;
+                        }
+
+                        return self::constrainUsersByCenterId($query, $centerId);
+                    })
+                    ->searchable()
+                    ->preload(),
             ])
             ->recordActions([
                 EditAction::make()
                     ->visible(fn (User $record): bool => static::canEdit($record)),
             ]);
+    }
+
+    public static function constrainUsersByCenterId(Builder $query, int $centerId): Builder
+    {
+        return $query->where(function (Builder $inner) use ($centerId): void {
+            $inner->whereHas('headedCenters', fn (Builder $centers) => $centers->where('centers.id', $centerId))
+                ->orWhereHas('managedCenters', fn (Builder $centers) => $centers->where('centers.id', $centerId))
+                ->orWhereHas('employee', fn (Builder $employee) => $employee->where('center_id', $centerId));
+        });
+    }
+
+    public static function constrainUsersByCenterName(Builder $query, string $search): Builder
+    {
+        $term = '%'.$search.'%';
+
+        return $query->where(function (Builder $inner) use ($term): void {
+            $inner->whereHas('headedCenters', fn (Builder $centers) => $centers->where('centers.name', 'like', $term))
+                ->orWhereHas('managedCenters', fn (Builder $centers) => $centers->where('centers.name', 'like', $term))
+                ->orWhereHas('employee.center', fn (Builder $centers) => $centers->where('name', 'like', $term));
+        });
     }
 
     public static function getPages(): array

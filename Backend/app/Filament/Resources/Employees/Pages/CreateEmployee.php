@@ -3,16 +3,13 @@
 namespace App\Filament\Resources\Employees\Pages;
 
 use App\Enums\CenterStaffRole;
-use App\Enums\UserRole;
 use App\Filament\Resources\Employees\EmployeeResource;
 use App\Models\Center;
 use App\Models\Employee;
-use App\Models\User;
+use App\Services\CenterStaffCredentialService;
 use App\Services\OrganizationAccessService;
 use App\Support\LoginId;
 use Filament\Resources\Pages\CreateRecord;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class CreateEmployee extends CreateRecord
@@ -61,21 +58,6 @@ class CreateEmployee extends CreateRecord
     {
         /** @var Employee $employee */
         $employee = $this->record;
-        $loginId = trim((string) $employee->mobile);
-        $password = LoginId::defaultPasswordFromMobile($loginId);
-        $email = $employee->email ?: $employee->mobile.'@fieldtrack.local';
-
-        DB::transaction(function () use ($employee, $password, $loginId, $email): void {
-            User::query()->create([
-                'employee_id' => $employee->id,
-                'name' => $employee->full_name,
-                'email' => $email,
-                'login_id' => $loginId,
-                'password' => Hash::make($password),
-                'role' => UserRole::Employee->value,
-                'is_active' => (bool) $employee->status,
-                'must_change_password' => true,
-            ]);
-        });
+        app(CenterStaffCredentialService::class)->createLoginUser($employee);
     }
 }

@@ -8,12 +8,16 @@ use App\Filament\Resources\Employees\Pages\CreateEmployee;
 use App\Filament\Resources\Employees\Pages\EditEmployee;
 use App\Filament\Resources\Employees\Pages\ListEmployees;
 use App\Models\Employee;
+use App\Services\CenterStaffCredentialService;
 use App\Services\OrganizationAccessService;
+use App\Support\LoginId;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -90,17 +94,10 @@ class EmployeeResource extends Resource
                 ->length(10)
                 ->regex('/^[6-9][0-9]{9}$/')
                 ->unique(ignoreRecord: true)
-                ->helperText(fn (string $operation): ?string => $operation === 'create'
-                    ? 'Login ID will be this number. Default password is the last 4 digits.'
-                    : null),
-            TextInput::make('email')->label('Email')->email()->nullable(),
-            TextInput::make('login_password')
-                ->label('Password')
-                ->password()
-                ->revealable()
-                ->dehydrated(false)
-                ->visibleOn('edit')
-                ->helperText('Leave blank to keep the current password.'),
+                ->helperText(fn (string $operation): string => $operation === 'create'
+                    ? 'Login ID will be this number. Default password is the last 4 digits. You do not need to enter a Login ID or Password.'
+                    : 'Changing this number does not change the password. Use Reset Password to set it to the last 4 digits.'),
+            TextInput::make('email')->label('Email (optional)')->email()->nullable(),
             Select::make('staff_role')
                 ->label('Login Role')
                 ->options(CenterStaffRole::options())
@@ -145,6 +142,7 @@ class EmployeeResource extends Resource
             ])
             ->recordActions([
                 EditAction::make(),
+                self::resetPasswordAction(),
             ]);
     }
 
@@ -155,5 +153,34 @@ class EmployeeResource extends Resource
             'create' => CreateEmployee::route('/create'),
             'edit' => EditEmployee::route('/{record}/edit'),
         ];
+    }
+
+    public static function resetPasswordAction(): Action
+    {
+        return Action::make('resetPassword')
+            ->label('Reset Password')
+            ->icon('heroicon-o-key')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading('Reset Password')
+            ->modalDescription('This sets the password to the last 4 digits of the current mobile number. The Login ID is not changed.')
+            ->modalSubmitActionLabel('Reset Password')
+            ->visible(function (?Employee $record): bool {
+                $user = auth()->user();
+
+                return $record !== null
+                    && $record->user !== null
+                    && $user !== null
+                    && app(OrganizationAccessService::class)->canManageEmployees($user, $record->center);
+            })
+            ->action(function (Employee $record): void {
+                $password = app(CenterStaffCredentialService::class)->resetPassword($record->loadMissing('user'));
+
+                Notification::make()
+                    ->title(LoginId::defaultPasswordResetMessage($password))
+                    ->success()
+                    ->persistent()
+                    ->send();
+            });
     }
 }

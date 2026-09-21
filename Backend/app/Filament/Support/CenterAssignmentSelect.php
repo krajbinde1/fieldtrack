@@ -40,7 +40,7 @@ final class CenterAssignmentSelect
             ->helperText(
                 $name === 'managedCenters'
                     ? 'Assign this Center Manager to one or more Centers. The Center list shows these assignments automatically.'
-                    : 'Project Head can access only the selected Centers, even when they belong to the same Scheme.',
+                    : 'Project Manager can access only the selected Centers, even when they belong to the same Scheme.',
             )
             ->saveRelationshipsUsing(function (User $record, $state) use ($access, $user, $name): void {
                 $selected = array_map('intval', $state ?? []);

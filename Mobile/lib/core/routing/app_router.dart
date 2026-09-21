@@ -377,7 +377,7 @@ GoRouter createRouter(
           builder: (_, state) => SupervisorLeaveListScreen(
             auth: auth,
             apiPrefix: 'director',
-            title: 'Project Head Leave',
+            title: 'Project Manager Leave',
             statusFilter: state.uri.queryParameters['status'],
           ),
         ),

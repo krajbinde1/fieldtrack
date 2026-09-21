@@ -29,9 +29,11 @@ class ProjectHeadResource extends Resource
 
     protected static ?string $slug = 'project-heads';
 
-    protected static ?string $navigationLabel = 'Project Heads';
+    protected static ?string $navigationLabel = 'Project Managers';
 
-    protected static ?string $modelLabel = 'Project Head';
+    protected static ?string $modelLabel = 'Project Manager';
+
+    protected static ?string $pluralModelLabel = 'Project Managers';
 
     protected static string|\UnitEnum|null $navigationGroup = 'People';
 

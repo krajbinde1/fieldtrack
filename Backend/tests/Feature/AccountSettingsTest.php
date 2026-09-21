@@ -12,7 +12,7 @@ beforeEach(function () {
 });
 
 it('lets an admin open account settings', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     $this->actingAs($admin)->get('/admin/account-settings')->assertOk();
 });
@@ -34,7 +34,7 @@ it('blocks a center manager from account settings', function () {
 });
 
 it('requires the current password before saving account settings', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     Livewire::actingAs($admin)
         ->test(AccountSettings::class)
@@ -47,11 +47,11 @@ it('requires the current password before saving account settings', function () {
         ->call('save')
         ->assertHasFormErrors(['currentPassword']);
 
-    expect(User::query()->find($admin->id)?->login_id)->toBe('director');
+    expect(User::query()->find($admin->id)?->login_id)->toBe('admin');
 });
 
 it('rejects a login id that is already taken', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     Livewire::actingAs($admin)
         ->test(AccountSettings::class)
@@ -62,11 +62,11 @@ it('rejects a login id that is already taken', function () {
         ->call('save')
         ->assertHasFormErrors(['login_id']);
 
-    expect(User::query()->find($admin->id)?->login_id)->toBe('director');
+    expect(User::query()->find($admin->id)?->login_id)->toBe('admin');
 });
 
 it('updates the existing admin account then logs out so the new credentials work', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
     $adminId = $admin->id;
     $role = $admin->role;
     $userCount = User::query()->count();

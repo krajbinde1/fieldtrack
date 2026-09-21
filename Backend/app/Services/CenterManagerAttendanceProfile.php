@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\UserRole;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -32,12 +33,12 @@ final class CenterManagerAttendanceProfile
             if ($centerId === null) {
                 throw ValidationException::withMessages([
                     'employee' => $isProjectHead
-                        ? 'No assigned center found for this Project Head.'
+                        ? 'No assigned center found for this Project Manager.'
                         : 'No assigned center found for this Center Manager.',
                 ]);
             }
 
-            $roleLabel = $isProjectHead ? 'Project Head' : 'Center Manager';
+            $roleLabel = $isProjectHead ? UserRole::ProjectHead->label() : UserRole::CenterManager->label();
             $name = trim((string) $fresh->name);
             if ($name === '' || str_contains($name, '@')) {
                 $name = $roleLabel;

@@ -11,10 +11,11 @@ use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Project Head / Center Manager view-only route tracking.
+ * Project Manager / Center Manager view-only route tracking.
  * Response shape matches Director route-tracking for shared mobile UI.
  */
 class ManagerRouteTrackingController extends Controller
@@ -227,7 +228,7 @@ class ManagerRouteTrackingController extends Controller
         return 'Completed';
     }
 
-    private function formatIstDateTime(?\Illuminate\Support\Carbon $value): ?string
+    private function formatIstDateTime(?Carbon $value): ?string
     {
         return $value?->timezone(AttendanceCalendar::TIMEZONE)->toIso8601String();
     }

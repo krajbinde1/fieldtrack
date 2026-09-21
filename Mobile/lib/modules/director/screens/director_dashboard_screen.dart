@@ -191,7 +191,7 @@ class DirectorDashboardView extends StatelessWidget {
       if (!_centerScoped && (role.isDirector || role.isAdmin))
         _DirectorTile(
           icon: const Icon(Icons.event_note_rounded),
-          label: 'Project Head Leave',
+          label: 'Project Manager Leave',
           value: 'Pending: $pendingLeave',
           path: '/director/leaves?status=pending',
           color: const Color(0xFFEA580C),

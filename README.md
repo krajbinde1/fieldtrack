@@ -4,7 +4,7 @@ Independent attendance and employee route-tracking application (Web + Android).
 
 This project reuses Punch In / Punch Out / GPS / photo / background route-tracking from ParamGold Sales ERP, with hierarchy:
 
-Admin → Director → Project Head → Center Manager → Employee
+Admin → Director → Project Manager → Center Manager → Employee
 
 ParamGold Sales ERP is **not** modified. FieldTrack uses its own database, API, users, and Android package (`com.param.fieldtrack`).
 
@@ -41,13 +41,13 @@ Local seeded logins (not production database credentials):
 
 | Role | Login ID | Password |
 |---|---|---|
-| Admin | director | Director@123 |
+| Admin | admin | Director@123 |
 | Director | fielddirector | Director@123 |
-| Project Head | projecthead | ProjectHead@123 |
+| Project Manager | projecthead | ProjectHead@123 |
 | Center Manager | centermgr | CenterMgr@123 |
 | Employee | 9876543210 | Employee@123 |
 
-Production seeding creates **only** the Admin account (existing `director` login). Change that password immediately after first live login.
+Production seeding creates **only** the Admin account (login ID `admin`). Change that password immediately after first live login.
 
 ## Local setup (Mobile)
 

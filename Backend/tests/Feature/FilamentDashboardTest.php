@@ -60,7 +60,7 @@ it('shows director admin management summary without scheme count or admission ta
         ->assertSee('Total Employees')
         ->assertSee('Punched In Today')
         ->assertSee('Active Routes')
-        ->assertSee('Pending Project Head Leaves')
+        ->assertSee('Pending Project Manager Leaves')
         ->assertSee('Today Confirmed Admissions')
         ->assertSee('This Month Confirmed Admissions')
         ->assertSee('Attendance Today')

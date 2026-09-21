@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\CenterStaffRole;
 use App\Enums\UserRole;
 use App\Models\Center;
 use App\Models\Employee;
@@ -26,7 +27,7 @@ class DemoOrganizationSeeder extends Seeder
         $projectHead = User::query()->updateOrCreate(
             ['login_id' => 'projecthead'],
             [
-                'name' => 'Project Head',
+                'name' => 'Project Manager',
                 'email' => 'projecthead@fieldtrack.local',
                 'password' => Hash::make('ProjectHead@123'),
                 'role' => UserRole::ProjectHead->value,
@@ -49,7 +50,7 @@ class DemoOrganizationSeeder extends Seeder
             ['code' => 'OTHER'],
             [
                 'name' => 'Other Project',
-                'description' => 'Used to verify Project Head isolation',
+                'description' => 'Used to verify Project Manager isolation',
                 'is_active' => true,
             ],
         );
@@ -111,7 +112,7 @@ class DemoOrganizationSeeder extends Seeder
                 'joining_date' => now()->toDateString(),
                 'base_location' => 'Pune',
                 'status' => true,
-                'staff_role' => \App\Enums\CenterStaffRole::Mobilizer->value,
+                'staff_role' => CenterStaffRole::Mobilizer->value,
                 'created_by_user_id' => $centerManager->id,
             ],
         );
@@ -140,7 +141,7 @@ class DemoOrganizationSeeder extends Seeder
                 'joining_date' => now()->toDateString(),
                 'base_location' => 'Nashik',
                 'status' => true,
-                'staff_role' => \App\Enums\CenterStaffRole::Mobilizer->value,
+                'staff_role' => CenterStaffRole::Mobilizer->value,
                 'created_by_user_id' => $otherManager->id,
             ],
         );

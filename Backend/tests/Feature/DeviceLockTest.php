@@ -134,7 +134,7 @@ it('lets admin reset the device so the next login registers a new phone', functi
 
 it('does not device-lock admin web login', function () {
     $this->seed();
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
     $admin->forceFill(['active_mobile_device_id' => 'phone-admin'])->save();
 
     $this->actingAs($admin)

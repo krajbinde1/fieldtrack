@@ -60,7 +60,7 @@ function seedOrg(): array
     $admin = User::create([
         'name' => 'Admin',
         'email' => 'dir@test.local',
-        'login_id' => 'director',
+        'login_id' => 'admin',
         'password' => Hash::make('Director@123'),
         'role' => UserRole::Admin->value,
         'is_active' => true,

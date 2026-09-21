@@ -76,7 +76,7 @@ class LeaveRequestsTable
                 SelectFilter::make('leave_type')->options(LeaveType::options()),
                 SelectFilter::make('status')->options(LeaveStatus::options()),
                 Filter::make('project_head_only')
-                    ->label('Project Head leaves')
+                    ->label('Project Manager leaves')
                     ->toggle()
                     ->visible(fn (): bool => auth()->user()?->isAdminOrDirector() === true)
                     ->query(function (Builder $query, array $data): Builder {
@@ -86,7 +86,7 @@ class LeaveRequestsTable
 
                         return app(OrganizationAccessService::class)->constrainToProjectHeadLeaves($query);
                     })
-                    ->indicateUsing(fn (array $data): ?string => ($data['isActive'] ?? false) ? 'Project Head leaves' : null),
+                    ->indicateUsing(fn (array $data): ?string => ($data['isActive'] ?? false) ? 'Project Manager leaves' : null),
                 Filter::make('date_range')
                     ->schema([
                         DatePicker::make('from')->label('From'),

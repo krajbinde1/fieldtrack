@@ -174,7 +174,7 @@ class _ManagerCreateEmployeeScreenState
                           decoration: const InputDecoration(
                             labelText: 'Mobile Number',
                             helperText:
-                                'Login ID is this number. Default password is the last 4 digits.',
+                                'Login ID is this number. Default password is the last 4 digits. You do not need to enter a Login ID or Password.',
                             counterText: '',
                           ),
                           validator: (value) {

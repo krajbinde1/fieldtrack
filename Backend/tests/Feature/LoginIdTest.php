@@ -23,12 +23,18 @@ it('requires email when org user login id is blank', function () {
 
 it('builds a default password from the last 4 digits of a mobile number', function () {
     expect(LoginId::defaultPasswordFromMobile('9876543210'))->toBe('3210')
-        ->and(LoginId::defaultPasswordFromMobile('  9123456780  '))->toBe('6780');
+        ->and(LoginId::defaultPasswordFromMobile('  9123456780  '))->toBe('6780')
+        ->and(LoginId::defaultPasswordFromMobile('7796171633'))->toBe('1633');
+});
+
+it('builds the default password reset message', function () {
+    expect(LoginId::defaultPasswordResetMessage('1633'))
+        ->toBe('Password reset successfully. Default password: 1633');
 });
 
 it('rejects a duplicate login id', function () {
     seedOrg();
-    LoginId::assertUnique('director');
+    LoginId::assertUnique('admin');
 })->throws(ValidationException::class);
 
 it('lets a user sign in with a custom login id', function () {

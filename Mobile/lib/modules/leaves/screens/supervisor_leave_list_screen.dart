@@ -83,10 +83,10 @@ class _SupervisorLeaveListScreenState extends State<SupervisorLeaveListScreen> {
                     icon: const Icon(Icons.event_available_outlined),
                     message: widget.statusFilter == 'pending'
                         ? (widget.apiPrefix == 'director'
-                            ? 'No pending Project Head leave requests.'
+                            ? 'No pending Project Manager leave requests.'
                             : 'No pending leave requests in your scope.')
                         : (widget.apiPrefix == 'director'
-                            ? 'No Project Head leave requests.'
+                            ? 'No Project Manager leave requests.'
                             : 'No leave requests in your scope.'),
                   ),
                 ],

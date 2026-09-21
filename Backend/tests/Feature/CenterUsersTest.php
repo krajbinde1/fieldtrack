@@ -3,7 +3,11 @@
 use App\Enums\CenterStaffRole;
 use App\Enums\UserRole;
 use App\Filament\Resources\Employees\Pages\CreateEmployee;
+use App\Filament\Resources\Employees\Pages\EditEmployee;
+use App\Filament\Resources\Employees\Pages\ListEmployees;
 use App\Filament\Resources\OrgUsers\Pages\CreateOrgUser;
+use App\Filament\Resources\OrgUsers\Pages\ListOrgUsers;
+use App\Models\Center;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
@@ -21,7 +25,7 @@ it('lets a center manager create a user with login id and password from mobile',
     Livewire::actingAs($manager)
         ->test(CreateEmployee::class)
         ->assertFormFieldDoesNotExist('login_id')
-        ->assertFormFieldIsHidden('login_password')
+        ->assertFormFieldDoesNotExist('login_password')
         ->fillForm([
             'center_id' => $centerId,
             'full_name' => 'New Mobilizer',
@@ -119,13 +123,106 @@ it('lets a center manager create a user from the mobile api with the same creden
     ])->assertOk()->assertJsonPath('user.login_id', '9876543219');
 });
 
+it('lets a center manager reset a user password to the last 4 digits of the current mobile', function () {
+    $manager = User::query()->where('login_id', 'centermgr')->firstOrFail();
+    $employee = Employee::query()->where('mobile', '9876543210')->firstOrFail();
+    $loginId = $employee->user?->login_id;
+
+    expect($loginId)->not->toBeNull()
+        ->and(Hash::check('Employee@123', $employee->user?->password))->toBeTrue();
+
+    $this->actingAs($manager, 'sanctum')
+        ->postJson('/api/manager/employees/'.$employee->id.'/reset-password')
+        ->assertOk()
+        ->assertJsonPath('message', 'Password reset successfully. Default password: 3210')
+        ->assertJsonPath('data.default_password', '3210')
+        ->assertJsonPath('data.login_id', $loginId);
+
+    expect(Hash::check('3210', $employee->user?->fresh()->password))->toBeTrue()
+        ->and($employee->user?->fresh()->must_change_password)->toBeTrue();
+
+    $this->postJson('/api/login', [
+        'login_id' => $loginId,
+        'password' => 'Employee@123',
+        'device_id' => 'device-old-password',
+    ])->assertUnprocessable();
+
+    $this->postJson('/api/login', [
+        'login_id' => $loginId,
+        'password' => '3210',
+        'device_id' => 'device-reset-password',
+    ])->assertOk()->assertJsonPath('user.must_change_password', true);
+});
+
+it('does not change the password when a center manager updates the mobile number', function () {
+    $manager = User::query()->where('login_id', 'centermgr')->firstOrFail();
+    $employee = Employee::query()->where('mobile', '9876543210')->firstOrFail();
+    $originalLoginId = $employee->user?->login_id;
+
+    Livewire::actingAs($manager)
+        ->test(EditEmployee::class, ['record' => $employee->getKey()])
+        ->assertFormFieldDoesNotExist('login_password')
+        ->assertActionExists('resetPassword')
+        ->fillForm([
+            'mobile' => '9123456790',
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $employee->refresh()->load('user');
+    expect($employee->mobile)->toBe('9123456790')
+        ->and($employee->user?->login_id)->toBe($originalLoginId)
+        ->and(Hash::check('Employee@123', $employee->user?->password))->toBeTrue();
+
+    Livewire::actingAs($manager)
+        ->test(EditEmployee::class, ['record' => $employee->getKey()])
+        ->callAction('resetPassword')
+        ->assertNotified('Password reset successfully. Default password: 6790');
+
+    expect(Hash::check('6790', $employee->user?->fresh()->password))->toBeTrue()
+        ->and(Hash::check('Employee@123', $employee->user?->fresh()->password))->toBeFalse()
+        ->and($employee->user?->fresh()->login_id)->toBe($originalLoginId);
+});
+
+it('lets a center manager reset a password from the users table', function () {
+    $manager = User::query()->where('login_id', 'centermgr')->firstOrFail();
+    $employee = Employee::query()->where('mobile', '9876543210')->firstOrFail();
+
+    Livewire::actingAs($manager)
+        ->test(ListEmployees::class)
+        ->callTableAction('resetPassword', $employee)
+        ->assertNotified('Password reset successfully. Default password: 3210');
+
+    expect(Hash::check('3210', $employee->user?->fresh()->password))->toBeTrue();
+});
+
+it('does not let a center manager reset another center user password', function () {
+    $manager = User::query()->where('login_id', 'centermgr')->firstOrFail();
+    $other = Employee::query()->where('mobile', '9876543211')->firstOrFail();
+
+    $this->actingAs($manager, 'sanctum')
+        ->postJson('/api/manager/employees/'.$other->id.'/reset-password')
+        ->assertForbidden();
+
+    expect(Hash::check('Employee@123', $other->user?->fresh()->password))->toBeTrue();
+});
+
+it('does not let a project head reset a center user password', function () {
+    $projectHead = User::query()->where('login_id', 'projecthead')->firstOrFail();
+    $employee = Employee::query()->where('mobile', '9876543210')->firstOrFail();
+
+    $this->actingAs($projectHead, 'sanctum')
+        ->postJson('/api/manager/employees/'.$employee->id.'/reset-password')
+        ->assertForbidden();
+});
+
 it('does not let a center manager see or edit another center user', function () {
     $manager = User::query()->where('login_id', 'centermgr')->firstOrFail();
     $own = Employee::query()->where('mobile', '9876543210')->firstOrFail();
     $other = Employee::query()->where('mobile', '9876543211')->firstOrFail();
 
     Livewire::actingAs($manager)
-        ->test(\App\Filament\Resources\Employees\Pages\ListEmployees::class)
+        ->test(ListEmployees::class)
         ->assertCanSeeTableRecords([$own])
         ->assertCanNotSeeTableRecords([$other]);
 
@@ -135,14 +232,14 @@ it('does not let a center manager see or edit another center user', function () 
 });
 
 it('does not let admin create operational center staff', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     $this->actingAs($admin)->get('/admin/center-users')->assertForbidden();
     $this->actingAs($admin)->get('/admin/center-users/create')->assertForbidden();
 });
 
 it('lets admin create a director from the people users module', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     Livewire::actingAs($admin)
         ->test(CreateOrgUser::class)
@@ -165,9 +262,9 @@ it('lets admin create a director from the people users module', function () {
 });
 
 it('lets admin assign a project head to selected centers across projects', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
-    $demoCenter = \App\Models\Center::query()->where('code', 'C1')->firstOrFail();
-    $otherCenter = \App\Models\Center::query()->where('code', 'C9')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
+    $demoCenter = Center::query()->where('code', 'C1')->firstOrFail();
+    $otherCenter = Center::query()->where('code', 'C9')->firstOrFail();
 
     Livewire::actingAs($admin)
         ->test(CreateOrgUser::class)
@@ -192,7 +289,7 @@ it('lets admin assign a project head to selected centers across projects', funct
 });
 
 it('uses email as login id when admin leaves login id blank for a director', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     Livewire::actingAs($admin)
         ->test(CreateOrgUser::class)
@@ -220,7 +317,7 @@ it('uses email as login id when admin leaves login id blank for a director', fun
 });
 
 it('does not overwrite a custom org user login id when email changes', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     $component = Livewire::actingAs($admin)
         ->test(CreateOrgUser::class)
@@ -238,7 +335,7 @@ it('does not overwrite a custom org user login id when email changes', function 
 });
 
 it('rejects a duplicate login id on the people users module', function () {
-    $admin = User::query()->where('login_id', 'director')->firstOrFail();
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
     Livewire::actingAs($admin)
         ->test(CreateOrgUser::class)
@@ -262,8 +359,35 @@ it('lets a director see center managers from every center without a project assi
 
     expect($director->directedProjects()->count())->toBe(0);
 
-    \Livewire\Livewire::actingAs($director)
-        ->test(\App\Filament\Resources\OrgUsers\Pages\ListOrgUsers::class)
+    Livewire::actingAs($director)
+        ->test(ListOrgUsers::class)
         ->assertCanSeeTableRecords([$own, $other]);
 });
 
+it('shows assigned centers on the admin users list and can filter by center name', function () {
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
+    $director = User::query()->where('login_id', 'fielddirector')->firstOrFail();
+    $projectHead = User::query()->where('login_id', 'projecthead')->firstOrFail();
+    $manager = User::query()->where('login_id', 'centermgr')->firstOrFail();
+    $otherManager = User::query()->where('login_id', 'othermgr')->firstOrFail();
+    $employee = User::query()->where('login_id', '9876543210')->firstOrFail();
+    $demoCenterId = $manager->managedCenters()->first()?->id;
+
+    expect($director->assignedCenterNames())->toBe([])
+        ->and($admin->assignedCenterNames())->toBe([])
+        ->and($projectHead->assignedCenterNames())->toBe(['Demo Center'])
+        ->and($manager->assignedCenterNames())->toBe(['Demo Center'])
+        ->and($otherManager->assignedCenterNames())->toBe(['Other Center'])
+        ->and($employee->assignedCenterNames())->toBe(['Demo Center'])
+        ->and($demoCenterId)->not->toBeNull();
+
+    Livewire::actingAs($admin)
+        ->test(ListOrgUsers::class)
+        ->assertSee('Center')
+        ->assertSee('Demo Center')
+        ->assertSee('Other Center')
+        ->assertCanSeeTableRecords([$director, $projectHead, $manager, $otherManager])
+        ->filterTable('center', $demoCenterId)
+        ->assertCanSeeTableRecords([$projectHead, $manager])
+        ->assertCanNotSeeTableRecords([$otherManager, $director]);
+});

@@ -40,7 +40,7 @@ void main() {
     expect(RoutePermissions.canAccessPath('/manager/employees', role), isFalse);
   });
 
-  test('Project Head uses director monitoring routes plus self attendance', () {
+  test('Project Manager uses director monitoring routes plus self attendance', () {
     const role = UserRole.projectHead;
 
     expect(role.canAccessDirectorRoutes(), isTrue);
@@ -244,7 +244,7 @@ void main() {
     expect(find.text('Punched In Today'), findsOneWidget);
     expect(find.text('18 / 25'), findsOneWidget);
     expect(find.text('Active Routes'), findsOneWidget);
-    expect(find.text('Project Head Leave'), findsOneWidget);
+    expect(find.text('Project Manager Leave'), findsOneWidget);
     expect(find.text('Pending: 1'), findsOneWidget);
     expect(find.text('Confirmed Admissions'), findsOneWidget);
     expect(find.text('Total: 7'), findsOneWidget);
@@ -264,7 +264,7 @@ void main() {
     expect(find.text('Users / Employees'), findsNothing);
   });
 
-  testWidgets('Project Head dashboard matches Director monitoring plus self attendance', (
+  testWidgets('Project Manager dashboard matches Director monitoring plus self attendance', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -293,7 +293,7 @@ void main() {
     );
 
     expect(find.text('Rahul Patil'), findsOneWidget);
-    expect(find.text('Project Head'), findsWidgets);
+    expect(find.text('Project Manager'), findsWidgets);
     expect(find.text('Attendance Status'), findsOneWidget);
     expect(find.text('View Details'), findsOneWidget);
     expect(find.text('Punch In'), findsOneWidget);
@@ -307,7 +307,7 @@ void main() {
     expect(find.text('Active Routes'), findsOneWidget);
     expect(find.text('Confirmed Admissions'), findsOneWidget);
     expect(find.text('Total: 4'), findsOneWidget);
-    expect(find.text('Project Head Leave'), findsNothing);
+    expect(find.text('Project Manager Leave'), findsNothing);
     expect(find.text('Modules'), findsNothing);
     expect(find.text('Targets'), findsNothing);
     expect(find.text('My Attendance'), findsNothing);
@@ -353,7 +353,7 @@ void main() {
     expect(find.text('Siddhesh Kaluse'), findsOneWidget);
     expect(find.text('Center Manager'), findsWidgets);
     expect(find.text('Total Centers'), findsNothing);
-    expect(find.text('Project Head Leave'), findsNothing);
+    expect(find.text('Project Manager Leave'), findsNothing);
     expect(find.text('Employees'), findsOneWidget);
     expect(find.text('Punched In Today'), findsOneWidget);
     expect(find.text('1 / 3'), findsOneWidget);

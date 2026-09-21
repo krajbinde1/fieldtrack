@@ -3,18 +3,16 @@
 namespace App\Http\Controllers\Api\Manager;
 
 use App\Enums\CenterStaffRole;
-use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\Center;
 use App\Models\Employee;
-use App\Models\User;
+use App\Services\CenterStaffCredentialService;
 use App\Services\DirectorWorkforceService;
 use App\Services\OrganizationAccessService;
 use App\Support\LoginId;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class ManagerEmployeeController extends Controller
@@ -22,6 +20,7 @@ class ManagerEmployeeController extends Controller
     public function __construct(
         private readonly OrganizationAccessService $access,
         private readonly DirectorWorkforceService $workforce,
+        private readonly CenterStaffCredentialService $credentials,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -101,13 +100,11 @@ class ManagerEmployeeController extends Controller
             'You can only create users for your own Center.',
         );
 
-        $loginId = trim((string) $data['mobile']);
-        LoginId::assertUnique($loginId, attribute: 'mobile');
+        LoginId::assertUnique(trim((string) $data['mobile']), attribute: 'mobile');
 
         $role = CenterStaffRole::tryFromMixed($data['staff_role'] ?? null);
-        $password = LoginId::defaultPasswordFromMobile($loginId);
 
-        $employee = DB::transaction(function () use ($actor, $center, $data, $role, $loginId, $password): Employee {
+        $employee = DB::transaction(function () use ($actor, $center, $data, $role): Employee {
             $employee = Employee::query()->create([
                 'center_id' => $center->id,
                 'full_name' => $data['full_name'],
@@ -120,16 +117,7 @@ class ManagerEmployeeController extends Controller
                 'status' => (bool) ($data['status'] ?? true),
             ]);
 
-            User::query()->create([
-                'employee_id' => $employee->id,
-                'name' => $employee->full_name,
-                'email' => $employee->email ?: $employee->mobile.'@fieldtrack.local',
-                'login_id' => $loginId,
-                'password' => Hash::make($password),
-                'role' => UserRole::Employee->value,
-                'is_active' => (bool) $employee->status,
-                'must_change_password' => true,
-            ]);
+            $this->credentials->createLoginUser($employee);
 
             return $employee->load(['center:id,name', 'user:id,employee_id,login_id']);
         });
@@ -138,6 +126,30 @@ class ManagerEmployeeController extends Controller
             'success' => true,
             'data' => $this->employeePayload($employee),
         ], 201);
+    }
+
+    public function resetPassword(Request $request, Employee $employee): JsonResponse
+    {
+        $actor = $request->user();
+        abort_unless(
+            $employee->center !== null
+                && $this->access->canManageEmployees($actor, $employee->center)
+                && $this->access->canViewEmployee($actor, $employee),
+            403,
+            'You can only reset passwords for users in your own Center.',
+        );
+
+        $password = $this->credentials->resetPassword($employee->load('user'));
+
+        return response()->json([
+            'success' => true,
+            'message' => LoginId::defaultPasswordResetMessage($password),
+            'data' => [
+                'id' => $employee->id,
+                'login_id' => $employee->user?->login_id,
+                'default_password' => $password,
+            ],
+        ]);
     }
 
     /**

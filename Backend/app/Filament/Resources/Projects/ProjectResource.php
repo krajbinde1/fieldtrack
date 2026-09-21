@@ -73,7 +73,7 @@ class ProjectResource extends Resource
                 TextColumn::make('code')->searchable()->sortable(),
                 TextColumn::make('name')->searchable()->sortable(),
                 TextColumn::make('project_heads')
-                    ->label('Project Head(s)')
+                    ->label('Project Manager(s)')
                     ->state(function (Project $record): string {
                         $names = $record->centers
                             ->flatMap(fn ($center) => $center->projectHeads)

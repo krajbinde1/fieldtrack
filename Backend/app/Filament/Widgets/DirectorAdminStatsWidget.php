@@ -122,7 +122,7 @@ class DirectorAdminStatsWidget extends Widget
                 'icon' => 'routes',
             ],
             [
-                'label' => 'Pending Project Head Leaves',
+                'label' => 'Pending Project Manager Leaves',
                 'value' => (string) $pendingPhLeaves,
                 'hint' => null,
                 'url' => FilamentFilterUrl::for(LeaveRequestResource::class, [
