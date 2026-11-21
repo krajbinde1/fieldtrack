@@ -54,7 +54,8 @@ it('opens the main admin dashboard across all authorized centers', function () {
 
     expect(Dashboard::getNavigationLabel())->toBe('Main Dashboard')
         ->and(CenterDashboard::getNavigationLabel())->toBe('Center Dashboard')
-        ->and(CenterDashboard::shouldRegisterNavigation())->toBeTrue()
+        ->and(CenterDashboard::shouldRegisterNavigation())->toBeFalse()
+        ->and(CenterResource::getNavigationLabel())->toBe('Center Dashboard')
         ->and(CenterResource::shouldRegisterNavigation())->toBeTrue()
         ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeTrue()
         ->and(DeviceManagement::shouldRegisterNavigation())->toBeTrue()
@@ -494,7 +495,7 @@ it('does not force center selection on a center manager', function () {
         ->assertSee('Dashboard')
         ->assertDontSee('Change Center')
         ->assertDontSee('Main Dashboard')
-        ->assertDontSee('Center Dashboard');
+        ->assertSee('Center Dashboard');
 
     $this->actingAs($org['centerManager'])->get('/admin/center-dashboard')->assertRedirect('/admin/centers');
     expect(CenterDashboard::shouldRegisterNavigation())->toBeFalse()
@@ -538,7 +539,7 @@ it('does not force center selection on a director', function () {
         ->assertSee('Dashboard')
         ->assertDontSee('Change Center')
         ->assertDontSee('Main Dashboard')
-        ->assertDontSee('Center Dashboard');
+        ->assertSee('Center Dashboard');
 
     $this->actingAs($org['director'])->get('/admin/center-dashboard')->assertForbidden();
     expect(CenterDashboard::shouldRegisterNavigation())->toBeFalse()
@@ -566,7 +567,7 @@ it('does not show center switching to a project head', function () {
         ->assertSee('Dashboard')
         ->assertDontSee('Change Center')
         ->assertDontSee('Main Dashboard')
-        ->assertDontSee('Center Dashboard');
+        ->assertSee('Center Dashboard');
 
     $this->actingAs($org['projectHead'])->get('/admin/center-dashboard')->assertForbidden();
     $this->actingAs($org['projectHead'])->get('/admin/attendances')->assertOk();

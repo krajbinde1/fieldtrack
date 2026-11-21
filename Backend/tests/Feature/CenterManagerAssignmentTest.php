@@ -17,11 +17,8 @@ it('assigns center managers from the user form and reflects them on the center l
 
     Livewire::actingAs($org['admin'])
         ->test(CreateCenter::class)
-        ->assertFormFieldExists('centerManagers')
-        ->assertActionHasLabel(
-            TestAction::make('createOption')->schemaComponent('centerManagers'),
-            '+ Create New Center Manager',
-        )
+        ->assertFormFieldHidden('centerManagers')
+        ->assertFormFieldVisible('coordinators')
         ->fillForm([
             'scheme_id' => $org['projectA']->id,
             'name' => 'Unassigned Center',
@@ -56,7 +53,12 @@ it('assigns center managers from the user form and reflects them on the center l
 
     Livewire::actingAs($org['admin'])
         ->test(EditCenter::class, ['record' => $center->getKey()])
-        ->assertFormFieldExists('centerManagers');
+        ->assertFormFieldVisible('centerManagers')
+        ->assertFormFieldHidden('coordinators')
+        ->assertActionHasLabel(
+            TestAction::make('createOption')->schemaComponent('centerManagers'),
+            '+ Create New Center Manager',
+        );
 
     Livewire::actingAs($org['admin'])
         ->test(ListCenters::class)
@@ -83,13 +85,22 @@ it('assigns selected center managers from the center form and reflects them on u
             'name' => 'Managed From Center',
             'address' => '1 Center Road',
             'is_active' => true,
-            'centerManagers' => [$secondManager->id],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
     $center = Center::query()->where('name', 'Managed From Center')->firstOrFail();
-    expect($center->centerManagers()->pluck('users.id')->all())
+    expect($center->centerManagers)->toHaveCount(0);
+
+    Livewire::actingAs($org['admin'])
+        ->test(EditCenter::class, ['record' => $center->getKey()])
+        ->fillForm([
+            'centerManagers' => [$secondManager->id],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($center->fresh()->centerManagers()->pluck('users.id')->all())
         ->toBe([$secondManager->id])
         ->and($org['centerManager']->fresh()->managedCenters()->pluck('centers.id')->all())
         ->toContain($org['centerA']->id)
@@ -121,13 +132,21 @@ it('creates a center manager from the center form modal, auto-selects them, and 
             'name' => 'Modal Assigned Center',
             'is_active' => true,
         ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $center = Center::query()->where('name', 'Modal Assigned Center')->firstOrFail();
+    expect($center->centerManagers)->toHaveCount(0);
+
+    Livewire::actingAs($org['admin'])
+        ->test(EditCenter::class, ['record' => $center->getKey()])
         ->callAction(TestAction::make('createOption')->schemaComponent('centerManagers'), [
             'name' => 'Modal CM',
             'mobile' => '9123456790',
             'email' => null,
         ])
         ->assertHasNoFormErrors()
-        ->call('create')
+        ->call('save')
         ->assertHasNoFormErrors();
 
     $manager = User::query()->where('login_id', '9123456790')->first();
@@ -138,8 +157,7 @@ it('creates a center manager from the center form modal, auto-selects them, and 
         ->and(Hash::check('6790', $manager->password))->toBeTrue()
         ->and($manager->getRawOriginal('password'))->not->toBe('6790');
 
-    $center = Center::query()->where('name', 'Modal Assigned Center')->firstOrFail();
-    expect($center->centerManagers->pluck('id')->all())->toContain($manager->id)
+    expect($center->fresh()->centerManagers->pluck('id')->all())->toContain($manager->id)
         ->and($manager->managedCenters()->pluck('centers.id')->all())->toContain($center->id)
         ->and($org['centerA']->fresh()->centerManagers->pluck('id')->all())->toContain($org['centerManager']->id);
 
@@ -160,17 +178,23 @@ it('lets a project head create a center manager from the center form', function 
             'name' => 'PH Modal Center',
             'is_active' => true,
         ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $center = Center::query()->where('name', 'PH Modal Center')->firstOrFail();
+
+    Livewire::actingAs($org['projectHead'])
+        ->test(EditCenter::class, ['record' => $center->getKey()])
         ->callAction(TestAction::make('createOption')->schemaComponent('centerManagers'), [
             'name' => 'PH Created CM',
             'mobile' => '9123456791',
             'email' => 'phcreatedcm@fieldtrack.local',
         ])
         ->assertHasNoFormErrors()
-        ->call('create')
+        ->call('save')
         ->assertHasNoFormErrors();
 
     $manager = User::query()->where('login_id', '9123456791')->firstOrFail();
-    $center = Center::query()->where('name', 'PH Modal Center')->firstOrFail();
 
     expect($manager->email)->toBe('phcreatedcm@fieldtrack.local')
         ->and(Hash::check('6791', $manager->password))->toBeTrue()
@@ -218,7 +242,7 @@ it('rejects a duplicate mobile number when creating a center manager from the ce
     $org['centerManager']->update(['login_id' => '9123456799']);
 
     Livewire::actingAs($org['admin'])
-        ->test(CreateCenter::class)
+        ->test(EditCenter::class, ['record' => $org['centerA']->getKey()])
         ->callAction(TestAction::make('createOption')->schemaComponent('centerManagers'), [
             'name' => 'Duplicate CM',
             'mobile' => '9123456799',

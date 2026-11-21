@@ -20,9 +20,12 @@ class CreateCenter extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        unset($data['code'], $data['login_id'], $data['login_user_id'], $data['centerManagers']);
+        unset($data['code'], $data['login_id'], $data['login_user_id'], $data['centerManagers'], $data['coordinators']);
 
-        return app(CenterLoginService::class)->applyManagerSelection($data, $this->data ?? []);
+        $state = $this->data ?? [];
+        unset($state['centerManagers']);
+
+        return app(CenterLoginService::class)->applyManagerSelection($data, $state);
     }
 
     protected function afterCreate(): void

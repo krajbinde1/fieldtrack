@@ -239,7 +239,7 @@ it('shows a profile menu with logout for every web admin role', function (string
     } else {
         $response
             ->assertDontSee('Main Dashboard', false)
-            ->assertDontSee('Center Dashboard', false)
+            ->assertSee('Center Dashboard', false)
             ->assertDontSee('Change Center', false);
     }
 

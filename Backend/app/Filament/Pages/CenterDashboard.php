@@ -30,17 +30,7 @@ class CenterDashboard extends Dashboard
 
     public static function shouldRegisterNavigation(): bool
     {
-        $user = auth()->user();
-
-        if (! $user instanceof User || ! ($user->isAdmin() || $user->isCenterCoordinator())) {
-            return false;
-        }
-
-        if ($user->isAdmin()) {
-            return true;
-        }
-
-        return app(AdminCenterContext::class)->hasValidSelection($user);
+        return false;
     }
 
     public function mount(): void

@@ -80,6 +80,45 @@ it('scopes a center coordinator to assigned centers and keeps them read-only', f
         ->test(ListCenters::class)
         ->assertSee('Center A')
         ->assertDontSee('Center B');
+
+    $listHtml = Livewire::actingAs($org['admin'])
+        ->test(ListCenters::class)
+        ->assertSee('Sr. No.')
+        ->assertSee('Center Name')
+        ->assertSee('Scheme')
+        ->assertSee('Center Coordinator(s)')
+        ->assertSee('Center Manager')
+        ->assertSee('Employees')
+        ->assertSee('Is Active')
+        ->assertSee('Actions')
+        ->assertSee('Coordinator')
+        ->assertSee('Second Coordinator')
+        ->assertSee('CM')
+        ->assertSee('Not Assigned')
+        ->assertSee('Open Dashboard')
+        ->assertSee('Edit')
+        ->html();
+
+    expect($listHtml)
+        ->toMatch('/fi-badge[^>]*>\s*Coordinator\s*</')
+        ->toMatch('/fi-badge[^>]*>\s*Second Coordinator\s*</')
+        ->not->toMatch('/fi-badge[^>]*>\s*CM\s*</');
+
+    $cursor = 0;
+    foreach ([
+        'fi-ta-header-cell-index',
+        'fi-ta-header-cell-name',
+        'fi-ta-header-cell-scheme.name',
+        'fi-ta-header-cell-coordinators.name',
+        'fi-ta-header-cell-center-managers.name',
+        'fi-ta-header-cell-employees-count',
+        'fi-ta-header-cell-is-active',
+        'fi-ta-header-cell fi-align-end',
+    ] as $marker) {
+        $position = strpos($listHtml, $marker, $cursor);
+        expect($position)->not->toBeFalse();
+        $cursor = $position + strlen($marker);
+    }
 });
 
 it('lets one manager cover several centers and rejects a second active manager', function () {

@@ -7,6 +7,7 @@ use App\Filament\Pages\CenterDashboard;
 use App\Filament\Resources\Centers\Pages\CreateCenter;
 use App\Filament\Resources\Centers\Pages\EditCenter;
 use App\Filament\Resources\Centers\Pages\ListCenters;
+use App\Filament\Support\CenterCoordinatorSelect;
 use App\Filament\Support\CenterManagerSelect;
 use App\Models\Center;
 use App\Models\Scheme;
@@ -15,6 +16,7 @@ use App\Services\AdminCenterContext;
 use App\Services\CenterLoginService;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
+use Illuminate\Database\Eloquent\Builder;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -38,6 +40,8 @@ class CenterResource extends Resource
     protected static ?string $model = Center::class;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Organization';
+
+    protected static ?string $navigationLabel = 'Center Dashboard';
 
     protected static ?int $navigationSort = 2;
 
@@ -115,7 +119,8 @@ class CenterResource extends Resource
                 ->hiddenOn('create')
                 ->helperText('Sign-in ID for this center.'),
             TextInput::make('address')->maxLength(255),
-            CenterManagerSelect::make()->live(),
+            CenterCoordinatorSelect::make()->visibleOn('create'),
+            CenterManagerSelect::make()->live()->visibleOn('edit'),
             Select::make('primary_center_manager_id')
                 ->label('Primary Center Manager')
                 ->options(function (Get $get): array {
@@ -134,6 +139,7 @@ class CenterResource extends Resource
                         ])
                         ->all();
                 })
+                ->hiddenOn('create')
                 ->visible(function (Get $get): bool {
                     $selected = $get('centerManagers');
 
@@ -150,17 +156,42 @@ class CenterResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['coordinators', 'centerManagers']))
             ->columns([
-                TextColumn::make('scheme.name')->label('Scheme / Project')->searchable()->sortable(),
-                TextColumn::make('code')->label('Center Code')->searchable(),
-                TextColumn::make('name')->searchable(),
-                TextColumn::make('centerManagers.name')->label('Center Manager(s)')->badge()->placeholder('—'),
-                TextColumn::make('employees_count')->counts('employees')->label('Employees'),
-                IconColumn::make('is_active')->boolean(),
+                TextColumn::make('index')
+                    ->label('Sr. No.')
+                    ->rowIndex(),
+                TextColumn::make('name')
+                    ->label('Center Name')
+                    ->searchable(),
+                TextColumn::make('scheme.name')
+                    ->label('Scheme')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('coordinators.name')
+                    ->label('Center Coordinator(s)')
+                    ->badge()
+                    ->placeholder('Not Assigned'),
+                TextColumn::make('centerManagers.name')
+                    ->label('Center Manager')
+                    ->state(function (Center $record): ?string {
+                        $managers = $record->centerManagers
+                            ->reject(fn (User $user): bool => $user->isCenterLogin());
+
+                        return ($managers->firstWhere('is_active', true) ?? $managers->sortBy('name')->first())?->name;
+                    })
+                    ->placeholder('Not Assigned'),
+                TextColumn::make('employees_count')
+                    ->counts('employees')
+                    ->label('Employees'),
+                IconColumn::make('is_active')
+                    ->label('Is Active')
+                    ->boolean(),
             ])
             ->filters([
                 SelectFilter::make('scheme_id')->label('Scheme / Project')->relationship('scheme', 'name')->preload(),
             ])
+            ->recordActionsColumnLabel('Actions')
             ->recordActions([
                 Action::make('openDashboard')
                     ->label('Open Dashboard')

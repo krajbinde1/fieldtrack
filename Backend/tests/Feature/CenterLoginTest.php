@@ -84,16 +84,30 @@ it('creates a center login from the primary manager mobile without changing that
             'scheme_id' => $org['projectA']->id,
             'name' => 'Khultabad 4.0',
             'is_active' => true,
-            'centerManagers' => [$manager->id],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
     $center = Center::query()->where('name', 'Khultabad 4.0')->firstOrFail();
-    $account = $center->loginUser;
 
     expect($center->login_id)->toBe('khultabad_4_0')
-        ->and($center->primary_center_manager_id)->toBe($manager->id)
+        ->and($center->primary_center_manager_id)->toBeNull()
+        ->and($center->login_user_id)->toBeNull()
+        ->and($center->centerManagers)->toHaveCount(0)
+        ->and($manager->fresh()->getRawOriginal('password'))->toBe($managerPassword);
+
+    Livewire::actingAs($org['admin'])
+        ->test(EditCenter::class, ['record' => $center->getKey()])
+        ->fillForm([
+            'centerManagers' => [$manager->id],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $center->refresh();
+    $account = $center->loginUser;
+
+    expect($center->primary_center_manager_id)->toBe($manager->id)
         ->and($account)->not->toBeNull()
         ->and($account->is_center_login)->toBeTrue()
         ->and($account->role)->toBe(UserRole::CenterManager->value)
@@ -134,30 +148,37 @@ it('rejects a second active manager on the same center', function () {
             'scheme_id' => $org['projectA']->id,
             'name' => 'Two Manager Center',
             'is_active' => true,
-            'centerManagers' => [$first->id, $second->id],
-        ])
-        ->call('create')
-        ->assertHasErrors(['centerManagers' => 'A center can have only one active Center Manager.']);
-
-    expect(Center::query()->where('name', 'Two Manager Center')->exists())->toBeFalse();
-
-    Livewire::actingAs($org['admin'])
-        ->test(CreateCenter::class)
-        ->fillForm([
-            'scheme_id' => $org['projectA']->id,
-            'name' => 'Two Manager Center',
-            'is_active' => true,
-            'centerManagers' => [$second->id],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
     $center = Center::query()->where('name', 'Two Manager Center')->firstOrFail();
 
-    expect($center->primary_center_manager_id)->toBe($second->id)
-        ->and($center->centerManagers()->pluck('users.id')->all())->toBe([$second->id])
-        ->and(Hash::check('6702', $center->loginUser->password))->toBeTrue()
-        ->and(Hash::check('6701', $center->loginUser->password))->toBeFalse()
+    Livewire::actingAs($org['admin'])
+        ->test(EditCenter::class, ['record' => $center->getKey()])
+        ->fillForm([
+            'centerManagers' => [$first->id, $second->id],
+        ])
+        ->call('save')
+        ->assertHasErrors(['centerManagers' => 'A center can have only one active Center Manager.']);
+
+    expect($center->fresh()->centerManagers)->toHaveCount(0)
+        ->and($center->fresh()->login_user_id)->toBeNull()
+        ->and($first->fresh()->getRawOriginal('password'))->toBe($firstPassword)
+        ->and($second->fresh()->getRawOriginal('password'))->toBe($secondPassword);
+
+    Livewire::actingAs($org['admin'])
+        ->test(EditCenter::class, ['record' => $center->getKey()])
+        ->fillForm([
+            'centerManagers' => [$second->id],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($center->fresh()->primary_center_manager_id)->toBe($second->id)
+        ->and($center->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$second->id])
+        ->and(Hash::check('6702', $center->fresh()->loginUser->password))->toBeTrue()
+        ->and(Hash::check('6701', $center->fresh()->loginUser->password))->toBeFalse()
         ->and($first->fresh()->getRawOriginal('password'))->toBe($firstPassword)
         ->and($second->fresh()->getRawOriginal('password'))->toBe($secondPassword);
 });
@@ -208,16 +229,26 @@ it('blocks center login creation and reset without a usable primary mobile', fun
             'scheme_id' => $org['projectA']->id,
             'name' => 'No Mobile Center',
             'is_active' => true,
-            'centerManagers' => [$org['centerManager']->id],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
     $center = Center::query()->where('name', 'No Mobile Center')->firstOrFail();
 
-    expect($center->login_id)->toBe('no_mobile_center')
-        ->and($center->login_user_id)->toBeNull()
-        ->and($center->primary_center_manager_id)->toBe($org['centerManager']->id);
+    expect($center->login_user_id)->toBeNull()
+        ->and($center->centerManagers)->toHaveCount(0);
+
+    Livewire::actingAs($org['admin'])
+        ->test(EditCenter::class, ['record' => $center->getKey()])
+        ->fillForm([
+            'centerManagers' => [$org['centerManager']->id],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($center->fresh()->login_id)->toBe('no_mobile_center')
+        ->and($center->fresh()->login_user_id)->toBeNull()
+        ->and($center->fresh()->primary_center_manager_id)->toBe($org['centerManager']->id);
 
     try {
         app(CenterLoginService::class)->resetPassword($center);
