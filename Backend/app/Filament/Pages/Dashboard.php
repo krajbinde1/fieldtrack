@@ -35,6 +35,18 @@ class Dashboard extends BaseDashboard
         return 'Dashboard';
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = auth()->user();
+
+        // Admins get a single custom link in the sidebar start slot.
+        if ($user instanceof User && $user->isAdmin()) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function getTitle(): string
     {
         $user = auth()->user();

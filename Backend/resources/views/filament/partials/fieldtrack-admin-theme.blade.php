@@ -214,6 +214,81 @@
         background: rgba(11, 27, 58, 0.45);
     }
 
+    /* Main Dashboard card — only the custom top-of-nav link, not other items. */
+    html.fieldtrack-admin .fi-sidebar-nav .ft-main-dashboard-link {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0.1rem 0 0.95rem;
+        padding: 0.72rem 0.8rem;
+        border-radius: 0.95rem;
+        text-decoration: none;
+        color: #fff !important;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+        line-height: 1.2;
+        background: linear-gradient(145deg, rgba(124, 108, 248, 0.55) 0%, rgba(76, 48, 140, 0.72) 100%);
+        border: 1px solid rgba(216, 204, 255, 0.34);
+        box-shadow: 0 10px 22px rgba(8, 12, 32, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+        transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    html.fieldtrack-admin .fi-sidebar-nav .ft-main-dashboard-link:hover {
+        color: #fff !important;
+        background: linear-gradient(145deg, rgba(141, 126, 252, 0.72) 0%, rgba(91, 58, 168, 0.82) 100%);
+        border-color: rgba(237, 233, 254, 0.55);
+        box-shadow: 0 12px 24px rgba(8, 12, 32, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    }
+
+    html.fieldtrack-admin .fi-sidebar-nav .ft-main-dashboard-link.is-active,
+    html.fieldtrack-admin .fi-sidebar-nav .ft-main-dashboard-link[aria-current="page"] {
+        color: #fff !important;
+        background: linear-gradient(145deg, #6d5ef6 0%, #4f46e5 52%, #3b2f86 100%);
+        border-color: rgba(255, 255, 255, 0.5);
+        box-shadow: 0 12px 26px rgba(79, 70, 229, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    }
+
+    html.fieldtrack-admin .fi-sidebar-nav .ft-main-dashboard-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.9rem;
+        height: 1.9rem;
+        flex: 0 0 auto;
+        border-radius: 0.6rem;
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+    }
+
+    html.fieldtrack-admin .fi-sidebar-nav .ft-main-dashboard-icon svg {
+        width: 1.05rem;
+        height: 1.05rem;
+        display: block;
+    }
+
+    html.fieldtrack-admin .fi-sidebar-nav .ft-main-dashboard-label {
+        min-width: 0;
+        color: #fff;
+    }
+
+    html.fieldtrack-admin .fi-sidebar:not(.fi-sidebar-open) .ft-main-dashboard-link {
+        justify-content: center;
+        gap: 0;
+        padding-inline: 0.4rem;
+    }
+
+    html.fieldtrack-admin .fi-sidebar:not(.fi-sidebar-open) .ft-main-dashboard-label {
+        display: none;
+    }
+
+    html.fieldtrack-admin.dark .fi-sidebar-nav .ft-main-dashboard-link,
+    html.fieldtrack-admin.dark .fi-sidebar-nav .ft-main-dashboard-link:hover,
+    html.fieldtrack-admin.dark .fi-sidebar-nav .ft-main-dashboard-link.is-active {
+        color: #fff !important;
+    }
+
     /* -------------------------------------------------------------------------
      * Top header
      * ------------------------------------------------------------------------- */

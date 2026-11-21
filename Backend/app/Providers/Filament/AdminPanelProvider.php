@@ -114,6 +114,7 @@ class AdminPanelProvider extends PanelProvider
     {
         $searchHook = $this->firstExistingRenderHook(['GLOBAL_SEARCH_BEFORE', 'TOPBAR_END']);
         $userHook = $this->firstExistingRenderHook(['USER_MENU_BEFORE', 'TOPBAR_END']);
+        $sidebarNavHook = $this->firstExistingRenderHook(['SIDEBAR_NAV_START']);
 
         if ($this->renderHookExists('HEAD_END')) {
             $panel = $panel->renderHook(
@@ -133,6 +134,13 @@ class AdminPanelProvider extends PanelProvider
             $panel = $panel->renderHook(
                 constant(PanelsRenderHook::class.'::'.$userHook),
                 fn () => view('filament.partials.fieldtrack-topbar-user'),
+            );
+        }
+
+        if ($sidebarNavHook !== null) {
+            $panel = $panel->renderHook(
+                constant(PanelsRenderHook::class.'::'.$sidebarNavHook),
+                fn () => view('filament.partials.fieldtrack-main-dashboard-nav'),
             );
         }
 
