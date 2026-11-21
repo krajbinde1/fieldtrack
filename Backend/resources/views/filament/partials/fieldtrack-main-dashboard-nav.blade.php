@@ -26,5 +26,10 @@
             </svg>
         </span>
         <span class="ft-main-dashboard-label">{{ $dashboardLabel }}</span>
+        <span class="ft-main-dashboard-chevron" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none">
+                <path d="M7.5 4.5 13 10l-5.5 5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </span>
     </a>
 @endif
