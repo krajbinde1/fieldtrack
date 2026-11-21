@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Enums\AdmissionStatus;
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Support\FilamentFilterUrl;
+use App\Filament\Widgets\Concerns\UsesOrganizationWideDashboardScope;
 use App\Models\Admission;
 use App\Models\Center;
 use App\Models\User;
@@ -17,6 +18,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class DirectorConfirmedAdmissionsByCenterWidget extends TableWidget
 {
+    use UsesOrganizationWideDashboardScope;
+
     protected static ?int $sort = 4;
 
     protected int|string|array $columnSpan = 'full';

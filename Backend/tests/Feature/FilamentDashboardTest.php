@@ -64,7 +64,7 @@ it('shows director admin management summary without scheme count or admission ta
         ->assertSee('Today Confirmed Admissions')
         ->assertSee('This Month Confirmed Admissions')
         ->assertSee('Attendance Today')
-        ->assertSee('Present / Half Day / Absent')
+        ->assertSee('Present / Half Day / Absent / Running / On Leave')
         ->assertDontSee('Schemes')
         ->assertSee('/admin/centers')
         ->assertSee('/admin/users')

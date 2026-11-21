@@ -51,7 +51,13 @@ it('lets an admin open organization, people, and field-operation pages', functio
         ->get('/admin')
         ->assertOk()
         ->assertSee('Main Admin Dashboard')
+        ->assertSee('Main Dashboard')
+        ->assertSee('Center Dashboard')
         ->assertDontSee('Change Center');
+
+    $this->actingAs($admin)
+        ->get('/admin/center-dashboard')
+        ->assertRedirect('/admin/centers');
 
     $this->withSession([
         AdminCenterContext::SESSION_KEY => Center::query()->where('code', 'C1')->value('id'),
@@ -61,9 +67,19 @@ it('lets an admin open organization, people, and field-operation pages', functio
         ->get('/admin')
         ->assertOk()
         ->assertSee('Param FieldTrack')
+        ->assertSee('Main Admin Dashboard')
+        ->assertSee('Main Dashboard')
+        ->assertSee('Center Dashboard')
         ->assertDontSee('Scheme Master')
         ->assertSee('Change Center')
         ->assertSee('Back to All Centers');
+
+    $this->actingAs($admin)
+        ->get('/admin/center-dashboard')
+        ->assertOk()
+        ->assertSee('Demo Center Dashboard')
+        ->assertSee('Change Center')
+        ->assertDontSee('Main Admin Dashboard');
 
     $html = $dashboard->getContent();
     expect(substr_count($html, 'class="ft-topbar-search"'))->toBe(1)
@@ -214,6 +230,18 @@ it('shows a profile menu with logout for every web admin role', function (string
         ->assertSee('/admin/logout', false)
         ->assertSee('/admin/profile', false)
         ->assertSee('/admin/change-password', false);
+
+    if ($loginId === 'admin') {
+        $response
+            ->assertSee('Main Dashboard', false)
+            ->assertSee('Center Dashboard', false)
+            ->assertSee('Main Admin Dashboard', false);
+    } else {
+        $response
+            ->assertDontSee('Main Dashboard', false)
+            ->assertDontSee('Center Dashboard', false)
+            ->assertDontSee('Change Center', false);
+    }
 
     if (in_array($loginId, ['admin', 'fielddirector'], true)) {
         $response

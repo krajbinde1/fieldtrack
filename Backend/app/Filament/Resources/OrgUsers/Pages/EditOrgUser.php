@@ -12,7 +12,7 @@ class EditOrgUser extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        unset($data['role']);
+        unset($data['role'], $data['is_center_login']);
 
         $data['login_id'] = LoginId::resolveFromEmail(
             $data['login_id'] ?? null,

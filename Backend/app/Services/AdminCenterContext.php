@@ -22,6 +22,8 @@ final class AdminCenterContext
 {
     public const SESSION_KEY = 'admin_selected_center_id';
 
+    private const ORGANIZATION_WIDE_DEPTH = 'admin_center_organization_wide_depth';
+
     public function forget(): void
     {
         session()->forget(self::SESSION_KEY);
@@ -32,8 +34,47 @@ final class AdminCenterContext
         return $this->idFor($user) !== null;
     }
 
+    public function beginOrganizationWideScope(): void
+    {
+        request()->attributes->set(self::ORGANIZATION_WIDE_DEPTH, $this->organizationWideDepth() + 1);
+    }
+
+    public function endOrganizationWideScope(): void
+    {
+        request()->attributes->set(
+            self::ORGANIZATION_WIDE_DEPTH,
+            max(0, $this->organizationWideDepth() - 1),
+        );
+    }
+
+    private function organizationWideDepth(): int
+    {
+        return (int) request()->attributes->get(self::ORGANIZATION_WIDE_DEPTH, 0);
+    }
+
+    /**
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    public function duringOrganizationWideScope(callable $callback): mixed
+    {
+        $this->beginOrganizationWideScope();
+
+        try {
+            return $callback();
+        } finally {
+            $this->endOrganizationWideScope();
+        }
+    }
+
     public function idFor(?User $user): ?int
     {
+        if ($this->organizationWideDepth() > 0) {
+            return null;
+        }
+
         if (! $user?->isAdmin()) {
             return null;
         }

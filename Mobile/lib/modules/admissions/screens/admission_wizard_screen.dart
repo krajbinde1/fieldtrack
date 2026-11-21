@@ -184,25 +184,51 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
   };
 
   String? _validateStep(int step) {
+    final missing = _missingLabelsForStep(step);
+    if (missing.isEmpty) return null;
+    return 'Please complete required fields before submitting: ${missing.join(', ')}.';
+  }
+
+  List<String> _missingLabelsForStep(int step) {
     switch (step) {
       case 0:
-        if (_schemeId == null) return 'Please select a scheme.';
+        return _schemeId == null ? const ['Scheme'] : const [];
       case 1:
-        if (_firstName.text.trim().isEmpty) return 'First name is required.';
-        if (_lastName.text.trim().isEmpty) return 'Last name is required.';
-        if (_gender == null) return 'Please select gender.';
-        if (_religion == null) return 'Please select religion.';
-        if (_caste == null) return 'Please select caste.';
+        final missing = <String>[];
+        final first = _firstName.text.trim();
+        final last = _lastName.text.trim();
+        if (first.isEmpty && last.isEmpty && _middleName.text.trim().isEmpty) {
+          missing.add('Applicant Name');
+        } else {
+          if (first.isEmpty) missing.add('First Name');
+          if (last.isEmpty) missing.add('Last Name');
+        }
+        if (_gender == null) missing.add('Gender');
+        if (_religion == null) missing.add('Religion');
+        if (_caste == null) missing.add('Caste');
+        return missing;
       case 2:
-        if (_districtId == null) return 'Please select a district.';
-        if (_talukaId == null) return 'Please select a taluka.';
-        if (_village.text.trim().isEmpty) return 'Village is required.';
+        final missing = <String>[];
+        if (_districtId == null) missing.add('District');
+        if (_talukaId == null) missing.add('Taluka');
+        if (_village.text.trim().isEmpty) missing.add('Village');
+        return missing;
       case 3:
         if (_record?.documentOf('aadhaar') == null) {
-          return 'Please upload the Aadhaar Card.';
+          return const ['Aadhaar Card'];
         }
+        return const [];
+      default:
+        return const [];
     }
-    return null;
+  }
+
+  String? _submitValidationMessage() {
+    final missing = <String>[
+      for (var step = 0; step <= 3; step++) ..._missingLabelsForStep(step),
+    ];
+    if (missing.isEmpty) return null;
+    return 'Please complete required fields before submitting: ${missing.join(', ')}.';
   }
 
   Future<bool> _persist({required int step, required bool validate}) async {
@@ -250,7 +276,7 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
       final nextStep = AdmissionWizardNavigation.next(_step);
       final ok = await _persist(
         step: AdmissionWizardNavigation.draftStepOnNext(_step),
-        validate: true,
+        validate: false,
       );
       if (ok && mounted) setState(() => _step = nextStep);
       return;
@@ -260,13 +286,16 @@ class _AdmissionWizardScreenState extends State<AdmissionWizardScreen> {
 
   Future<void> _submit() async {
     if (_submittedLock || !_editable) return;
-    for (var i = 0; i <= 3; i++) {
-      final message = _validateStep(i);
-      if (message != null) {
-        setState(() => _step = i);
-        _toast(message);
-        return;
+    final message = _submitValidationMessage();
+    if (message != null) {
+      for (var i = 0; i <= 3; i++) {
+        if (_missingLabelsForStep(i).isNotEmpty) {
+          setState(() => _step = i);
+          break;
+        }
       }
+      _toast(message);
+      return;
     }
     final saved = await _persist(step: 5, validate: false);
     if (!saved || _admissionId == null) return;

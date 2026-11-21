@@ -8,8 +8,9 @@ use App\Filament\Widgets\DirectorConfirmedAdmissionsByCenterWidget;
 use App\Filament\Widgets\DirectorTodayTeamActivityWidget;
 use App\Filament\Widgets\FieldTrackStatsWidget;
 use App\Models\User;
-use App\Services\AdminCenterContext;
 use Filament\Pages\Dashboard as BaseDashboard;
+use Filament\Widgets\Widget;
+use Filament\Widgets\WidgetConfiguration;
 
 class Dashboard extends BaseDashboard
 {
@@ -23,14 +24,11 @@ class Dashboard extends BaseDashboard
         ];
     }
 
-    /**
-     * @return int | array<string, ?int>
-     */
     public static function getNavigationLabel(): string
     {
         $user = auth()->user();
 
-        if ($user instanceof User && $user->isAdmin() && ! app(AdminCenterContext::class)->hasValidSelection($user)) {
+        if ($user instanceof User && $user->isAdmin()) {
             return 'Main Dashboard';
         }
 
@@ -42,27 +40,40 @@ class Dashboard extends BaseDashboard
         $user = auth()->user();
 
         if ($user instanceof User && $user->isAdmin()) {
-            $center = app(AdminCenterContext::class)->centerFor($user);
-
-            return $center ? $center->name.' Dashboard' : 'Main Admin Dashboard';
+            return 'Main Admin Dashboard';
         }
 
         return 'Dashboard';
     }
 
-    public function getColumns(): int | array
+    public function getColumns(): int|array
     {
         return 1;
     }
 
+    /**
+     * @return array<class-string<Widget> | WidgetConfiguration>
+     */
     public function getWidgets(): array
     {
+        $organizationWide = $this->showsOrganizationWideDashboard();
+        $scope = function (string $widget) use ($organizationWide): string|WidgetConfiguration {
+            return $organizationWide
+                ? $widget::make(['organizationWide' => true])
+                : $widget;
+        };
+
         return [
-            DirectorAdminStatsWidget::class,
+            $scope(DirectorAdminStatsWidget::class),
             FieldTrackStatsWidget::class,
             AdmissionTargetPerformanceWidget::class,
-            DirectorConfirmedAdmissionsByCenterWidget::class,
-            DirectorTodayTeamActivityWidget::class,
+            $scope(DirectorConfirmedAdmissionsByCenterWidget::class),
+            $scope(DirectorTodayTeamActivityWidget::class),
         ];
+    }
+
+    protected function showsOrganizationWideDashboard(): bool
+    {
+        return true;
     }
 }

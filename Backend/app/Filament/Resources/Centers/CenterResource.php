@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\Centers;
 
 use App\Filament\Concerns\ScopesRecordsByOrganization;
-use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\CenterDashboard;
 use App\Filament\Resources\Centers\Pages\CreateCenter;
 use App\Filament\Resources\Centers\Pages\EditCenter;
 use App\Filament\Resources\Centers\Pages\ListCenters;
@@ -12,6 +12,7 @@ use App\Models\Center;
 use App\Models\Scheme;
 use App\Models\User;
 use App\Services\AdminCenterContext;
+use App\Services\CenterLoginService;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -20,7 +21,9 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -105,8 +108,45 @@ class CenterResource extends Resource
                     ->visible(fn (): bool => ($actor = auth()->user()) !== null && $access->canManageSchemes($actor))
                 ),
             TextInput::make('name')->required()->maxLength(255),
+            TextInput::make('login_id')
+                ->label('Center Login ID')
+                ->disabled()
+                ->dehydrated(false)
+                ->hiddenOn('create')
+                ->helperText('Sign-in ID for this center.'),
             TextInput::make('address')->maxLength(255),
-            CenterManagerSelect::make(),
+            CenterManagerSelect::make()->live(),
+            Select::make('primary_center_manager_id')
+                ->label('Primary Center Manager')
+                ->options(function (Get $get): array {
+                    $selected = $get('centerManagers');
+                    $ids = app(CenterLoginService::class)->eligibleManagerIds(is_array($selected) ? $selected : []);
+                    if ($ids === []) {
+                        return [];
+                    }
+
+                    return User::query()
+                        ->whereIn('id', $ids)
+                        ->orderBy('name')
+                        ->get()
+                        ->mapWithKeys(fn (User $user): array => [
+                            $user->id => trim($user->name.' ('.$user->login_id.')'),
+                        ])
+                        ->all();
+                })
+                ->visible(function (Get $get): bool {
+                    $selected = $get('centerManagers');
+
+                    return count(app(CenterLoginService::class)->eligibleManagerIds(is_array($selected) ? $selected : [])) > 1;
+                })
+                ->required(function (Get $get): bool {
+                    $selected = $get('centerManagers');
+
+                    return count(app(CenterLoginService::class)->eligibleManagerIds(is_array($selected) ? $selected : [])) > 1;
+                })
+                ->searchable()
+                ->preload()
+                ->helperText('Required when more than one active Center Manager is assigned. Inactive managers cannot be primary.'),
             Toggle::make('is_active')->default(true),
         ]);
     }
@@ -135,10 +175,34 @@ class CenterResource extends Resource
 
                         app(AdminCenterContext::class)->select($user, (int) $record->id);
 
-                        return redirect()->to(Dashboard::getUrl());
+                        return redirect()->to(CenterDashboard::getUrl());
                     }),
                 EditAction::make(),
             ]);
+    }
+
+    public static function resetPasswordAction(): Action
+    {
+        return Action::make('resetCenterPassword')
+            ->label('Reset Password')
+            ->icon('heroicon-o-key')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading('Reset Center Password')
+            ->modalDescription('Reset the center login password? The new password is not shown.')
+            ->modalSubmitActionLabel('Reset Password')
+            ->visible(fn (): bool => auth()->user()?->isAdmin() === true)
+            ->authorize(fn (): bool => auth()->user()?->isAdmin() === true)
+            ->action(function (Center $record): void {
+                abort_unless(auth()->user()?->isAdmin() === true, 403);
+
+                app(CenterLoginService::class)->resetPassword($record);
+
+                Notification::make()
+                    ->title('Center password was reset.')
+                    ->success()
+                    ->send();
+            });
     }
 
     public static function getPages(): array

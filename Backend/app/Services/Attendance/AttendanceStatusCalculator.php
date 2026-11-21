@@ -29,6 +29,9 @@ final class AttendanceStatusCalculator
 
     public const STATUS_WEEKLY_OFF = 'Weekly Off';
 
+    /** Open day with no punch and no approved leave. Not counted as Absent. */
+    public const STATUS_NOT_MARKED = 'Not Marked';
+
     /** Exact 8:00 hours = Present */
     public const PRESENT_MINUTES = 480;
 
@@ -53,7 +56,16 @@ final class AttendanceStatusCalculator
             self::STATUS_ABSENT => 'Absent',
             self::STATUS_LEAVE => 'On Leave',
             self::STATUS_WEEKLY_OFF => 'Weekly Off',
+            self::STATUS_NOT_MARKED => 'Not Marked',
         ];
+    }
+
+    /**
+     * A working day is closed once that IST date is before today.
+     */
+    public function isAttendanceDayClosed(Carbon $date): bool
+    {
+        return $date->copy()->startOfDay()->lt(AttendanceCalendar::today());
     }
 
     public function calculateFromMinutes(?int $minutes, bool $hasPunchIn, bool $hasPunchOut): string
@@ -119,34 +131,82 @@ final class AttendanceStatusCalculator
     }
 
     /**
-     * Resolve how a calendar working day counts in monthly summaries.
+     * One status per employee for a working day.
      *
-     * Today with open punch stays Punched In (not Absent).
-     * Past days with open punch (no punch-out) count as Absent.
+     * Approved leave and weekly off are kept.
+     * Punch in without punch out stays Running, including after the day closes.
+     * Completed punches use the 8h / 4h thresholds.
+     * No punch in becomes Absent only after the day closes.
      */
     public function classifyWorkingDay(?Attendance $attendance, Carbon $date): string
     {
-        if ($attendance === null) {
-            return self::STATUS_ABSENT;
-        }
-
-        if (in_array($attendance->attendance_status, self::PRESERVED_STATUSES, true)) {
+        if ($attendance !== null && in_array($attendance->attendance_status, self::PRESERVED_STATUSES, true)) {
             return (string) $attendance->attendance_status;
         }
 
-        $hasPunchIn = filled($attendance->punch_in_time);
-        $hasPunchOut = filled($attendance->punch_out_time);
-        $isToday = $date->toDateString() === AttendanceCalendar::today()->toDateString();
+        $hasPunchIn = $attendance !== null && filled($attendance->punch_in_time);
+        $hasPunchOut = $attendance !== null && filled($attendance->punch_out_time);
 
         if ($hasPunchIn && ! $hasPunchOut) {
-            return $isToday ? self::STATUS_PUNCHED_IN : self::STATUS_ABSENT;
+            return self::STATUS_PUNCHED_IN;
+        }
+
+        if (! $hasPunchIn) {
+            return $this->isAttendanceDayClosed($date)
+                ? self::STATUS_ABSENT
+                : self::STATUS_NOT_MARKED;
         }
 
         return $this->calculateFromMinutes(
             $attendance->workingDurationMinutes(),
-            $hasPunchIn,
+            true,
             $hasPunchOut,
         );
+    }
+
+    /**
+     * Mutually exclusive counts for one eligible-employee set on one date.
+     *
+     * @param  iterable<int>  $employeeIds
+     * @return array{present: int, half_day: int, absent: int, running: int, on_leave: int}
+     */
+    public function tallyEmployees(iterable $employeeIds, Carbon $date): array
+    {
+        $counts = [
+            'present' => 0,
+            'half_day' => 0,
+            'absent' => 0,
+            'running' => 0,
+            'on_leave' => 0,
+        ];
+        $ids = collect($employeeIds)->map(fn ($id): int => (int) $id)->filter(fn (int $id): bool => $id > 0)->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return $counts;
+        }
+
+        $records = Attendance::query()
+            ->whereIn('employee_id', $ids)
+            ->whereDate('attendance_date', $date->toDateString())
+            ->get()
+            ->groupBy(fn (Attendance $attendance): int => (int) $attendance->employee_id);
+
+        foreach ($ids as $id) {
+            $best = $records->get($id, collect())
+                ->sortByDesc(fn (Attendance $attendance): int => $attendance->workingDurationMinutes() ?? -1)
+                ->first();
+
+            match ($this->classifyWorkingDay($best, $date)) {
+                self::STATUS_PRESENT => $counts['present']++,
+                self::STATUS_HALF_DAY => $counts['half_day']++,
+                self::STATUS_ABSENT => $counts['absent']++,
+                self::STATUS_PUNCHED_IN => $counts['running']++,
+                self::STATUS_LEAVE => $counts['on_leave']++,
+                default => null,
+            };
+        }
+
+        return $counts;
     }
 
     public function formatWorkingHoursLabel(?Attendance $attendance): string

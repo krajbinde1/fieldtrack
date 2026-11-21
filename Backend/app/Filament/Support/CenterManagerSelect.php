@@ -26,7 +26,8 @@ final class CenterManagerSelect
                 name: 'centerManagers',
                 titleAttribute: 'name',
                 modifyQueryUsing: function (Builder $query, Select $component): Builder {
-                    $query->where('users.role', UserRole::CenterManager->value);
+                    $query->where('users.role', UserRole::CenterManager->value)
+                        ->where('users.is_center_login', false);
 
                     $assignedIds = [];
                     $record = $component->getRecord();
@@ -65,6 +66,7 @@ final class CenterManagerSelect
                     ? []
                     : User::query()
                         ->where('role', UserRole::CenterManager->value)
+                        ->where('is_center_login', false)
                         ->whereIn('id', $selected)
                         ->pluck('id')
                         ->all();

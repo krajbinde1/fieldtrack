@@ -25,6 +25,7 @@ class CreateOrgUser extends CreateRecord
         );
         LoginId::assertUnique($data['login_id']);
         $data['must_change_password'] = $data['must_change_password'] ?? true;
+        unset($data['is_center_login']);
 
         return $data;
     }

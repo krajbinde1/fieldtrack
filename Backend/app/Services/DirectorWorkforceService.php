@@ -188,6 +188,7 @@ final class DirectorWorkforceService
 
         return User::query()
             ->where('is_active', true)
+            ->where('is_center_login', false)
             ->whereIn('role', $roles)
             ->with([
                 'employee:id,employee_code,center_id',

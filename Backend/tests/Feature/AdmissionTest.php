@@ -336,6 +336,66 @@ function submitCompleteAdmission(array $ctx, array $overrides = []): int
     return $id;
 }
 
+it('keeps an incomplete draft and blocks submit, resubmit, and confirm', function () {
+    Storage::fake('local');
+    $ctx = seedAdmissionsContext();
+
+    $draftId = $this->actingAs($ctx['userA'], 'sanctum')
+        ->postJson('/api/admissions/drafts', ['current_step' => 1])
+        ->assertCreated()
+        ->assertJsonPath('data.status', 'draft')
+        ->json('data.id');
+
+    expect(Admission::query()->find($draftId))->not->toBeNull();
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->postJson('/api/admissions/'.$draftId.'/submit')
+        ->assertStatus(422)
+        ->assertJsonPath('errors.first_name.0', 'Applicant Name is required.');
+
+    expect(Admission::query()->find($draftId)->status)->toBe(AdmissionStatus::Draft);
+
+    $submittedId = submitCompleteAdmission($ctx, ['first_name' => 'Ready']);
+    $this->actingAs($ctx['centerManager'], 'sanctum')
+        ->postJson('/api/manager/admissions/'.$submittedId.'/revert', [
+            'reason' => 'Name needs correction.',
+        ])
+        ->assertOk();
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->patchJson('/api/admissions/drafts/'.$submittedId, [
+            'first_name' => '',
+            'middle_name' => '',
+            'last_name' => '',
+        ])
+        ->assertOk();
+
+    $this->actingAs($ctx['userA'], 'sanctum')
+        ->postJson('/api/admissions/'.$submittedId.'/submit')
+        ->assertStatus(422)
+        ->assertJsonPath('errors.first_name.0', 'Applicant Name is required.');
+
+    expect(Admission::query()->find($submittedId)->status)->toBe(AdmissionStatus::Reverted);
+
+    $incompleteSubmitted = submitCompleteAdmission($ctx, ['first_name' => 'Later']);
+    Admission::query()->whereKey($incompleteSubmitted)->update([
+        'first_name' => null,
+        'middle_name' => null,
+        'last_name' => null,
+        'full_name' => null,
+    ]);
+
+    $this->actingAs($ctx['centerManager'], 'sanctum')
+        ->postJson('/api/manager/admissions/'.$incompleteSubmitted.'/confirm')
+        ->assertStatus(422)
+        ->assertJsonPath('errors.first_name.0', 'Applicant Name is required.');
+
+    $kept = Admission::query()->find($incompleteSubmitted);
+    expect($kept)->not->toBeNull()
+        ->and($kept->status)->toBe(AdmissionStatus::Submitted)
+        ->and($kept->confirmed_at)->toBeNull();
+});
+
 it('lets the assigned center manager confirm a submitted admission', function () {
     Storage::fake('local');
     $ctx = seedAdmissionsContext();
@@ -536,4 +596,3 @@ it('counts only confirmed admissions toward employee target achievement', functi
         ->assertOk()
         ->assertJsonPath('data.achieved', 1);
 });
-

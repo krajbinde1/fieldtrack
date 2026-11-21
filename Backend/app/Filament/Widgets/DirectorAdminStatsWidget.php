@@ -11,6 +11,7 @@ use App\Filament\Resources\EmployeeRoutes\EmployeeRouteResource;
 use App\Filament\Resources\LeaveRequests\LeaveRequestResource;
 use App\Filament\Resources\OrgUsers\OrgUserResource;
 use App\Filament\Support\FilamentFilterUrl;
+use App\Filament\Widgets\Concerns\UsesOrganizationWideDashboardScope;
 use App\Models\Attendance;
 use App\Models\User;
 use App\Services\AdminCenterContext;
@@ -22,6 +23,10 @@ use Filament\Widgets\Widget;
 
 class DirectorAdminStatsWidget extends Widget
 {
+    use UsesOrganizationWideDashboardScope;
+
+    private bool $resolvingOrganizationWideCards = false;
+
     protected string $view = 'filament.widgets.director-admin-stats-widget';
 
     protected int|string|array $columnSpan = 'full';
@@ -47,6 +52,18 @@ class DirectorAdminStatsWidget extends Widget
      */
     public function getCards(): array
     {
+        if ($this->organizationWide && ! $this->resolvingOrganizationWideCards) {
+            $this->resolvingOrganizationWideCards = true;
+
+            try {
+                return app(AdminCenterContext::class)->duringOrganizationWideScope(
+                    fn (): array => $this->getCards(),
+                );
+            } finally {
+                $this->resolvingOrganizationWideCards = false;
+            }
+        }
+
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
         $context = app(AdminCenterContext::class);
@@ -75,15 +92,23 @@ class DirectorAdminStatsWidget extends Widget
             ->whereDate('confirmed_at', '<=', $today)
             ->count();
 
-        $todayAttendance = Attendance::query()
-            ->whereIn('employee_id', $employeeIds)
-            ->whereDate('attendance_date', $today);
-        $present = (clone $todayAttendance)->where('attendance_status', AttendanceStatusCalculator::STATUS_PRESENT)->count();
-        $halfDay = (clone $todayAttendance)->where('attendance_status', AttendanceStatusCalculator::STATUS_HALF_DAY)->count();
-        $absent = (clone $todayAttendance)->where('attendance_status', AttendanceStatusCalculator::STATUS_ABSENT)->count();
-
         $todayDateFilter = ['attendance_date' => ['date' => $today]];
         $centerId = $user instanceof User && $user->isAdmin() ? $context->idFor($user) : null;
+        $attendanceEmployees = $user instanceof User
+            ? $access->fieldEmployeeQuery($user)
+            : $access->employeeQuery($user)->where('status', true);
+        if ($centerId !== null) {
+            $attendanceEmployees->where('center_id', $centerId);
+        }
+        $attendanceTally = app(AttendanceStatusCalculator::class)->tallyEmployees(
+            $attendanceEmployees->pluck('id'),
+            AttendanceCalendar::today(),
+        );
+        $present = $attendanceTally['present'];
+        $halfDay = $attendanceTally['half_day'];
+        $absent = $attendanceTally['absent'];
+        $running = $attendanceTally['running'];
+        $onLeave = $attendanceTally['on_leave'];
 
         $employeesCard = [
             'label' => 'Total Employees',
@@ -138,8 +163,8 @@ class DirectorAdminStatsWidget extends Widget
         ];
         $attendanceCard = [
             'label' => 'Attendance Today',
-            'value' => $present.' / '.$halfDay.' / '.$absent,
-            'hint' => 'Present / Half Day / Absent',
+            'value' => $present.' / '.$halfDay.' / '.$absent.' / '.$running.' / '.$onLeave,
+            'hint' => 'Present / Half Day / Absent / Running / On Leave',
             'url' => FilamentFilterUrl::for(AttendanceResource::class, $todayDateFilter),
             'tone' => 'sage',
             'icon' => 'attendance',

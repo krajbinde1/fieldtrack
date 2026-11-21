@@ -89,6 +89,6 @@ class SelectCenter extends Page
 
         app(AdminCenterContext::class)->select($user, (int) ($data['center_id'] ?? 0));
 
-        return redirect()->intended(Dashboard::getUrl());
+        return redirect()->intended(CenterDashboard::getUrl());
     }
 }

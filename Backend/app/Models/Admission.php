@@ -152,11 +152,15 @@ class Admission extends Model
         if (! $this->scheme_id) {
             $missing[] = 'Scheme';
         }
-        if (! filled($this->first_name)) {
-            $missing[] = 'First Name';
-        }
-        if (! filled($this->last_name)) {
-            $missing[] = 'Last Name';
+        if (! filled($this->composeFullName())) {
+            $missing[] = 'Applicant Name';
+        } else {
+            if (! filled($this->first_name)) {
+                $missing[] = 'First Name';
+            }
+            if (! filled($this->last_name)) {
+                $missing[] = 'Last Name';
+            }
         }
         if (! filled($this->gender)) {
             $missing[] = 'Gender';

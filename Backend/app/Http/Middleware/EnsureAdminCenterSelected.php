@@ -13,9 +13,10 @@ class EnsureAdminCenterSelected
 {
     /**
      * Admins without a selected center stay on the main dashboard, Centers, and
-     * global settings. Center-specific modules redirect to the Centers list.
+     * global settings. The center dashboard and center-specific modules
+     * redirect to the Centers list.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -42,6 +43,7 @@ class EnsureAdminCenterSelected
         $path = trim($request->path(), '/');
 
         foreach ([
+            'center-dashboard',
             'users',
             'attendances',
             'employee-routes',

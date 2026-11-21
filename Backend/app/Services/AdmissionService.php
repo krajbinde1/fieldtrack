@@ -291,6 +291,11 @@ final class AdmissionService
                 ]);
             }
 
+            if ($status === AdmissionStatus::Confirmed) {
+                $locked->loadMissing(['documents', 'scheme', 'taluka']);
+                $this->assertReadyToSubmit($locked, 'confirming');
+            }
+
             $locked->status = $status;
             $locked->review_reason = $reason;
             $locked->reviewed_by_user_id = $reviewer->id;
@@ -302,7 +307,7 @@ final class AdmissionService
         });
     }
 
-    public function assertReadyToSubmit(Admission $admission): void
+    public function assertReadyToSubmit(Admission $admission, string $action = 'submitting'): void
     {
         if ($admission->scheme_id) {
             $scheme = $admission->scheme ?? Scheme::query()->find($admission->scheme_id);
@@ -324,10 +329,37 @@ final class AdmissionService
 
         $missing = $admission->missingSubmitFields();
         if ($missing !== []) {
-            throw ValidationException::withMessages([
-                'admission' => 'Please complete required fields before submitting: '.implode(', ', $missing).'.',
-            ]);
+            $errors = [
+                'admission' => 'Please complete required fields before '.$action.': '.implode(', ', $missing).'.',
+            ];
+            foreach ($missing as $label) {
+                $key = $this->submitFieldKey($label);
+                if ($key === 'admission') {
+                    continue;
+                }
+                $errors[$key] = $label.' is required.';
+            }
+
+            throw ValidationException::withMessages($errors);
         }
+    }
+
+    private function submitFieldKey(string $label): string
+    {
+        return match ($label) {
+            'Applicant Name', 'First Name' => 'first_name',
+            'Last Name' => 'last_name',
+            'Scheme' => 'scheme_id',
+            'Gender' => 'gender',
+            'Religion' => 'religion',
+            'Caste' => 'caste',
+            'State' => 'state',
+            'District' => 'district_id',
+            'Taluka' => 'taluka_id',
+            'Village' => 'village',
+            'Aadhaar Card' => 'aadhaar',
+            default => 'admission',
+        };
     }
 
     private function requireEmployee(User $user): Employee

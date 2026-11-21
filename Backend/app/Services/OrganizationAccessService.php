@@ -65,6 +65,12 @@ final class OrganizationAccessService
             return null;
         }
 
+        if ($user->isCenterLogin()) {
+            $centerId = Center::query()->where('login_user_id', $user->id)->value('id');
+
+            return $centerId ? [(int) $centerId] : [];
+        }
+
         if ($user->isProjectHead()) {
             return $user->headedCenters()->pluck('centers.id')->map(fn ($id) => (int) $id)->all();
         }
@@ -604,6 +610,10 @@ final class OrganizationAccessService
 
     public function canManageOrgUser(User $actor, User $record): bool
     {
+        if ($record->isCenterLogin()) {
+            return false;
+        }
+
         if (! in_array($record->role, [
             UserRole::Director->value,
             UserRole::ProjectHead->value,

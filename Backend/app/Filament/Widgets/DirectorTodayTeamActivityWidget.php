@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Attendances\AttendanceResource;
+use App\Filament\Widgets\Concerns\UsesOrganizationWideDashboardScope;
 use App\Models\Attendance;
 use App\Models\User;
 use App\Services\AdminCenterContext;
@@ -16,6 +17,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class DirectorTodayTeamActivityWidget extends TableWidget
 {
+    use UsesOrganizationWideDashboardScope;
+
     protected static ?int $sort = 5;
 
     protected int|string|array $columnSpan = 'full';

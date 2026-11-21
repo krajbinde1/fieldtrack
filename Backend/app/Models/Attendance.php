@@ -183,7 +183,8 @@ class Attendance extends Model
                 AttendanceStatusCalculator::STATUS_HALF_DAY => $halfDays++,
                 AttendanceStatusCalculator::STATUS_PUNCHED_IN => $openPunchToday++,
                 AttendanceStatusCalculator::STATUS_LEAVE,
-                AttendanceStatusCalculator::STATUS_WEEKLY_OFF => null,
+                AttendanceStatusCalculator::STATUS_WEEKLY_OFF,
+                AttendanceStatusCalculator::STATUS_NOT_MARKED => null,
                 default => $absentDays++,
             };
         }

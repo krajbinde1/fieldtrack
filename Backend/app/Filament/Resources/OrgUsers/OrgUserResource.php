@@ -71,7 +71,9 @@ class OrgUserResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->with(['headedCenters', 'managedCenters', 'employee.center']);
+        $query = parent::getEloquentQuery()
+            ->with(['headedCenters', 'managedCenters', 'employee.center'])
+            ->where('is_center_login', false);
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
 

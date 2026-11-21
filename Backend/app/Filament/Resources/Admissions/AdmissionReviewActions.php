@@ -113,7 +113,8 @@ final class AdmissionReviewActions
             }
             Notification::make()->title($title)->success()->send();
         } catch (ValidationException $exception) {
-            Notification::make()->title($exception->getMessage())->danger()->send();
+            $message = collect($exception->errors())->flatten()->first() ?: $exception->getMessage();
+            Notification::make()->title((string) $message)->danger()->send();
         }
     }
 }

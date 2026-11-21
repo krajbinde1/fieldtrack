@@ -11,6 +11,7 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -32,6 +33,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
         'must_change_password',
         'role',
         'is_active',
+        'is_center_login',
         'active_mobile_session_id',
         'active_mobile_device_id',
         'active_mobile_token_id',
@@ -53,6 +55,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
             'password' => 'hashed',
             'must_change_password' => 'boolean',
             'is_active' => 'boolean',
+            'is_center_login' => 'boolean',
             'active_mobile_login_at' => 'datetime',
         ];
     }
@@ -84,6 +87,11 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
     {
         return $this->belongsToMany(Center::class, 'center_manager_assignments')
             ->withTimestamps();
+    }
+
+    public function centerLogin(): HasOne
+    {
+        return $this->hasOne(Center::class, 'login_user_id');
     }
 
     public function roleEnum(): UserRole
@@ -134,6 +142,11 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
         return $this->hasRole(UserRole::CenterManager);
     }
 
+    public function isCenterLogin(): bool
+    {
+        return $this->is_center_login === true;
+    }
+
     public function isEmployeeUser(): bool
     {
         return $this->hasRole(UserRole::Employee);
@@ -147,6 +160,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
     public function assignedCenterNames(): array
     {
         $centers = match (true) {
+            $this->isCenterLogin() => collect([$this->centerLogin])->filter(),
             $this->isProjectHead() => $this->headedCenters,
             $this->isCenterManager() => $this->managedCenters,
             $this->isEmployeeUser() => collect([$this->employee?->center])->filter(),

@@ -189,6 +189,91 @@ it('calculates Absent under 4 hours', function () {
         ->and($attendance->total_working_minutes)->toBe(239);
 });
 
+it('keeps running punches separate and marks missing punch as absent only after the day closes', function () {
+    Carbon::setTestNow(Carbon::parse('2026-08-12 11:00:00', AttendanceCalendar::TIMEZONE));
+
+    $calculator = app(AttendanceStatusCalculator::class);
+    $present = makeAttendanceEmployee();
+    $half = makeAttendanceEmployee();
+    $short = makeAttendanceEmployee();
+    $running = makeAttendanceEmployee();
+    $missedToday = makeAttendanceEmployee();
+    $missedYesterday = makeAttendanceEmployee();
+    $leftOpen = makeAttendanceEmployee();
+    $onLeave = makeAttendanceEmployee();
+
+    Attendance::create([
+        'employee_id' => $present->id,
+        'attendance_date' => '2026-08-12',
+        'punch_in_time' => '09:00:00',
+        'punch_out_time' => '18:00:00',
+        'approval_status' => 'Pending',
+    ]);
+    Attendance::create([
+        'employee_id' => $half->id,
+        'attendance_date' => '2026-08-12',
+        'punch_in_time' => '09:00:00',
+        'punch_out_time' => '13:00:00',
+        'approval_status' => 'Pending',
+    ]);
+    Attendance::create([
+        'employee_id' => $short->id,
+        'attendance_date' => '2026-08-12',
+        'punch_in_time' => '09:00:00',
+        'punch_out_time' => '12:00:00',
+        'approval_status' => 'Pending',
+    ]);
+    Attendance::create([
+        'employee_id' => $running->id,
+        'attendance_date' => '2026-08-12',
+        'punch_in_time' => '09:00:00',
+        'approval_status' => 'Pending',
+    ]);
+    Attendance::create([
+        'employee_id' => $leftOpen->id,
+        'attendance_date' => '2026-08-11',
+        'punch_in_time' => '09:00:00',
+        'approval_status' => 'Pending',
+    ]);
+    Attendance::create([
+        'employee_id' => $onLeave->id,
+        'attendance_date' => '2026-08-12',
+        'attendance_status' => AttendanceStatusCalculator::STATUS_LEAVE,
+        'approval_status' => 'Approved',
+        'remarks' => 'On Leave',
+    ]);
+
+    $today = AttendanceCalendar::today();
+    $yesterday = $today->copy()->subDay();
+    $counts = $calculator->tallyEmployees([
+        $present->id,
+        $half->id,
+        $short->id,
+        $running->id,
+        $missedToday->id,
+        $missedYesterday->id,
+        $leftOpen->id,
+        $onLeave->id,
+    ], $today);
+
+    expect($counts)->toBe([
+        'present' => 1,
+        'half_day' => 1,
+        'absent' => 1,
+        'running' => 1,
+        'on_leave' => 1,
+    ])
+        ->and(array_sum($counts))->toBe(5)
+        ->and($calculator->classifyWorkingDay(null, $today))->toBe(AttendanceStatusCalculator::STATUS_NOT_MARKED)
+        ->and($calculator->classifyWorkingDay(null, $yesterday))->toBe(AttendanceStatusCalculator::STATUS_ABSENT)
+        ->and($calculator->classifyWorkingDay(
+            Attendance::query()->where('employee_id', $leftOpen->id)->first(),
+            $yesterday,
+        ))->toBe(AttendanceStatusCalculator::STATUS_PUNCHED_IN);
+
+    Carbon::setTestNow();
+});
+
 it('does not count open punch today as Absent in monthly summary', function () {
     Carbon::setTestNow(Carbon::parse('2026-08-11 12:00:00', AttendanceCalendar::TIMEZONE));
 
@@ -332,4 +417,3 @@ it('stores punch in and punch out photos separately and returns public urls', fu
     $this->get('/storage/admissions/secret.jpg')->assertNotFound();
     $this->get('/storage/../.env')->assertNotFound();
 });
-

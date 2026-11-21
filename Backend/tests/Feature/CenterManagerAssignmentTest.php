@@ -84,6 +84,7 @@ it('assigns selected center managers from the center form and reflects them on u
             'address' => '1 Center Road',
             'is_active' => true,
             'centerManagers' => [$org['centerManager']->id, $secondManager->id],
+            'primary_center_manager_id' => $secondManager->id,
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -185,6 +186,7 @@ it('adds and removes center managers on edit without wiping other centers', func
         ->test(EditCenter::class, ['record' => $org['centerA']->getKey()])
         ->fillForm([
             'centerManagers' => [$org['centerManager']->id, $other->id],
+            'primary_center_manager_id' => $other->id,
         ])
         ->call('save')
         ->assertHasNoFormErrors();

@@ -65,7 +65,9 @@ class CenterManagerResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('role', UserRole::CenterManager->value);
+        $query = parent::getEloquentQuery()
+            ->where('role', UserRole::CenterManager->value)
+            ->where('is_center_login', false);
         $user = auth()->user();
 
         if ($user === null) {

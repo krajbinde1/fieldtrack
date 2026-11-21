@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\Centers\Pages;
 
 use App\Filament\Resources\Centers\CenterResource;
+use App\Models\Center;
+use App\Services\CenterLoginService;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateCenter extends CreateRecord
@@ -18,9 +20,9 @@ class CreateCenter extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        unset($data['code']);
+        unset($data['code'], $data['login_id'], $data['login_user_id'], $data['centerManagers']);
 
-        return $data;
+        return app(CenterLoginService::class)->applyManagerSelection($data, $this->data ?? []);
     }
 
     protected function afterCreate(): void
@@ -28,6 +30,11 @@ class CreateCenter extends CreateRecord
         $user = auth()->user();
         if ($user?->isProjectHead()) {
             $user->headedCenters()->syncWithoutDetaching([$this->record->id]);
+        }
+
+        $record = $this->getRecord();
+        if ($record instanceof Center) {
+            app(CenterLoginService::class)->syncAccount($record);
         }
     }
 }
