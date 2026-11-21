@@ -75,7 +75,7 @@ it('assigns multiple coordinators on create and leaves center managers for edit'
     Livewire::actingAs($org['admin'])
         ->test(EditCenter::class, ['record' => $center->getKey()])
         ->assertFormFieldVisible('centerManagers')
-        ->assertFormFieldHidden('coordinators')
+        ->assertFormFieldVisible('coordinators')
         ->assertSee('Center Login ID')
         ->assertActionVisible('resetCenterPassword')
         ->fillForm([

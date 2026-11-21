@@ -4,6 +4,7 @@ namespace App\Filament\Auth;
 
 use App\Models\User;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Facades\Filament;
@@ -13,10 +14,37 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Component;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Validation\ValidationException;
 
 class Login extends BaseLogin
 {
+    /**
+     * @return array<mixed>
+     */
+    public function getExtraBodyAttributes(): array
+    {
+        return [
+            'class' => 'ft-auth-login',
+        ];
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return parent::getSubheading()
+            ?? 'Enter your Login ID and password to continue.';
+    }
+
+    protected function getRememberFormComponent(): Component
+    {
+        return parent::getRememberFormComponent()->label('Remember Me');
+    }
+
+    protected function getAuthenticateFormAction(): Action
+    {
+        return parent::getAuthenticateFormAction()->label('Sign In');
+    }
+
     protected function getEmailFormComponent(): Component
     {
         return TextInput::make('login_id')

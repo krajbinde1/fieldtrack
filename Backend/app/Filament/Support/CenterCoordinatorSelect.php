@@ -10,6 +10,8 @@ use App\Support\LoginId;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
+use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -49,6 +51,7 @@ final class CenterCoordinatorSelect
             ->searchable()
             ->optionsLimit(250)
             ->helperText('Assign one or more Center Coordinators. A center can have more than one coordinator.')
+            ->visible(fn (string $operation): bool => $operation === 'create' || self::canAssign())
             ->createOptionModalHeading('Create New Coordinator')
             ->createOptionForm(self::createForm())
             ->createOptionUsing(fn (array $data): int => self::createCoordinator($data))
@@ -58,19 +61,72 @@ final class CenterCoordinatorSelect
                 ->link()
                 ->visible(fn (): bool => self::canCreateCoordinator())
             )
-            ->saveRelationshipsUsing(function (Center $record, $state): void {
-                $selected = array_values(array_unique(array_map('intval', $state ?? [])));
-                $ids = $selected === []
-                    ? []
-                    : User::query()
-                        ->where('role', UserRole::CenterCoordinator->value)
-                        ->where('is_center_login', false)
-                        ->whereIn('id', $selected)
-                        ->pluck('id')
-                        ->all();
+            ->saveRelationshipsUsing(function (Select $component, Center $record, $state): void {
+                $operation = $component->getContainer()?->getOperation();
 
-                $record->coordinators()->sync($ids);
+                if ($operation !== 'create') {
+                    abort_unless(self::canAssign(), 403);
+                }
+
+                self::sync($record, $state);
             });
+    }
+
+    public static function canAssign(): bool
+    {
+        $actor = auth()->user();
+
+        return $actor instanceof User
+            && app(OrganizationAccessService::class)->hasOrganizationWideAccess($actor);
+    }
+
+    public static function assignAction(): Action
+    {
+        return Action::make('assignCoordinators')
+            ->label('Assign Coordinators')
+            ->modalHeading('Assign Coordinators')
+            ->modalSubmitActionLabel('Save')
+            ->authorize(fn (): bool => self::canAssign())
+            ->schema([
+                self::make(),
+            ])
+            ->mountUsing(function (Action $action, ?Schema $schema): void {
+                abort_unless(self::canAssign(), 403);
+
+                $record = $action->getRecord();
+                $ids = $record instanceof Center
+                    ? $record->coordinators()->pluck('users.id')->map(fn ($id): string => (string) $id)->all()
+                    : [];
+
+                $schema?->fill(['coordinators' => $ids]);
+            })
+            ->before(function (): void {
+                abort_unless(self::canAssign(), 403);
+            })
+            ->action(function (): void {
+                Notification::make()
+                    ->title('Coordinators updated.')
+                    ->success()
+                    ->send();
+            });
+    }
+
+    private static function sync(Center $record, mixed $state): void
+    {
+        $selected = array_values(array_unique(array_map(
+            'intval',
+            array_filter(is_array($state) ? $state : [], fn ($id): bool => filled($id)),
+        )));
+        $ids = $selected === []
+            ? []
+            : User::query()
+                ->where('role', UserRole::CenterCoordinator->value)
+                ->where('is_center_login', false)
+                ->whereIn('id', $selected)
+                ->pluck('id')
+                ->all();
+
+        $record->coordinators()->sync($ids);
     }
 
     public static function canCreateCoordinator(): bool

@@ -144,6 +144,22 @@ class AdminPanelProvider extends PanelProvider
             );
         }
 
+        if ($this->renderHookExists('HEAD_END')) {
+            $panel = $panel->renderHook(
+                constant(PanelsRenderHook::class.'::HEAD_END'),
+                fn () => view('filament.partials.fieldtrack-login-theme'),
+                scopes: Login::class,
+            );
+        }
+
+        if ($this->renderHookExists('SIMPLE_LAYOUT_START')) {
+            $panel = $panel->renderHook(
+                constant(PanelsRenderHook::class.'::SIMPLE_LAYOUT_START'),
+                fn () => view('filament.auth.login-brand-panel'),
+                scopes: Login::class,
+            );
+        }
+
         return $panel;
     }
 

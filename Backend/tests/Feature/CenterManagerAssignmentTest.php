@@ -54,7 +54,7 @@ it('assigns center managers from the user form and reflects them on the center l
     Livewire::actingAs($org['admin'])
         ->test(EditCenter::class, ['record' => $center->getKey()])
         ->assertFormFieldVisible('centerManagers')
-        ->assertFormFieldHidden('coordinators')
+        ->assertFormFieldVisible('coordinators')
         ->assertActionHasLabel(
             TestAction::make('createOption')->schemaComponent('centerManagers'),
             '+ Create New Center Manager',

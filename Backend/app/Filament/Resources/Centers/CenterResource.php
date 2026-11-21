@@ -26,6 +26,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -110,6 +111,47 @@ class CenterResource extends Resource
                     ->iconButton(false)
                     ->link()
                     ->visible(fn (): bool => ($actor = auth()->user()) !== null && $access->canManageSchemes($actor))
+                )
+                ->suffixAction(
+                    Action::make('deleteScheme')
+                        ->label('Delete Scheme')
+                        ->icon('heroicon-o-trash')
+                        ->color('danger')
+                        ->link()
+                        ->requiresConfirmation()
+                        ->modalHeading('Delete Scheme')
+                        ->modalDescription('Delete the selected scheme? This cannot be undone. Deletion is only allowed when the scheme is not used by any records.')
+                        ->modalSubmitActionLabel('Delete Scheme')
+                        ->visible(fn (): bool => static::canDeleteSchemes())
+                        ->authorize(fn (): bool => static::canDeleteSchemes())
+                        ->action(function (Get $get, Set $set): void {
+                            $schemeId = $get('scheme_id');
+
+                            if (blank($schemeId)) {
+                                Notification::make()
+                                    ->title('Select a scheme to delete.')
+                                    ->warning()
+                                    ->send();
+
+                                return;
+                            }
+
+                            if (! static::deleteUnusedScheme($schemeId)) {
+                                Notification::make()
+                                    ->title(Scheme::DELETE_BLOCKED_MESSAGE)
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
+
+                            $set('scheme_id', null);
+
+                            Notification::make()
+                                ->title(Scheme::DELETED_MESSAGE)
+                                ->success()
+                                ->send();
+                        }),
                 ),
             TextInput::make('name')->required()->maxLength(255),
             TextInput::make('login_id')
@@ -119,7 +161,7 @@ class CenterResource extends Resource
                 ->hiddenOn('create')
                 ->helperText('Sign-in ID for this center.'),
             TextInput::make('address')->maxLength(255),
-            CenterCoordinatorSelect::make()->visibleOn('create'),
+            CenterCoordinatorSelect::make(),
             CenterManagerSelect::make()->live()->visibleOn('edit'),
             Select::make('primary_center_manager_id')
                 ->label('Primary Center Manager')
@@ -171,7 +213,9 @@ class CenterResource extends Resource
                 TextColumn::make('coordinators.name')
                     ->label('Center Coordinator(s)')
                     ->badge()
-                    ->placeholder('Not Assigned'),
+                    ->placeholder('Not Assigned')
+                    ->action(CenterCoordinatorSelect::assignAction())
+                    ->disabledClick(fn (): bool => ! CenterCoordinatorSelect::canAssign()),
                 TextColumn::make('centerManagers.name')
                     ->label('Center Manager')
                     ->state(function (Center $record): ?string {
@@ -239,6 +283,36 @@ class CenterResource extends Resource
                     ->success()
                     ->send();
             });
+    }
+
+    public static function canDeleteSchemes(): bool
+    {
+        $actor = auth()->user();
+
+        return $actor instanceof User
+            && app(OrganizationAccessService::class)->hasOrganizationWideAccess($actor);
+    }
+
+    public static function deleteUnusedScheme(mixed $schemeId): bool
+    {
+        $actor = auth()->user();
+
+        abort_unless(
+            $actor instanceof User && app(OrganizationAccessService::class)->hasOrganizationWideAccess($actor),
+            403,
+        );
+
+        if (blank($schemeId)) {
+            return false;
+        }
+
+        $scheme = Scheme::query()->find($schemeId);
+
+        if (! $scheme instanceof Scheme) {
+            return true;
+        }
+
+        return $scheme->deleteIfUnused();
     }
 
     public static function getPages(): array
