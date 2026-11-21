@@ -12,6 +12,7 @@ use App\Filament\Resources\LeaveRequests\LeaveRequestResource;
 use App\Filament\Resources\OrgUsers\OrgUserResource;
 use App\Filament\Support\FilamentFilterUrl;
 use App\Models\Attendance;
+use App\Services\AdminCenterContext;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Services\DirectorWorkforceService;
 use App\Services\OrganizationAccessService;
@@ -47,10 +48,14 @@ class DirectorAdminStatsWidget extends Widget
     {
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
+        $context = app(AdminCenterContext::class);
         $today = AttendanceCalendar::today()->toDateString();
         $monthStart = AttendanceCalendar::today()->copy()->startOfMonth()->toDateString();
-        $employeeIds = $access->employeeQuery($user)->where('status', true)->pluck('id');
-        $workforce = app(DirectorWorkforceService::class)->summarize($user);
+        $employeeIds = $context->scopeEmployees(
+            $access->employeeQuery($user)->where('status', true),
+            $user,
+        )->pluck('id');
+        $workforce = app(DirectorWorkforceService::class)->summarize($user, $context->workforceCenterId($user));
         $employeeTotal = $workforce['total'];
         $punchedIn = $workforce['punched_in_today'];
 
@@ -61,11 +66,11 @@ class DirectorAdminStatsWidget extends Widget
             ->whereNull('punch_out_time')
             ->count();
 
-        $pendingPhLeaves = $access->projectHeadLeaveQuery($user)
+        $pendingPhLeaves = $context->scopeByCenterId($access->projectHeadLeaveQuery($user), $user)
             ->where('status', LeaveStatus::Pending->value)
             ->count();
 
-        $confirmedQuery = $access->admissionQuery($user)
+        $confirmedQuery = $context->scopeByCenterId($access->admissionQuery($user), $user)
             ->where('status', AdmissionStatus::Confirmed);
         $confirmedToday = (clone $confirmedQuery)->whereDate('confirmed_at', $today)->count();
         $confirmedMonth = (clone $confirmedQuery)
@@ -85,7 +90,7 @@ class DirectorAdminStatsWidget extends Widget
         return [
             [
                 'label' => 'Total Centers',
-                'value' => (string) $access->centerQuery($user)->count(),
+                'value' => (string) $context->scopeCenters($access->centerQuery($user), $user)->count(),
                 'hint' => null,
                 'url' => CenterResource::getUrl(),
                 'tone' => 'lavender',

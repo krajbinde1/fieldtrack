@@ -6,6 +6,7 @@ use App\Filament\Resources\EmployeeRoutes\EmployeeRouteResource;
 use App\Filament\Support\EmployeeSelect;
 use App\Filament\Support\TodayDateFilter;
 use App\Models\Attendance;
+use App\Services\AdminCenterContext;
 use App\Services\EmployeeRouteAnalysisService;
 use App\Support\AttendanceCalendar;
 use Filament\Actions\Action;
@@ -67,7 +68,11 @@ class EmployeeRoutesTable
             ->filters([
                 SelectFilter::make('employee_id')
                     ->label('Employee')
-                    ->relationship('employee', 'full_name')
+                    ->relationship(
+                        name: 'employee',
+                        titleAttribute: 'full_name',
+                        modifyQueryUsing: fn ($query) => app(AdminCenterContext::class)->scopeEmployees($query),
+                    )
                     ->tap(fn (SelectFilter $filter) => EmployeeSelect::applyRelationshipFilter($filter))
                     ->preload(),
                 TodayDateFilter::make('attendance_date', 'Date'),

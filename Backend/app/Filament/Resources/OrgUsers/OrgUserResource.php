@@ -9,6 +9,7 @@ use App\Filament\Resources\OrgUsers\Pages\ListOrgUsers;
 use App\Filament\Support\CenterAssignmentSelect;
 use App\Filament\Support\LoginIdInput;
 use App\Models\User;
+use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Actions\EditAction;
@@ -78,6 +79,14 @@ class OrgUserResource extends Resource
         $query->whereIn('role', $roles);
 
         if ($user->isAdmin() || $user->isDirector()) {
+            if ($user->isAdmin()) {
+                $centerId = app(AdminCenterContext::class)->idFor($user);
+
+                return $centerId === null
+                    ? $query->whereRaw('1 = 0')
+                    : self::constrainUsersByCenterId($query, $centerId);
+            }
+
             return $query;
         }
 
@@ -157,7 +166,8 @@ class OrgUserResource extends Resource
                             return [];
                         }
 
-                        return $access->centerQuery($user)
+                        return app(AdminCenterContext::class)
+                            ->scopeCenters($access->centerQuery($user), $user)
                             ->orderBy('name')
                             ->pluck('name', 'id')
                             ->all();

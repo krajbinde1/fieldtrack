@@ -2,7 +2,16 @@
 
 use App\Enums\UserRole;
 use App\Filament\Auth\Login;
+use App\Filament\Resources\Centers\Pages\CreateCenter;
+use App\Filament\Resources\Centers\Pages\ListCenters;
+use App\Models\Attendance;
+use App\Models\Center;
+use App\Models\Employee;
 use App\Models\User;
+use App\Services\AdminCenterContext;
+use App\Support\AttendanceCalendar;
+use App\Support\PublicStorage;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -30,7 +39,7 @@ it('lets the existing top-level login sign in as admin', function () {
         ])
         ->call('authenticate')
         ->assertHasNoFormErrors()
-        ->assertRedirect();
+        ->assertRedirect('/admin/select-center');
 
     $this->assertAuthenticatedAs($user);
 });
@@ -38,10 +47,18 @@ it('lets the existing top-level login sign in as admin', function () {
 it('lets an admin open organization, people, and field-operation pages', function () {
     $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
+    $this->actingAs($admin)->get('/admin')->assertRedirect('/admin/select-center');
+
+    $this->withSession([
+        AdminCenterContext::SESSION_KEY => Center::query()->where('code', 'C1')->value('id'),
+    ]);
+
     $dashboard = $this->actingAs($admin)
         ->get('/admin')
         ->assertOk()
-        ->assertSee('Param FieldTrack');
+        ->assertSee('Param FieldTrack')
+        ->assertDontSee('Scheme Master')
+        ->assertSee('Change Center');
 
     $html = $dashboard->getContent();
     expect(substr_count($html, 'class="ft-topbar-search"'))->toBe(1)
@@ -105,10 +122,10 @@ it('blocks a project head from project-head administration', function () {
 
 it('lets an admin open a full employee route map', function () {
     $admin = User::query()->where('login_id', 'admin')->firstOrFail();
-    $employee = \App\Models\Employee::query()->where('mobile', '9876543210')->firstOrFail();
-    $attendance = \App\Models\Attendance::create([
+    $employee = Employee::query()->where('mobile', '9876543210')->firstOrFail();
+    $attendance = Attendance::create([
         'employee_id' => $employee->id,
-        'attendance_date' => \App\Support\AttendanceCalendar::today()->toDateString(),
+        'attendance_date' => AttendanceCalendar::today()->toDateString(),
         'punch_in_time' => '09:00:00',
         'punch_in_latitude' => 18.5204,
         'punch_in_longitude' => 73.8567,
@@ -117,6 +134,9 @@ it('lets an admin open a full employee route map', function () {
     ]);
 
     $this->actingAs($admin)
+        ->withSession([
+            AdminCenterContext::SESSION_KEY => $employee->center_id,
+        ])
         ->get('/admin/employee-routes/'.$attendance->id)
         ->assertOk()
         ->assertSee('Employee Route', false);
@@ -132,10 +152,52 @@ it('blocks a center manager from project administration', function () {
     $this->actingAs($centerManager)->get('/admin/schemes')->assertForbidden();
     $this->actingAs($centerManager)->get('/admin/centers/create')->assertForbidden();
     $this->actingAs($centerManager)->get('/admin/directors')->assertForbidden();
+
+    Livewire::actingAs($centerManager)
+        ->test(ListCenters::class)
+        ->assertActionHidden('create');
+
+    Livewire::actingAs($centerManager)
+        ->test(CreateCenter::class)
+        ->assertForbidden();
+
+    $response = $this->actingAs($centerManager, 'sanctum')
+        ->postJson('/api/manager/centers', [
+            'name' => 'Unauthorized Center',
+        ]);
+
+    expect($response->status())->toBeIn([404, 405]);
+});
+
+it('lets admin and project manager create centers', function () {
+    $admin = User::query()->where('login_id', 'admin')->firstOrFail();
+    $projectHead = User::query()->where('login_id', 'projecthead')->firstOrFail();
+
+    Livewire::actingAs($admin)
+        ->test(ListCenters::class)
+        ->assertActionVisible('create');
+
+    Livewire::actingAs($projectHead)
+        ->test(ListCenters::class)
+        ->assertActionVisible('create');
+
+    Livewire::actingAs($admin)
+        ->test(CreateCenter::class)
+        ->assertSuccessful();
+
+    Livewire::actingAs($projectHead)
+        ->test(CreateCenter::class)
+        ->assertSuccessful();
 });
 
 it('shows a profile menu with logout for every web admin role', function (string $loginId) {
     $user = User::query()->where('login_id', $loginId)->firstOrFail();
+
+    if ($loginId === 'admin') {
+        $this->withSession([
+            AdminCenterContext::SESSION_KEY => Center::query()->where('code', 'C1')->value('id'),
+        ]);
+    }
 
     $response = $this->actingAs($user)
         ->get('/admin')
@@ -166,6 +228,12 @@ it('shows a profile menu with logout for every web admin role', function (string
 
 it('logs every web admin role out through filament and blocks returning to admin pages', function (string $loginId) {
     $user = User::query()->where('login_id', $loginId)->firstOrFail();
+
+    if ($loginId === 'admin') {
+        $this->withSession([
+            AdminCenterContext::SESSION_KEY => Center::query()->where('code', 'C1')->value('id'),
+        ]);
+    }
 
     $dashboard = $this->actingAs($user)->get('/admin');
     $dashboard->assertOk();
@@ -200,13 +268,13 @@ it('lets a web admin open profile and change password pages', function () {
 
 it('keeps punch photos and locations on the attendance view instead of the list', function () {
     $admin = User::query()->where('login_id', 'admin')->firstOrFail();
-    $employee = \App\Models\Employee::query()->where('mobile', '9876543210')->firstOrFail();
-    \Illuminate\Support\Facades\Storage::fake('public');
-    \Illuminate\Support\Facades\Storage::disk('public')->put('attendance/in.jpg', 'in-photo');
-    \Illuminate\Support\Facades\Storage::disk('public')->put('attendance/out.jpg', 'out-photo');
-    $attendance = \App\Models\Attendance::create([
+    $employee = Employee::query()->where('mobile', '9876543210')->firstOrFail();
+    Storage::fake('public');
+    Storage::disk('public')->put('attendance/in.jpg', 'in-photo');
+    Storage::disk('public')->put('attendance/out.jpg', 'out-photo');
+    $attendance = Attendance::create([
         'employee_id' => $employee->id,
-        'attendance_date' => \App\Support\AttendanceCalendar::today()->toDateString(),
+        'attendance_date' => AttendanceCalendar::today()->toDateString(),
         'punch_in_time' => '09:00:00',
         'punch_out_time' => '18:00:00',
         'punch_in_location' => 'Pune HQ',
@@ -221,8 +289,12 @@ it('keeps punch photos and locations on the attendance view instead of the list'
         'approval_status' => 'Pending',
     ]);
 
-    $inUrl = \App\Support\PublicStorage::url('attendance/in.jpg');
-    $outUrl = \App\Support\PublicStorage::url('attendance/out.jpg');
+    $inUrl = PublicStorage::url('attendance/in.jpg');
+    $outUrl = PublicStorage::url('attendance/out.jpg');
+
+    $this->withSession([
+        AdminCenterContext::SESSION_KEY => $employee->center_id,
+    ]);
 
     $this->actingAs($admin)
         ->get('/admin/attendances')

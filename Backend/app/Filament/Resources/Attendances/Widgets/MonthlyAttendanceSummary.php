@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Attendances\Widgets;
 use App\Filament\Resources\Attendances\AttendanceResource;
 use App\Models\Attendance;
 use App\Models\Employee;
+use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Filament\Actions\Action;
@@ -41,9 +42,10 @@ class MonthlyAttendanceSummary extends BaseWidget
         $monthLabel = AttendanceCalendar::now()->month($month)->format('F');
 
         return $table
-            ->query(fn (): Builder => app(OrganizationAccessService::class)
-                ->employeeQuery(auth()->user())
-                ->orderBy('full_name'))
+            ->query(fn (): Builder => app(AdminCenterContext::class)->scopeEmployees(
+                app(OrganizationAccessService::class)->employeeQuery(auth()->user()),
+                auth()->user(),
+            )->orderBy('full_name'))
             ->heading(self::$heading.' — '.$monthLabel.' '.$year)
             ->headerActions([
                 Action::make('previousMonth')

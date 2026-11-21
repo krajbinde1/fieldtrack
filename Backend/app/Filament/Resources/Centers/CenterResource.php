@@ -8,10 +8,13 @@ use App\Filament\Resources\Centers\Pages\EditCenter;
 use App\Filament\Resources\Centers\Pages\ListCenters;
 use App\Filament\Support\CenterManagerSelect;
 use App\Models\Center;
+use App\Models\Scheme;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
@@ -62,7 +65,7 @@ class CenterResource extends Resource
 
         return $schema->components([
             Select::make('scheme_id')
-                ->label('Scheme / Project')
+                ->label('Select Scheme')
                 ->relationship(
                     name: 'scheme',
                     titleAttribute: 'name',
@@ -71,7 +74,33 @@ class CenterResource extends Resource
                 ->required()
                 ->preload()
                 ->searchable()
-                ->disabled(fn (): bool => auth()->user()?->isCenterManager() ?? false),
+                ->disabled(fn (): bool => auth()->user()?->isCenterManager() ?? false)
+                ->createOptionModalHeading('Create New Scheme')
+                ->createOptionForm([
+                    TextInput::make('name')->required()->maxLength(255),
+                    TextInput::make('code')->maxLength(64)->unique(ignoreRecord: true),
+                    Textarea::make('description')->columnSpanFull(),
+                    Toggle::make('is_active')->label('Active')->default(true),
+                ])
+                ->createOptionUsing(function (array $data) use ($access): int {
+                    $actor = auth()->user();
+                    abort_unless($actor && $access->canManageSchemes($actor), 403);
+
+                    $scheme = Scheme::query()->create([
+                        'name' => $data['name'],
+                        'code' => filled($data['code'] ?? null) ? $data['code'] : null,
+                        'description' => filled($data['description'] ?? null) ? $data['description'] : null,
+                        'is_active' => (bool) ($data['is_active'] ?? true),
+                    ]);
+
+                    return (int) $scheme->getKey();
+                })
+                ->createOptionAction(fn (Action $action): Action => $action
+                    ->label('+ Create New Scheme')
+                    ->iconButton(false)
+                    ->link()
+                    ->visible(fn (): bool => ($actor = auth()->user()) !== null && $access->canManageSchemes($actor))
+                ),
             TextInput::make('name')->required()->maxLength(255),
             TextInput::make('address')->maxLength(255),
             CenterManagerSelect::make(),

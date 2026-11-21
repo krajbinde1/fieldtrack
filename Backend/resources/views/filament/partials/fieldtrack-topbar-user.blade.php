@@ -1,6 +1,8 @@
 @php
 use App\Filament\Pages\AccountSettings;
 use App\Filament\Pages\ChangePassword;
+use App\Filament\Pages\SelectCenter;
+use App\Services\AdminCenterContext;
 use Filament\Facades\Filament;
 
     $user = Filament::auth()->user() ?? auth()->user();
@@ -16,10 +18,19 @@ use Filament\Facades\Filament;
     $accountSettingsUrl = AccountSettings::canAccess() ? AccountSettings::getUrl() : null;
     $changePasswordUrl = ChangePassword::getUrl();
     $logoutUrl = Filament::getLogoutUrl();
+    $selectedCenter = $user ? app(AdminCenterContext::class)->centerFor($user) : null;
+    $changeCenterUrl = $selectedCenter ? SelectCenter::getUrl() : null;
 @endphp
 
 @if ($user)
 <div class="ft-topbar-user" data-ft-topbar-user>
+    @if ($selectedCenter && filled($changeCenterUrl))
+        <a class="ft-change-center" href="{{ $changeCenterUrl }}">
+            <span class="ft-change-center-name">{{ $selectedCenter->name }}</span>
+            <span class="ft-change-center-action">Change Center</span>
+        </a>
+    @endif
+
     <button type="button" class="ft-topbar-bell" aria-label="Notifications" title="No new notifications">
         <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <path d="M10 2.4a5 5 0 0 0-5 5v1.7c0 .7-.2 1.3-.6 1.9L3.5 12.7A1.2 1.2 0 0 0 4.5 14.6h11a1.2 1.2 0 0 0 1-1.9l-.9-1.7a3.4 3.4 0 0 1-.6-1.9V7.4a5 5 0 0 0-5-5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>

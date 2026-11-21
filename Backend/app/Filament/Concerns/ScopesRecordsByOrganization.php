@@ -9,6 +9,7 @@ use App\Models\Center;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\Scheme;
+use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -35,42 +36,35 @@ trait ScopesRecordsByOrganization
         };
 
         if ($ids === null) {
-            return $query;
-        }
-
-        if ($model === Attendance::class) {
-            return $query->whereIn('employee_id', $ids)->with(['employee.center.scheme']);
-        }
-
-        if ($model === Admission::class) {
-            return $query->whereIn('center_id', $ids)->with([
+            $scoped = $query;
+        } elseif ($model === Attendance::class) {
+            $scoped = $query->whereIn('employee_id', $ids)->with(['employee.center.scheme']);
+        } elseif ($model === Admission::class) {
+            $scoped = $query->whereIn('center_id', $ids)->with([
                 'scheme',
                 'employee.center.scheme',
                 'district',
                 'taluka',
                 'reviewedBy',
             ]);
-        }
-
-        if ($model === LeaveRequest::class) {
-            return $query->whereIn('employee_id', $ids)->with([
+        } elseif ($model === LeaveRequest::class) {
+            $scoped = $query->whereIn('employee_id', $ids)->with([
                 'employee.center.scheme',
                 'center',
                 'scheme',
             ]);
-        }
-
-        if ($model === AdmissionTarget::class) {
-            return $query->whereNull('parent_id')->whereIn('employee_id', $ids)->with([
+        } elseif ($model === AdmissionTarget::class) {
+            $scoped = $query->whereNull('parent_id')->whereIn('employee_id', $ids)->with([
                 'employee.center.scheme',
                 'center',
                 'scheme',
                 'weeks',
             ]);
+        } else {
+            $table = (new $model)->getTable();
+            $scoped = $query->whereIn($table.'.id', $ids);
         }
 
-        $table = (new $model)->getTable();
-
-        return $query->whereIn($table.'.id', $ids);
+        return app(AdminCenterContext::class)->applyToResourceQuery($scoped, $user, $model);
     }
 }

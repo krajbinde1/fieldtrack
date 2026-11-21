@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Attendances\Tables;
 use App\Models\Attendance;
 use App\Filament\Support\EmployeeSelect;
 use App\Filament\Support\TodayDateFilter;
+use App\Services\AdminCenterContext;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Support\AttendanceCalendar;
 use Filament\Actions\BulkActionGroup;
@@ -60,7 +61,11 @@ class AttendancesTable
                 TodayDateFilter::make('attendance_date', 'Date'),
                 SelectFilter::make('employee_id')
                     ->label('Employee')
-                    ->relationship('employee', 'full_name')
+                    ->relationship(
+                        name: 'employee',
+                        titleAttribute: 'full_name',
+                        modifyQueryUsing: fn ($query) => app(AdminCenterContext::class)->scopeEmployees($query),
+                    )
                     ->tap(fn (SelectFilter $filter) => EmployeeSelect::applyRelationshipFilter($filter))
                     ->preload(),
                 Filter::make('punched_in')

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Admissions\Tables;
 use App\Enums\AdmissionStatus;
 use App\Filament\Support\EmployeeSelect;
 use App\Models\Admission;
+use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -60,7 +61,9 @@ class AdmissionsTable
                     ->relationship(
                         name: 'scheme',
                         titleAttribute: 'name',
-                        modifyQueryUsing: fn ($query) => $user ? $access->schemeQuery($user) : $query->whereRaw('1=0'),
+                        modifyQueryUsing: fn ($query) => $user
+                            ? app(AdminCenterContext::class)->scopeSchemes($access->schemeQuery($user), $user)
+                            : $query->whereRaw('1=0'),
                     )
                     ->preload()
                     ->searchable(),
@@ -69,13 +72,19 @@ class AdmissionsTable
                     ->relationship(
                         name: 'center',
                         titleAttribute: 'name',
-                        modifyQueryUsing: fn ($query) => $user ? $access->centerQuery($user) : $query->whereRaw('1=0'),
+                        modifyQueryUsing: fn ($query) => $user
+                            ? app(AdminCenterContext::class)->scopeCenters($access->centerQuery($user), $user)
+                            : $query->whereRaw('1=0'),
                     )
                     ->preload()
                     ->searchable(),
                 SelectFilter::make('employee_id')
                     ->label('Employee')
-                    ->relationship('employee', 'full_name')
+                    ->relationship(
+                        name: 'employee',
+                        titleAttribute: 'full_name',
+                        modifyQueryUsing: fn ($query) => app(AdminCenterContext::class)->scopeEmployees($query),
+                    )
                     ->tap(fn (SelectFilter $filter) => EmployeeSelect::applyRelationshipFilter($filter))
                     ->preload(),
                 SelectFilter::make('district_id')

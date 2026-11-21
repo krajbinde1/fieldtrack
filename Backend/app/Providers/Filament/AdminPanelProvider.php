@@ -7,6 +7,7 @@ use App\Filament\Auth\Login;
 use App\Filament\Auth\LoginResponse;
 use App\Filament\Auth\LogoutResponse;
 use App\Filament\Pages\Dashboard;
+use App\Http\Middleware\EnsureAdminCenterSelected;
 use App\Http\Middleware\PreventAdminPageCache;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
@@ -80,6 +81,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsureAdminCenterSelected::class,
             ]);
 
         $panel = $this->applyOptionalPanelMethods($panel);

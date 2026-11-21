@@ -9,6 +9,13 @@ class CreateCenter extends CreateRecord
 {
     protected static string $resource = CenterResource::class;
 
+    public function mount(): void
+    {
+        abort_unless(CenterResource::canCreate(), 403);
+
+        parent::mount();
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         unset($data['code']);

@@ -7,6 +7,7 @@ use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Support\FilamentFilterUrl;
 use App\Models\Center;
 use App\Models\User;
+use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -30,10 +31,11 @@ class DirectorConfirmedAdmissionsByCenterWidget extends TableWidget
     {
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
+        $context = app(AdminCenterContext::class);
 
         return $table
             ->heading('Center-wise Confirmed Admissions')
-            ->query(fn (): Builder => $access->centerQuery($user)
+            ->query(fn (): Builder => $context->scopeCenters($access->centerQuery($user), $user)
                 ->with('scheme:id,name')
                 ->withCount([
                     'admissions as confirmed_admissions_count' => fn (Builder $query) => $query
@@ -79,7 +81,7 @@ class DirectorConfirmedAdmissionsByCenterWidget extends TableWidget
             return 0;
         }
 
-        $this->cachedMaxConfirmed = (int) ($access->centerQuery($user)
+        $this->cachedMaxConfirmed = (int) (app(AdminCenterContext::class)->scopeCenters($access->centerQuery($user), $user)
             ->withCount([
                 'admissions as confirmed_admissions_count' => fn (Builder $query) => $query
                     ->where('status', AdmissionStatus::Confirmed),

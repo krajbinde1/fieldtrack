@@ -6,6 +6,7 @@ use App\Enums\AdmissionTargetType;
 use App\Filament\Support\EmployeeSelect;
 use App\Filament\Support\TodayDateFilter;
 use App\Models\AdmissionTarget;
+use App\Services\AdminCenterContext;
 use App\Services\AdmissionTargetService;
 use App\Services\OrganizationAccessService;
 use App\Support\AdmissionTargetPeriod;
@@ -101,13 +102,19 @@ class AdmissionTargetsTable
                     ->relationship(
                         name: 'center',
                         titleAttribute: 'name',
-                        modifyQueryUsing: fn ($query) => $user ? $access->centerQuery($user) : $query->whereRaw('1=0'),
+                        modifyQueryUsing: fn ($query) => $user
+                            ? app(AdminCenterContext::class)->scopeCenters($access->centerQuery($user), $user)
+                            : $query->whereRaw('1=0'),
                     )
                     ->preload()
                     ->searchable(),
                 SelectFilter::make('employee_id')
                     ->label('Employee')
-                    ->relationship('employee', 'full_name')
+                    ->relationship(
+                        name: 'employee',
+                        titleAttribute: 'full_name',
+                        modifyQueryUsing: fn ($query) => app(AdminCenterContext::class)->scopeEmployees($query),
+                    )
                     ->tap(fn (SelectFilter $filter) => EmployeeSelect::applyRelationshipFilter($filter))
                     ->preload(),
             ])

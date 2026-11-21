@@ -2,6 +2,7 @@
 
 namespace App\Filament\Auth;
 
+use App\Services\AdminCenterContext;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
 use Filament\Facades\Filament;
 use Illuminate\Http\RedirectResponse;
@@ -11,6 +12,8 @@ class LogoutResponse implements LogoutResponseContract
 {
     public function toResponse($request): RedirectResponse|Redirector
     {
+        app(AdminCenterContext::class)->forget();
+
         return redirect()
             ->to(Filament::hasLogin() ? Filament::getLoginUrl() : Filament::getUrl())
             ->withHeaders([

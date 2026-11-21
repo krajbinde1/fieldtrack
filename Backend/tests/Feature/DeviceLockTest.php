@@ -3,7 +3,9 @@
 use App\Enums\UserRole;
 use App\Exceptions\DeviceRegisteredException;
 use App\Filament\Pages\DeviceManagement;
+use App\Models\Center;
 use App\Models\User;
+use App\Services\AdminCenterContext;
 use App\Services\Auth\MobileSessionService;
 use Livewire\Livewire;
 
@@ -138,6 +140,9 @@ it('does not device-lock admin web login', function () {
     $admin->forceFill(['active_mobile_device_id' => 'phone-admin'])->save();
 
     $this->actingAs($admin)
+        ->withSession([
+            AdminCenterContext::SESSION_KEY => Center::query()->where('code', 'C1')->value('id'),
+        ])
         ->get('/admin')
         ->assertOk();
 });

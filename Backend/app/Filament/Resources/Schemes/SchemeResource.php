@@ -39,6 +39,11 @@ class SchemeResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Schemes';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function canAccess(): bool
     {
         $user = auth()->user();

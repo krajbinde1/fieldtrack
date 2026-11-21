@@ -302,6 +302,36 @@
         position: relative;
     }
 
+    .ft-change-center {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+        max-width: 14rem;
+        padding: 0.28rem 0.7rem;
+        border: 1px solid var(--ft-border);
+        border-radius: 999px;
+        background: #fff;
+        line-height: 1.15;
+        text-decoration: none;
+    }
+
+    .ft-change-center-name {
+        max-width: 12rem;
+        overflow: hidden;
+        color: var(--ft-text);
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ft-change-center-action {
+        color: #6d5ef6;
+        font-size: 0.68rem;
+        font-weight: 700;
+    }
+
     .ft-topbar-bell {
         display: inline-flex;
         align-items: center;

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Attendances\Pages;
 
 use App\Filament\Resources\Attendances\AttendanceResource;
 use App\Models\Employee;
+use App\Services\AdminCenterContext;
 use App\Support\AttendanceAdminMonthlyReport;
 use App\Support\AttendanceCalendar;
 use Filament\Resources\Pages\Page;
@@ -24,6 +25,8 @@ class EmployeePresentDays extends Page
 
     public function mount(Employee $employee): void
     {
+        app(AdminCenterContext::class)->abortUnlessEmployeeInAdminCenter($employee);
+
         $this->employee = $employee;
         $this->month = (int) request()->query('month', AttendanceCalendar::now()->month);
         $this->year = (int) request()->query('year', AttendanceCalendar::now()->year);
