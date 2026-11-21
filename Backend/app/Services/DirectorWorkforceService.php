@@ -222,16 +222,11 @@ final class DirectorWorkforceService
      */
     private function fieldEmployees(User $viewer, ?int $centerId, ?int $schemeId, array $excludeEmployeeIds): Collection
     {
-        return $this->access->employeeQuery($viewer)
-            ->where('status', true)
+        return $this->access->fieldEmployeeQuery($viewer)
             ->with(['center:id,name,scheme_id', 'center.scheme:id,name', 'user:id,employee_id,login_id,role,name'])
             ->when($centerId !== null, fn ($query) => $query->where('center_id', $centerId))
             ->when($schemeId !== null, fn ($query) => $query->whereHas('center', fn ($center) => $center->where('scheme_id', $schemeId)))
             ->when($excludeEmployeeIds !== [], fn ($query) => $query->whereNotIn('id', $excludeEmployeeIds))
-            ->where(function ($query): void {
-                $query->whereDoesntHave('user')
-                    ->orWhereHas('user', fn ($user) => $user->where('role', UserRole::Employee->value));
-            })
             ->orderBy('full_name')
             ->get();
     }

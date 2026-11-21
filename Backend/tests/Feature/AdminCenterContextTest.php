@@ -22,9 +22,11 @@ use Filament\Actions\Testing\TestAction;
 use App\Models\Admission;
 use App\Models\AdmissionTarget;
 use App\Models\Attendance;
+use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\AdminCenterContext;
+use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -299,7 +301,28 @@ it('selects a center from the centers list and can return to every center', func
 
     expect(session(AdminCenterContext::SESSION_KEY))->toBe($org['centerA']->id);
 
+    $managerEmployee = Employee::create([
+        'center_id' => $org['centerA']->id,
+        'full_name' => 'Manager Profile',
+        'mobile' => '9000000091',
+        'designation' => 'Manager',
+        'status' => true,
+    ]);
+    $org['centerManager']->update(['employee_id' => $managerEmployee->id]);
+    Employee::create([
+        'center_id' => $org['centerA']->id,
+        'full_name' => 'Inactive Emp',
+        'mobile' => '9000000092',
+        'status' => false,
+    ]);
+    $org['empA']->update(['designation' => 'Field Executive']);
+
     $this->withSession(rememberAdminCenter($org['centerA']->id));
+
+    $expectedEmployees = app(OrganizationAccessService::class)
+        ->fieldEmployeeQuery($org['admin'])
+        ->where('center_id', $org['centerA']->id)
+        ->count();
 
     $scoped = Livewire::actingAs($org['admin'])
         ->test(DirectorAdminStatsWidget::class)
@@ -317,6 +340,10 @@ it('selects a center from the centers list and can return to every center', func
             'This Month Confirmed Admissions',
             'Pending Leaves',
         ])
+        ->and((int) $scoped[0]['value'])->toBe($expectedEmployees)
+        ->and($expectedEmployees)->toBe(1)
+        ->and($scoped[0]['url'])->toContain('employees=1')
+        ->and($scoped[0]['url'])->toContain('center='.$org['centerA']->id)
         ->and((int) $scoped[0]['value'])->toBeLessThan($allEmployees);
 
     Livewire::actingAs($org['admin'])
@@ -344,6 +371,52 @@ it('selects a center from the centers list and can return to every center', func
     Livewire::actingAs($org['centerManager'])
         ->test(ListCenters::class)
         ->assertActionHidden(TestAction::make('openDashboard')->table($org['centerA']));
+
+    $this->withSession(rememberAdminCenter($org['centerA']->id));
+
+    Livewire::actingAs($org['admin'])
+        ->test(ListOrgUsers::class, [
+            'employees' => 1,
+            'center' => $org['centerA']->id,
+        ])
+        ->assertSee('Employee Code')
+        ->assertSee('Designation')
+        ->assertSee('Mobile')
+        ->assertSee('Status')
+        ->assertSee('View')
+        ->assertSee($org['empA']->employee_code)
+        ->assertSee('Emp A')
+        ->assertSee('Field Executive')
+        ->assertSee('9000000001')
+        ->assertSee('Center A')
+        ->assertSee('Active')
+        ->assertDontSee('Manager Profile')
+        ->assertDontSee('Inactive Emp')
+        ->assertDontSee('Emp B');
+
+    $this->actingAs($org['admin'])
+        ->get(OrgUserResource::getUrl('viewEmployee', [
+            'employee' => $org['empA'],
+            'center' => $org['centerA']->id,
+        ]))
+        ->assertOk()
+        ->assertSee($org['empA']->employee_code)
+        ->assertSee('Field Executive')
+        ->assertSee('9000000001')
+        ->assertSee('Center A')
+        ->assertSee('Active');
+
+    $this->actingAs($org['admin'])
+        ->get(OrgUserResource::getUrl('viewEmployee', [
+            'employee' => $org['empB'],
+            'center' => $org['centerA']->id,
+        ]))
+        ->assertNotFound();
+
+    Livewire::actingAs($org['admin'])
+        ->test(ListOrgUsers::class)
+        ->assertCanSeeTableRecords([$org['projectHead'], $org['centerManager']])
+        ->assertCanNotSeeTableRecords([$org['userA']]);
 });
 
 it('clears the selected center when an admin logs out', function () {

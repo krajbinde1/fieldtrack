@@ -185,6 +185,19 @@ final class OrganizationAccessService
         return $query->whereIn('id', $ids);
     }
 
+    /**
+     * Active employees only. Accounts with a non-employee role are excluded.
+     */
+    public function fieldEmployeeQuery(User $user): Builder
+    {
+        return $this->employeeQuery($user)
+            ->where('status', true)
+            ->where(function (Builder $query): void {
+                $query->whereDoesntHave('user')
+                    ->orWhereHas('user', fn (Builder $account) => $account->where('role', UserRole::Employee->value));
+            });
+    }
+
     public function attendanceQuery(User $user): Builder
     {
         $query = Attendance::query();

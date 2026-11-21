@@ -4,9 +4,11 @@ namespace App\Filament\Resources\OrgUsers;
 
 use App\Enums\UserRole;
 use App\Filament\Concerns\RequiresSelectedAdminCenter;
+use App\Models\Employee;
 use App\Filament\Resources\OrgUsers\Pages\CreateOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\EditOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\ListOrgUsers;
+use App\Filament\Resources\OrgUsers\Pages\ViewCenterEmployee;
 use App\Filament\Support\CenterAssignmentSelect;
 use App\Filament\Support\LoginIdInput;
 use App\Models\User;
@@ -191,6 +193,42 @@ class OrgUserResource extends Resource
             ]);
     }
 
+    public static function centerEmployeesQuery(User $user, int $centerId): Builder
+    {
+        return app(OrganizationAccessService::class)
+            ->fieldEmployeeQuery($user)
+            ->where('center_id', $centerId)
+            ->with('center');
+    }
+
+    public static function findAuthorizedCenterEmployee(User $user, int $centerId, int $employeeId): ?Employee
+    {
+        if ($centerId < 1) {
+            return null;
+        }
+
+        if ($user->isAdmin()) {
+            $selected = app(AdminCenterContext::class)->idFor($user);
+
+            if ($selected === null || $selected !== $centerId) {
+                return null;
+            }
+        }
+
+        $allowed = app(OrganizationAccessService::class)
+            ->centerQuery($user)
+            ->whereKey($centerId)
+            ->exists();
+
+        if (! $allowed) {
+            return null;
+        }
+
+        return static::centerEmployeesQuery($user, $centerId)
+            ->whereKey($employeeId)
+            ->first();
+    }
+
     public static function constrainUsersByCenterId(Builder $query, int $centerId): Builder
     {
         return $query->where(function (Builder $inner) use ($centerId): void {
@@ -217,6 +255,7 @@ class OrgUserResource extends Resource
             'index' => ListOrgUsers::route('/'),
             'create' => CreateOrgUser::route('/create'),
             'edit' => EditOrgUser::route('/{record}/edit'),
+            'viewEmployee' => ViewCenterEmployee::route('/employee/{employee}'),
         ];
     }
 }
