@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Enums\AdmissionStatus;
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Support\FilamentFilterUrl;
+use App\Models\Admission;
 use App\Models\Center;
 use App\Models\User;
 use App\Services\AdminCenterContext;
@@ -30,6 +31,51 @@ class DirectorConfirmedAdmissionsByCenterWidget extends TableWidget
     public function table(Table $table): Table
     {
         $user = auth()->user();
+        $centerId = $user instanceof User && $user->isAdmin()
+            ? app(AdminCenterContext::class)->idFor($user)
+            : null;
+
+        if ($centerId !== null) {
+            return $this->admissionDetailsTable($table, $user, $centerId);
+        }
+
+        return $this->centerSummaryTable($table, $user);
+    }
+
+    private function admissionDetailsTable(Table $table, ?User $user, int $centerId): Table
+    {
+        $access = app(OrganizationAccessService::class);
+
+        return $table
+            ->heading('Admission Details')
+            ->query(function () use ($access, $user, $centerId): Builder {
+                if (! $user instanceof User) {
+                    return Admission::query()->whereRaw('1 = 0');
+                }
+
+                return $access->admissionQuery($user)
+                    ->where('center_id', $centerId)
+                    ->with(['employee:id,full_name,employee_code'])
+                    ->latest('updated_at');
+            })
+            ->columns([
+                TextColumn::make('full_name')->label('Applicant')->searchable()->placeholder('-'),
+                TextColumn::make('employee.full_name')
+                    ->label('Employee')
+                    ->formatStateUsing(fn (Admission $record): string => $record->employee?->displayLabel() ?? '-'),
+                TextColumn::make('status')
+                    ->badge()
+                    ->formatStateUsing(fn ($state): string => $state instanceof AdmissionStatus ? $state->label() : ucfirst((string) $state))
+                    ->color(fn ($state): string => ($state instanceof AdmissionStatus ? $state : AdmissionStatus::tryFrom((string) $state))?->color() ?? 'gray'),
+                TextColumn::make('submitted_at')->label('Submitted')->dateTime('d M Y')->placeholder('-'),
+            ])
+            ->recordUrl(fn (Admission $record): string => AdmissionResource::getUrl('view', ['record' => $record]))
+            ->emptyStateHeading('No admissions')
+            ->emptyStateDescription('Admissions for this center will appear here.');
+    }
+
+    private function centerSummaryTable(Table $table, ?User $user): Table
+    {
         $access = app(OrganizationAccessService::class);
         $context = app(AdminCenterContext::class);
 

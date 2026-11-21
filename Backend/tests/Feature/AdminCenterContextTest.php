@@ -2,13 +2,18 @@
 
 use App\Enums\AdmissionStatus;
 use App\Enums\UserRole;
+use App\Filament\Pages\AppUpdateSettings;
+use App\Filament\Pages\DeviceManagement;
+use App\Filament\Pages\Reports;
 use App\Filament\Pages\SelectCenter;
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Resources\Admissions\Pages\ListAdmissions;
 use App\Filament\Resources\AdmissionTargets\Pages\ListAdmissionTargets;
 use App\Filament\Resources\Attendances\Pages\ListAttendances;
+use App\Filament\Resources\Centers\CenterResource;
 use App\Filament\Resources\Centers\Pages\ListCenters;
 use App\Filament\Resources\LeaveRequests\Pages\ListLeaveRequests;
+use App\Filament\Resources\OrgUsers\OrgUserResource;
 use App\Filament\Resources\OrgUsers\Pages\ListOrgUsers;
 use App\Filament\Resources\Schemes\Pages\ListSchemes;
 use App\Filament\Widgets\DirectorAdminStatsWidget;
@@ -37,8 +42,17 @@ it('opens the main admin dashboard across all authorized centers', function () {
     $this->actingAs($org['admin'])->get('/admin')
         ->assertOk()
         ->assertSee('Main Admin Dashboard')
+        ->assertSee('Main Dashboard')
+        ->assertSee('Centers')
         ->assertDontSee('Change Center')
         ->assertDontSee('Back to All Centers');
+
+    expect(CenterResource::shouldRegisterNavigation())->toBeTrue()
+        ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeTrue()
+        ->and(DeviceManagement::shouldRegisterNavigation())->toBeTrue()
+        ->and(OrgUserResource::shouldRegisterNavigation())->toBeFalse()
+        ->and(AdmissionResource::shouldRegisterNavigation())->toBeFalse()
+        ->and(Reports::shouldRegisterNavigation())->toBeFalse();
 
     foreach ([
         '/admin/users',
@@ -47,10 +61,15 @@ it('opens the main admin dashboard across all authorized centers', function () {
         '/admin/admissions',
         '/admin/admission-targets',
         '/admin/leave-requests',
-        '/admin/centers',
+        '/admin/reports',
+        '/admin/users/1/edit',
     ] as $uri) {
-        $this->actingAs($org['admin'])->get($uri)->assertOk();
+        $this->actingAs($org['admin'])->get($uri)->assertRedirect('/admin/centers');
     }
+
+    $this->actingAs($org['admin'])->get('/admin/centers')->assertOk()->assertSee('Center A')->assertSee('Center B');
+    $this->actingAs($org['admin'])->get('/admin/app-update-settings')->assertOk();
+    $this->actingAs($org['admin'])->get('/admin/device-management')->assertOk();
 
     $cards = Livewire::actingAs($org['admin'])
         ->test(DirectorAdminStatsWidget::class)
@@ -175,6 +194,10 @@ it('persists the selected center and scopes lists, filters, and direct urls', fu
         ->assertSee('Back to All Centers')
         ->assertSee($org['centerA']->name.' Dashboard');
 
+    expect(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
+        ->and(AdmissionResource::shouldRegisterNavigation())->toBeTrue()
+        ->and(Reports::shouldRegisterNavigation())->toBeTrue();
+
     Livewire::actingAs($org['admin'])
         ->test(ListAttendances::class)
         ->assertCanSeeTableRecords([$attendanceA])
@@ -202,8 +225,10 @@ it('persists the selected center and scopes lists, filters, and direct urls', fu
 
     Livewire::actingAs($org['admin'])
         ->test(DirectorConfirmedAdmissionsByCenterWidget::class)
-        ->assertSee('Center A')
-        ->assertDontSee('Center B');
+        ->assertSee('Admission Details')
+        ->assertSee('Asha One')
+        ->assertDontSee('Bina Two')
+        ->assertDontSee('Center-wise Confirmed Admissions');
 
     $this->actingAs($org['admin'])->get('/admin/attendances/'.$attendanceA->id)->assertOk();
     $this->actingAs($org['admin'])->get('/admin/attendances/'.$attendanceB->id)->assertNotFound();
@@ -281,24 +306,40 @@ it('selects a center from the centers list and can return to every center', func
         ->instance()
         ->getCards();
 
-    expect($scoped[0]['value'])->toBe('2')
-        ->and((int) $scoped[1]['value'])->toBeLessThan($allEmployees);
+    expect(array_column($scoped, 'label'))->not->toContain('Total Centers')
+        ->and(array_column($scoped, 'label'))->toBe([
+            'Total Employees',
+            'Punched In Today',
+            'Active Routes',
+            'Attendance Today',
+            'Total Admissions',
+            'Today Confirmed Admissions',
+            'This Month Confirmed Admissions',
+            'Pending Leaves',
+        ])
+        ->and((int) $scoped[0]['value'])->toBeLessThan($allEmployees);
 
     Livewire::actingAs($org['admin'])
         ->test(DirectorConfirmedAdmissionsByCenterWidget::class)
-        ->assertSee('Center A')
+        ->assertSee('Admission Details')
+        ->assertDontSee('Center-wise Confirmed Admissions')
         ->assertDontSee('Center B');
 
     $this->actingAs($org['admin'])
         ->post(route('admin.clear-center'))
-        ->assertRedirect('/admin')
+        ->assertRedirect('/admin/centers')
         ->assertSessionMissing(AdminCenterContext::SESSION_KEY);
 
     $this->actingAs($org['admin'])
-        ->get('/admin')
+        ->get('/admin/centers')
         ->assertOk()
-        ->assertSee('Main Admin Dashboard')
+        ->assertSee('Center A')
+        ->assertSee('Center B')
         ->assertDontSee('Back to All Centers');
+
+    Livewire::actingAs($org['admin'])
+        ->test(ListCenters::class)
+        ->assertCanSeeTableRecords([$org['centerA'], $org['centerB']]);
 
     Livewire::actingAs($org['centerManager'])
         ->test(ListCenters::class)
@@ -378,6 +419,12 @@ it('does not force center selection on a director', function () {
         ->get('/admin')
         ->assertOk()
         ->assertDontSee('Change Center');
+
+    expect(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
+        ->and(Reports::shouldRegisterNavigation())->toBeTrue();
+
+    $this->actingAs($org['director'])->get('/admin/users')->assertOk();
+    $this->actingAs($org['director'])->get('/admin/reports')->assertOk();
 
     $this->withSession(rememberAdminCenter($org['centerA']->id));
 

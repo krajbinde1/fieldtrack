@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\AdmissionTargets;
 
+use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\AdmissionTargets\Pages\CreateAdmissionTarget;
 use App\Filament\Resources\AdmissionTargets\Pages\EditAdmissionTarget;
@@ -20,6 +21,7 @@ use Filament\Tables\Table;
 
 class AdmissionTargetResource extends Resource
 {
+    use RequiresSelectedAdminCenter;
     use ScopesRecordsByOrganization;
 
     protected static ?string $model = AdmissionTarget::class;

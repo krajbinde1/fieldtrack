@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Models\Attendance;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
 class Reports extends Page implements HasTable
 {
     use InteractsWithTable;
+    use RequiresSelectedAdminCenter;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChartBar;
 

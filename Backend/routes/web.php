@@ -15,7 +15,7 @@ Route::post('/admin/clear-center', function () {
     abort_unless($user instanceof User && $user->isAdmin(), 403);
     app(AdminCenterContext::class)->forget();
 
-    return redirect('/admin');
+    return redirect('/admin/centers');
 })->middleware('auth')->name('admin.clear-center');
 
 Route::get('/storage/{path}', PublicStorageController::class)

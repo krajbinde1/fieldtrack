@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\EmployeeRoutes;
 
 use App\Filament\Concerns\DeniesOrdersOnlyFilamentUsers;
+use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\EmployeeRoutes\Pages\ListEmployeeRoutes;
 use App\Filament\Resources\EmployeeRoutes\Pages\ViewEmployeeRoute;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class EmployeeRouteResource extends Resource
 {
     use DeniesOrdersOnlyFilamentUsers;
+    use RequiresSelectedAdminCenter;
     use ScopesRecordsByOrganization;
 
     protected static ?string $model = Attendance::class;

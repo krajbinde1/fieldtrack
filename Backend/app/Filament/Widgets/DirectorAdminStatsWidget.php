@@ -12,6 +12,7 @@ use App\Filament\Resources\LeaveRequests\LeaveRequestResource;
 use App\Filament\Resources\OrgUsers\OrgUserResource;
 use App\Filament\Support\FilamentFilterUrl;
 use App\Models\Attendance;
+use App\Models\User;
 use App\Services\AdminCenterContext;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Services\DirectorWorkforceService;
@@ -66,10 +67,6 @@ class DirectorAdminStatsWidget extends Widget
             ->whereNull('punch_out_time')
             ->count();
 
-        $pendingPhLeaves = $context->scopeByCenterId($access->projectHeadLeaveQuery($user), $user)
-            ->where('status', LeaveStatus::Pending->value)
-            ->count();
-
         $confirmedQuery = $context->scopeByCenterId($access->admissionQuery($user), $user)
             ->where('status', AdmissionStatus::Confirmed);
         $confirmedToday = (clone $confirmedQuery)->whereDate('confirmed_at', $today)->count();
@@ -86,6 +83,96 @@ class DirectorAdminStatsWidget extends Widget
         $absent = (clone $todayAttendance)->where('attendance_status', AttendanceStatusCalculator::STATUS_ABSENT)->count();
 
         $todayDateFilter = ['attendance_date' => ['date' => $today]];
+        $centerId = $user instanceof User && $user->isAdmin() ? $context->idFor($user) : null;
+
+        $employeesCard = [
+            'label' => 'Total Employees',
+            'value' => (string) $employeeTotal,
+            'hint' => null,
+            'url' => OrgUserResource::getUrl(),
+            'tone' => 'sky',
+            'icon' => 'employees',
+        ];
+        $punchedCard = [
+            'label' => 'Punched In Today',
+            'value' => $punchedIn.' / '.$employeeTotal,
+            'hint' => 'Punched in / total employees',
+            'url' => FilamentFilterUrl::for(AttendanceResource::class, [
+                ...$todayDateFilter,
+                'punched_in' => ['isActive' => true],
+            ]),
+            'tone' => 'mint',
+            'icon' => 'punched',
+        ];
+        $routesCard = [
+            'label' => 'Active Routes',
+            'value' => (string) $activeRoutes,
+            'hint' => null,
+            'url' => FilamentFilterUrl::for(EmployeeRouteResource::class, [
+                ...$todayDateFilter,
+                'active_now' => ['isActive' => true],
+            ]),
+            'tone' => 'peach',
+            'icon' => 'routes',
+        ];
+        $attendanceCard = [
+            'label' => 'Attendance Today',
+            'value' => $present.' / '.$halfDay.' / '.$absent,
+            'hint' => 'Present / Half Day / Absent',
+            'url' => FilamentFilterUrl::for(AttendanceResource::class, $todayDateFilter),
+            'tone' => 'sage',
+            'icon' => 'attendance',
+        ];
+        $confirmedTodayCard = [
+            'label' => 'Today Confirmed Admissions',
+            'value' => (string) $confirmedToday,
+            'hint' => null,
+            'url' => self::confirmedAdmissionsUrl($today, $today, $centerId),
+            'tone' => 'lilac',
+            'icon' => 'admissions-today',
+        ];
+        $confirmedMonthCard = [
+            'label' => 'This Month Confirmed Admissions',
+            'value' => (string) $confirmedMonth,
+            'hint' => null,
+            'url' => self::confirmedAdmissionsUrl($monthStart, $today, $centerId),
+            'tone' => 'blue',
+            'icon' => 'admissions-month',
+        ];
+
+        if ($centerId !== null) {
+            $totalAdmissions = $context->scopeByCenterId($access->admissionQuery($user), $user)->count();
+            $pendingLeaves = $context->scopeByCenterId($access->leaveQuery($user), $user)
+                ->where('status', LeaveStatus::Pending->value)
+                ->count();
+
+            return [
+                $employeesCard,
+                $punchedCard,
+                $routesCard,
+                $attendanceCard,
+                [
+                    'label' => 'Total Admissions',
+                    'value' => (string) $totalAdmissions,
+                    'hint' => null,
+                    'url' => AdmissionResource::getUrl(),
+                    'tone' => 'lilac',
+                    'icon' => 'admissions-today',
+                ],
+                $confirmedTodayCard,
+                $confirmedMonthCard,
+                [
+                    'label' => 'Pending Leaves',
+                    'value' => (string) $pendingLeaves,
+                    'hint' => null,
+                    'url' => FilamentFilterUrl::for(LeaveRequestResource::class, [
+                        'status' => ['value' => LeaveStatus::Pending->value],
+                    ]),
+                    'tone' => 'amber',
+                    'icon' => 'leaves',
+                ],
+            ];
+        }
 
         return [
             [
@@ -96,39 +183,14 @@ class DirectorAdminStatsWidget extends Widget
                 'tone' => 'lavender',
                 'icon' => 'centers',
             ],
-            [
-                'label' => 'Total Employees',
-                'value' => (string) $employeeTotal,
-                'hint' => null,
-                'url' => OrgUserResource::getUrl(),
-                'tone' => 'sky',
-                'icon' => 'employees',
-            ],
-            [
-                'label' => 'Punched In Today',
-                'value' => $punchedIn.' / '.$employeeTotal,
-                'hint' => 'Punched in / total employees',
-                'url' => FilamentFilterUrl::for(AttendanceResource::class, [
-                    ...$todayDateFilter,
-                    'punched_in' => ['isActive' => true],
-                ]),
-                'tone' => 'mint',
-                'icon' => 'punched',
-            ],
-            [
-                'label' => 'Active Routes',
-                'value' => (string) $activeRoutes,
-                'hint' => null,
-                'url' => FilamentFilterUrl::for(EmployeeRouteResource::class, [
-                    ...$todayDateFilter,
-                    'active_now' => ['isActive' => true],
-                ]),
-                'tone' => 'peach',
-                'icon' => 'routes',
-            ],
+            $employeesCard,
+            $punchedCard,
+            $routesCard,
             [
                 'label' => 'Pending Project Manager Leaves',
-                'value' => (string) $pendingPhLeaves,
+                'value' => (string) $context->scopeByCenterId($access->projectHeadLeaveQuery($user), $user)
+                    ->where('status', LeaveStatus::Pending->value)
+                    ->count(),
                 'hint' => null,
                 'url' => FilamentFilterUrl::for(LeaveRequestResource::class, [
                     'status' => ['value' => LeaveStatus::Pending->value],
@@ -137,41 +199,26 @@ class DirectorAdminStatsWidget extends Widget
                 'tone' => 'amber',
                 'icon' => 'leaves',
             ],
-            [
-                'label' => 'Today Confirmed Admissions',
-                'value' => (string) $confirmedToday,
-                'hint' => null,
-                'url' => self::confirmedAdmissionsUrl($today, $today),
-                'tone' => 'lilac',
-                'icon' => 'admissions-today',
-            ],
-            [
-                'label' => 'This Month Confirmed Admissions',
-                'value' => (string) $confirmedMonth,
-                'hint' => null,
-                'url' => self::confirmedAdmissionsUrl($monthStart, $today),
-                'tone' => 'blue',
-                'icon' => 'admissions-month',
-            ],
-            [
-                'label' => 'Attendance Today',
-                'value' => $present.' / '.$halfDay.' / '.$absent,
-                'hint' => 'Present / Half Day / Absent',
-                'url' => FilamentFilterUrl::for(AttendanceResource::class, $todayDateFilter),
-                'tone' => 'sage',
-                'icon' => 'attendance',
-            ],
+            $confirmedTodayCard,
+            $confirmedMonthCard,
+            $attendanceCard,
         ];
     }
 
-    private static function confirmedAdmissionsUrl(string $from, string $until): string
+    private static function confirmedAdmissionsUrl(string $from, string $until, ?int $centerId = null): string
     {
-        return FilamentFilterUrl::for(AdmissionResource::class, [
+        $filters = [
             'status' => ['value' => AdmissionStatus::Confirmed->value],
             'confirmed_range' => [
                 'from' => $from,
                 'until' => $until,
             ],
-        ]);
+        ];
+
+        if ($centerId !== null) {
+            $filters['center_id'] = ['value' => $centerId];
+        }
+
+        return FilamentFilterUrl::for(AdmissionResource::class, $filters);
     }
 }

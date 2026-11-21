@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Admissions;
 
+use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\Admissions\Pages\ListAdmissions;
 use App\Filament\Resources\Admissions\Pages\ViewAdmission;
@@ -16,6 +17,7 @@ use Filament\Tables\Table;
 
 class AdmissionResource extends Resource
 {
+    use RequiresSelectedAdminCenter;
     use ScopesRecordsByOrganization;
 
     protected static ?string $model = Admission::class;

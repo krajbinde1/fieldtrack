@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Attendances;
 
 use App\Filament\Concerns\DeniesOrdersOnlyFilamentUsers;
+use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\Attendances\Pages\EmployeeAbsentDays;
 use App\Filament\Resources\Attendances\Pages\EmployeeHalfDays;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class AttendanceResource extends Resource
 {
     use DeniesOrdersOnlyFilamentUsers;
+    use RequiresSelectedAdminCenter;
     use ScopesRecordsByOrganization;
 
     protected static ?string $model = Attendance::class;

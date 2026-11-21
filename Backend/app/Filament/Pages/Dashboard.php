@@ -26,6 +26,17 @@ class Dashboard extends BaseDashboard
     /**
      * @return int | array<string, ?int>
      */
+    public static function getNavigationLabel(): string
+    {
+        $user = auth()->user();
+
+        if ($user instanceof User && $user->isAdmin() && ! app(AdminCenterContext::class)->hasValidSelection($user)) {
+            return 'Main Dashboard';
+        }
+
+        return 'Dashboard';
+    }
+
     public function getTitle(): string
     {
         $user = auth()->user();

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\OrgUsers;
 
 use App\Enums\UserRole;
+use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Resources\OrgUsers\Pages\CreateOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\EditOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\ListOrgUsers;
@@ -28,6 +29,7 @@ use Illuminate\Support\Facades\Hash;
 
 class OrgUserResource extends Resource
 {
+    use RequiresSelectedAdminCenter;
     protected static ?string $model = User::class;
 
     protected static ?string $slug = 'users';

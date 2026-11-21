@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\LeaveRequests;
 
+use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\LeaveRequests\Pages\ListLeaveRequests;
 use App\Filament\Resources\LeaveRequests\Pages\ViewLeaveRequest;
@@ -16,6 +17,7 @@ use Filament\Tables\Table;
 
 class LeaveRequestResource extends Resource
 {
+    use RequiresSelectedAdminCenter;
     use ScopesRecordsByOrganization;
 
     protected static ?string $model = LeaveRequest::class;

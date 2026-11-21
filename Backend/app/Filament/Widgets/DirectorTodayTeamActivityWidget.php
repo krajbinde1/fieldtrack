@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Attendances\AttendanceResource;
 use App\Models\Attendance;
+use App\Models\User;
 use App\Services\AdminCenterContext;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Services\OrganizationAccessService;
@@ -29,10 +30,14 @@ class DirectorTodayTeamActivityWidget extends TableWidget
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
         $today = AttendanceCalendar::today()->toDateString();
-        $employeeIds = app(AdminCenterContext::class)->scopeEmployees(
-            $access->employeeQuery($user)->where('status', true),
-            $user,
-        )->pluck('id');
+        $centerId = $user instanceof User && $user->isAdmin()
+            ? app(AdminCenterContext::class)->idFor($user)
+            : null;
+        $employees = $access->employeeQuery($user)->where('status', true);
+        if ($centerId !== null) {
+            $employees->where('center_id', $centerId);
+        }
+        $employeeIds = $employees->pluck('id');
 
         return $table
             ->heading('Today Team Activity')
