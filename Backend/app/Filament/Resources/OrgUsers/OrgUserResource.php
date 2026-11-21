@@ -72,7 +72,7 @@ class OrgUserResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
-            ->with(['headedCenters', 'managedCenters', 'employee.center'])
+            ->with(['headedCenters', 'managedCenters', 'coordinatedCenters', 'employee.center'])
             ->where('is_center_login', false);
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
@@ -98,7 +98,10 @@ class OrgUserResource extends Resource
 
         $centerIds = $access->visibleCenterIds($user) ?? [];
 
-        return $query->whereHas('managedCenters', fn ($q) => $q->whereIn('centers.id', $centerIds));
+        return $query->where(function (Builder $inner) use ($centerIds): void {
+            $inner->whereHas('managedCenters', fn ($q) => $q->whereIn('centers.id', $centerIds))
+                ->orWhereHas('coordinatedCenters', fn ($q) => $q->whereIn('centers.id', $centerIds));
+        });
     }
 
     public static function form(Schema $schema): Schema
@@ -126,6 +129,10 @@ class OrgUserResource extends Resource
                 ->dehydrated(fn ($state) => filled($state))
                 ->required(fn (string $operation): bool => $operation === 'create')
                 ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
+            CenterAssignmentSelect::make('coordinatedCenters')
+                ->label('Assigned Centers')
+                ->helperText('This Center Coordinator can view only these centers.')
+                ->visible(fn ($get): bool => $get('role') === UserRole::CenterCoordinator->value),
             CenterAssignmentSelect::make()
                 ->visible(fn ($get): bool => $get('role') === UserRole::ProjectHead->value),
             CenterAssignmentSelect::make('managedCenters')
@@ -235,6 +242,7 @@ class OrgUserResource extends Resource
     {
         return $query->where(function (Builder $inner) use ($centerId): void {
             $inner->whereHas('headedCenters', fn (Builder $centers) => $centers->where('centers.id', $centerId))
+                ->orWhereHas('coordinatedCenters', fn (Builder $centers) => $centers->where('centers.id', $centerId))
                 ->orWhereHas('managedCenters', fn (Builder $centers) => $centers->where('centers.id', $centerId))
                 ->orWhereHas('employee', fn (Builder $employee) => $employee->where('center_id', $centerId));
         });

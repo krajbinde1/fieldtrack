@@ -407,7 +407,7 @@ it('selects a center from the centers list and can return to every center', func
 
     Livewire::actingAs($org['centerManager'])
         ->test(ListCenters::class)
-        ->assertActionHidden(TestAction::make('openDashboard')->table($org['centerA']));
+        ->assertActionVisible(TestAction::make('openDashboard')->table($org['centerA']));
 
     $this->withSession(rememberAdminCenter($org['centerA']->id));
 
@@ -496,7 +496,7 @@ it('does not force center selection on a center manager', function () {
         ->assertDontSee('Main Dashboard')
         ->assertDontSee('Center Dashboard');
 
-    $this->actingAs($org['centerManager'])->get('/admin/center-dashboard')->assertForbidden();
+    $this->actingAs($org['centerManager'])->get('/admin/center-dashboard')->assertRedirect('/admin/centers');
     expect(CenterDashboard::shouldRegisterNavigation())->toBeFalse()
         ->and(Dashboard::getNavigationLabel())->toBe('Dashboard');
 

@@ -85,7 +85,7 @@ class ManagerEmployeeController extends Controller
             'full_name' => ['required', 'string', 'max:255'],
             'mobile' => ['required', 'regex:/^[6-9][0-9]{9}$/', Employee::uniqueAmongActive('mobile')],
             'email' => ['nullable', 'email', 'max:255'],
-            'staff_role' => ['required', Rule::in(CenterStaffRole::values())],
+            'staff_role' => ['required', Rule::in(array_keys(CenterStaffRole::assignableOptions()))],
             'status' => ['sometimes', 'boolean'],
         ]);
 

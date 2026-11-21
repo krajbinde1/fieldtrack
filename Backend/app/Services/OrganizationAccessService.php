@@ -27,7 +27,7 @@ final class OrganizationAccessService
             return null;
         }
 
-        if ($user->isProjectHead()) {
+        if ($user->isCenterCoordinator() || $user->isProjectHead()) {
             return Center::query()
                 ->whereIn('id', $this->visibleCenterIds($user) ?? [])
                 ->pluck('scheme_id')
@@ -69,6 +69,10 @@ final class OrganizationAccessService
             $centerId = Center::query()->where('login_user_id', $user->id)->value('id');
 
             return $centerId ? [(int) $centerId] : [];
+        }
+
+        if ($user->isCenterCoordinator()) {
+            return $user->coordinatedCenters()->pluck('centers.id')->map(fn ($id) => (int) $id)->all();
         }
 
         if ($user->isProjectHead()) {
@@ -581,7 +585,12 @@ final class OrganizationAccessService
 
     public function canAccessOrgUsers(User $user): bool
     {
-        return $user->isAdmin() || $user->isDirector() || $user->isProjectHead();
+        return $user->isAdmin() || $user->isDirector() || $user->isCenterCoordinator() || $user->isProjectHead();
+    }
+
+    public function isReadOnlyCenterViewer(User $user): bool
+    {
+        return $user->isCenterCoordinator();
     }
 
     /**
@@ -592,13 +601,17 @@ final class OrganizationAccessService
         if ($user->isAdmin()) {
             return [
                 UserRole::Director->value,
+                UserRole::CenterCoordinator->value,
                 UserRole::ProjectHead->value,
                 UserRole::CenterManager->value,
             ];
         }
 
         if ($user->isDirector()) {
-            return [UserRole::ProjectHead->value];
+            return [
+                UserRole::CenterCoordinator->value,
+                UserRole::ProjectHead->value,
+            ];
         }
 
         if ($user->isProjectHead()) {
@@ -614,8 +627,13 @@ final class OrganizationAccessService
             return false;
         }
 
+        if ($actor->isCenterCoordinator()) {
+            return false;
+        }
+
         if (! in_array($record->role, [
             UserRole::Director->value,
+            UserRole::CenterCoordinator->value,
             UserRole::ProjectHead->value,
             UserRole::CenterManager->value,
         ], true)) {
@@ -627,7 +645,7 @@ final class OrganizationAccessService
         }
 
         if ($actor->isDirector()) {
-            return $record->isProjectHead() || $record->isCenterManager();
+            return $record->isCenterCoordinator() || $record->isProjectHead() || $record->isCenterManager();
         }
 
         if ($actor->isProjectHead() && $record->isCenterManager()) {
@@ -647,6 +665,7 @@ final class OrganizationAccessService
         if ($user->isAdmin()) {
             return [
                 UserRole::Director->value,
+                UserRole::CenterCoordinator->value,
                 UserRole::ProjectHead->value,
                 UserRole::CenterManager->value,
             ];
@@ -654,12 +673,13 @@ final class OrganizationAccessService
 
         if ($user->isDirector()) {
             return [
+                UserRole::CenterCoordinator->value,
                 UserRole::ProjectHead->value,
                 UserRole::CenterManager->value,
             ];
         }
 
-        if ($user->isProjectHead()) {
+        if ($user->isCenterCoordinator() || $user->isProjectHead()) {
             return [UserRole::CenterManager->value];
         }
 
@@ -671,6 +691,7 @@ final class OrganizationAccessService
         return [
             UserRole::Admin->value,
             UserRole::Director->value,
+            UserRole::CenterCoordinator->value,
             UserRole::ProjectHead->value,
             UserRole::CenterManager->value,
         ];

@@ -83,17 +83,16 @@ it('assigns selected center managers from the center form and reflects them on u
             'name' => 'Managed From Center',
             'address' => '1 Center Road',
             'is_active' => true,
-            'centerManagers' => [$org['centerManager']->id, $secondManager->id],
-            'primary_center_manager_id' => $secondManager->id,
+            'centerManagers' => [$secondManager->id],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
     $center = Center::query()->where('name', 'Managed From Center')->firstOrFail();
-    expect($center->centerManagers()->pluck('users.id')->sort()->values()->all())
-        ->toBe(collect([$org['centerManager']->id, $secondManager->id])->sort()->values()->all())
+    expect($center->centerManagers()->pluck('users.id')->all())
+        ->toBe([$secondManager->id])
         ->and($org['centerManager']->fresh()->managedCenters()->pluck('centers.id')->all())
-        ->toContain($org['centerA']->id, $center->id)
+        ->toContain($org['centerA']->id)
         ->and($secondManager->fresh()->managedCenters()->pluck('centers.id')->all())
         ->toContain($center->id)
         ->and($org['centerA']->fresh()->centerManagers->pluck('id')->all())
@@ -101,7 +100,15 @@ it('assigns selected center managers from the center form and reflects them on u
 
     Livewire::actingAs($org['admin'])
         ->test(EditOrgUser::class, ['record' => $org['centerManager']->getKey()])
-        ->assertSee($center->name);
+        ->fillForm([
+            'managedCenters' => [$org['centerA']->id, $org['centerB']->id],
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($org['centerManager']->fresh()->managedCenters()->pluck('centers.id')->all())
+        ->toContain($org['centerA']->id, $org['centerB']->id)
+        ->and($center->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$secondManager->id]);
 });
 
 it('creates a center manager from the center form modal, auto-selects them, and assigns on save', function () {
@@ -186,13 +193,11 @@ it('adds and removes center managers on edit without wiping other centers', func
         ->test(EditCenter::class, ['record' => $org['centerA']->getKey()])
         ->fillForm([
             'centerManagers' => [$org['centerManager']->id, $other->id],
-            'primary_center_manager_id' => $other->id,
         ])
         ->call('save')
-        ->assertHasNoFormErrors();
+        ->assertHasErrors(['centerManagers' => 'A center can have only one active Center Manager.']);
 
-    expect($org['centerA']->fresh()->centerManagers->pluck('id')->sort()->values()->all())
-        ->toBe(collect([$org['centerManager']->id, $other->id])->sort()->values()->all())
+    expect($org['centerA']->fresh()->centerManagers->pluck('id')->all())->toBe([$org['centerManager']->id])
         ->and($org['centerB']->fresh()->centerManagers)->toHaveCount(0);
 
     Livewire::actingAs($org['admin'])

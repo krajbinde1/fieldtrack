@@ -194,7 +194,14 @@ class EmployeeAuthController extends Controller
      */
     private function mobilePermissions(User $user): array
     {
-        return array_values($user->roleEnum()->mobilePermissions());
+        $permissions = $user->roleEnum()->mobilePermissions();
+        $user->loadMissing('employee');
+
+        if ($user->isEmployeeUser() && $user->employee !== null) {
+            $permissions = array_merge($permissions, $user->employee->staffRoleEnum()->reservedPermissions());
+        }
+
+        return array_values(array_unique($permissions));
     }
 
     private function employeeData(Employee $employee): array

@@ -28,13 +28,16 @@ class DirectorConfirmedAdmissionsByCenterWidget extends TableWidget
 
     public static function canView(): bool
     {
-        return auth()->user()?->isAdminOrDirector() === true;
+        $user = auth()->user();
+
+        return $user instanceof User
+            && ($user->isAdminOrDirector() || $user->isCenterCoordinator());
     }
 
     public function table(Table $table): Table
     {
         $user = auth()->user();
-        $centerId = $user instanceof User && $user->isAdmin()
+        $centerId = $user instanceof User
             ? app(AdminCenterContext::class)->idFor($user)
             : null;
 

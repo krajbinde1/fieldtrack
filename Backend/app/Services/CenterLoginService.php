@@ -21,6 +21,12 @@ class CenterLoginService
     {
         $eligible = $this->eligibleManagerIds($this->selectedIds($state));
 
+        if (count($eligible) > 1) {
+            throw ValidationException::withMessages([
+                'centerManagers' => 'A center can have only one active Center Manager.',
+            ]);
+        }
+
         if (count($eligible) <= 1) {
             $data['primary_center_manager_id'] = $eligible[0] ?? null;
 
@@ -70,6 +76,32 @@ class CenterLoginService
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();
+    }
+
+    /**
+     * @param  list<int>  $centerIds
+     */
+    public function assertSoleActiveManager(User $manager, array $centerIds): void
+    {
+        if ($manager->is_active !== true || $manager->is_center_login === true) {
+            return;
+        }
+
+        foreach ($centerIds as $centerId) {
+            $taken = User::query()
+                ->where('role', UserRole::CenterManager->value)
+                ->where('is_active', true)
+                ->where('is_center_login', false)
+                ->whereKeyNot($manager->id)
+                ->whereHas('managedCenters', fn ($query) => $query->where('centers.id', $centerId))
+                ->exists();
+
+            if ($taken) {
+                throw ValidationException::withMessages([
+                    'managedCenters' => 'A center can have only one active Center Manager.',
+                ]);
+            }
+        }
     }
 
     public function syncAccount(Center $center): ?User

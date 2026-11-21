@@ -49,7 +49,9 @@ class EmployeeResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->isCenterManager() === true;
+        $user = auth()->user();
+
+        return $user?->isCenterManager() === true || $user?->isCenterCoordinator() === true;
     }
 
     public static function canCreate(): bool

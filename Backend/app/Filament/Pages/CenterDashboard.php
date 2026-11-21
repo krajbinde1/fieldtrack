@@ -22,19 +22,34 @@ class CenterDashboard extends Dashboard
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->isAdmin() === true;
+        $user = auth()->user();
+
+        return $user instanceof User
+            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager());
     }
 
     public static function shouldRegisterNavigation(): bool
     {
-        return static::canAccess();
+        $user = auth()->user();
+
+        if (! $user instanceof User || ! ($user->isAdmin() || $user->isCenterCoordinator())) {
+            return false;
+        }
+
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return app(AdminCenterContext::class)->hasValidSelection($user);
     }
 
     public function mount(): void
     {
         $user = auth()->user();
 
-        if ($user instanceof User && $user->isAdmin() && ! app(AdminCenterContext::class)->hasValidSelection($user)) {
+        if ($user instanceof User
+            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager())
+            && ! app(AdminCenterContext::class)->hasValidSelection($user)) {
             $this->redirect('/admin/centers');
         }
     }

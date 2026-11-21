@@ -5,6 +5,7 @@ namespace App\Filament\Support;
 use App\Models\Center;
 use App\Models\Scheme;
 use App\Models\User;
+use App\Services\CenterLoginService;
 use App\Services\OrganizationAccessService;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
@@ -39,8 +40,10 @@ final class CenterAssignmentSelect
             ->required()
             ->helperText(
                 $name === 'managedCenters'
-                    ? 'Assign this Center Manager to one or more Centers. The Center list shows these assignments automatically.'
-                    : 'Project Manager can access only the selected Centers, even when they belong to the same Scheme.',
+                    ? 'A manager can cover several centers. Each center can have only one active manager.'
+                    : ($name === 'coordinatedCenters'
+                        ? 'Coordinators can view only the selected centers. A center can have more than one coordinator.'
+                        : 'Project Manager can access only the selected Centers, even when they belong to the same Scheme.'),
             )
             ->saveRelationshipsUsing(function (User $record, $state) use ($access, $user, $name): void {
                 $selected = array_map('intval', $state ?? []);
@@ -48,18 +51,21 @@ final class CenterAssignmentSelect
                 $relation = $record->{$name}();
 
                 if ($visible === null) {
-                    $relation->sync($selected);
-
-                    return;
+                    $ids = $selected;
+                } else {
+                    $selected = array_values(array_intersect($selected, $visible));
+                    $keep = $relation
+                        ->whereNotIn('centers.id', $visible)
+                        ->pluck('centers.id')
+                        ->all();
+                    $ids = array_values(array_unique(array_merge($keep, $selected)));
                 }
 
-                $selected = array_values(array_intersect($selected, $visible));
-                $keep = $relation
-                    ->whereNotIn('centers.id', $visible)
-                    ->pluck('centers.id')
-                    ->all();
+                if ($name === 'managedCenters') {
+                    app(CenterLoginService::class)->assertSoleActiveManager($record, $ids);
+                }
 
-                $relation->sync(array_values(array_unique(array_merge($keep, $selected))));
+                $relation->sync($ids);
             });
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Centers\Pages;
 
 use App\Filament\Resources\Centers\CenterResource;
+use App\Models\User;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Tables\Table;
@@ -21,7 +22,8 @@ class ListCenters extends ListRecords
     {
         $table = parent::makeTable();
 
-        if (auth()->user()?->isAdmin() !== true) {
+        $user = auth()->user();
+        if (! $user instanceof User || ! ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager())) {
             return $table;
         }
 

@@ -50,7 +50,7 @@ final class CenterManagerSelect
             ->preload()
             ->searchable()
             ->optionsLimit(250)
-            ->helperText('Assign one or more existing Center Managers. This is the same assignment shown on Users → Assigned Centers.')
+            ->helperText('Assign one active Center Manager. That manager can still be assigned to other centers.')
             ->createOptionModalHeading('Create New Center Manager')
             ->createOptionForm(self::createForm())
             ->createOptionUsing(fn (array $data): int => self::createManager($data))
@@ -70,6 +70,12 @@ final class CenterManagerSelect
                         ->whereIn('id', $selected)
                         ->pluck('id')
                         ->all();
+
+                if (count($ids) > 1) {
+                    throw ValidationException::withMessages([
+                        'centerManagers' => 'A center can have only one active Center Manager.',
+                    ]);
+                }
 
                 $record->centerManagers()->sync($ids);
             });

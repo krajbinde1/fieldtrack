@@ -121,7 +121,7 @@ it('creates a center login from the primary manager mobile without changing that
         ->and($manager->fresh()->getRawOriginal('password'))->toBe($managerPassword);
 });
 
-it('requires one active primary manager when a center has several', function () {
+it('rejects a second active manager on the same center', function () {
     $org = seedOrg();
     $first = managerWithMobile('9123456701', 'First CM', 'firstcm@fieldtrack.local');
     $second = managerWithMobile('9123456702', 'Second CM', 'secondcm@fieldtrack.local');
@@ -137,7 +137,7 @@ it('requires one active primary manager when a center has several', function () 
             'centerManagers' => [$first->id, $second->id],
         ])
         ->call('create')
-        ->assertHasFormErrors(['primary_center_manager_id']);
+        ->assertHasErrors(['centerManagers' => 'A center can have only one active Center Manager.']);
 
     expect(Center::query()->where('name', 'Two Manager Center')->exists())->toBeFalse();
 
@@ -147,8 +147,7 @@ it('requires one active primary manager when a center has several', function () 
             'scheme_id' => $org['projectA']->id,
             'name' => 'Two Manager Center',
             'is_active' => true,
-            'centerManagers' => [$first->id, $second->id],
-            'primary_center_manager_id' => $second->id,
+            'centerManagers' => [$second->id],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -156,6 +155,7 @@ it('requires one active primary manager when a center has several', function () 
     $center = Center::query()->where('name', 'Two Manager Center')->firstOrFail();
 
     expect($center->primary_center_manager_id)->toBe($second->id)
+        ->and($center->centerManagers()->pluck('users.id')->all())->toBe([$second->id])
         ->and(Hash::check('6702', $center->loginUser->password))->toBeTrue()
         ->and(Hash::check('6701', $center->loginUser->password))->toBeFalse()
         ->and($first->fresh()->getRawOriginal('password'))->toBe($firstPassword)
@@ -236,7 +236,7 @@ it('blocks center login creation and reset without a usable primary mobile', fun
     $activePassword = $active->getRawOriginal('password');
     $ready = centerWithManager($org['projectA']->id, 'Inactive Primary Center', $active);
     $readyPassword = $ready->loginUser->getRawOriginal('password');
-    $ready->centerManagers()->sync([$active->id, $inactive->id]);
+    $ready->centerManagers()->sync([$inactive->id]);
     $ready->update(['primary_center_manager_id' => $inactive->id]);
 
     try {
@@ -328,11 +328,9 @@ it('backfills login ids and skips centers that cannot have a password yet', func
         'code' => 'AM1',
         'is_active' => true,
     ]);
-    $second = managerWithMobile('9123456702', 'Second CM', 'secondcm@fieldtrack.local');
-
     Center::query()->whereKey($ready->id)->update(['login_id' => null]);
     $manager->managedCenters()->attach($ready->id);
-    $ambiguous->centerManagers()->sync([$manager->id, $second->id]);
+    $ambiguous->centerManagers()->sync([$org['centerManager']->id]);
 
     app(CenterLoginService::class)->backfill();
 
@@ -347,7 +345,7 @@ it('backfills login ids and skips centers that cannot have a password yet', func
         ->and($lonely->fresh()->login_user_id)->toBeNull()
         ->and($ambiguous->fresh()->login_id)->toBe('ambiguous_center')
         ->and($ambiguous->fresh()->login_user_id)->toBeNull()
-        ->and($ambiguous->fresh()->primary_center_manager_id)->toBeNull()
+        ->and($ambiguous->fresh()->primary_center_manager_id)->toBe($org['centerManager']->id)
         ->and($manager->fresh()->getRawOriginal('password'))->toBe($managerPassword);
 
     $account->forceFill(['password' => 'custom-pass-99'])->save();

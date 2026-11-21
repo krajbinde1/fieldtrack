@@ -47,7 +47,7 @@ class CenterResource extends Resource
     {
         $user = auth()->user();
 
-        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isProjectHead() || $user?->isCenterManager());
+        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isCenterCoordinator() || $user?->isProjectHead() || $user?->isCenterManager());
     }
 
     public static function canCreate(): bool
@@ -139,11 +139,7 @@ class CenterResource extends Resource
 
                     return count(app(CenterLoginService::class)->eligibleManagerIds(is_array($selected) ? $selected : [])) > 1;
                 })
-                ->required(function (Get $get): bool {
-                    $selected = $get('centerManagers');
-
-                    return count(app(CenterLoginService::class)->eligibleManagerIds(is_array($selected) ? $selected : [])) > 1;
-                })
+                ->required(false)
                 ->searchable()
                 ->preload()
                 ->helperText('Required when more than one active Center Manager is assigned. Inactive managers cannot be primary.'),
@@ -168,10 +164,19 @@ class CenterResource extends Resource
             ->recordActions([
                 Action::make('openDashboard')
                     ->label('Open Dashboard')
-                    ->visible(fn (): bool => auth()->user()?->isAdmin() === true)
+                    ->visible(function (): bool {
+                        $user = auth()->user();
+
+                        return $user instanceof User
+                            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager());
+                    })
                     ->action(function (Center $record) {
                         $user = auth()->user();
-                        abort_unless($user instanceof User && $user->isAdmin(), 403);
+                        abort_unless(
+                            $user instanceof User
+                            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager()),
+                            403,
+                        );
 
                         app(AdminCenterContext::class)->select($user, (int) $record->id);
 

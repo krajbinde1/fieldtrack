@@ -94,6 +94,8 @@ class _EmployeeDashboardScreenState
           summary: _summary,
           loading: _loading,
           error: _error,
+          showAdmissions:
+              widget.auth.session?.employee.staffRole != 'food_hostel_supervisor',
           onPreset: (value) {
             setState(() => _preset = value);
             _load();
@@ -122,6 +124,7 @@ class EmployeeDashboardView extends StatelessWidget {
     this.attendanceLoading = false,
     this.summary,
     this.error,
+    this.showAdmissions = true,
   });
 
   final String name;
@@ -134,6 +137,7 @@ class EmployeeDashboardView extends StatelessWidget {
   final AdmissionTargetSummary? summary;
   final bool loading;
   final Object? error;
+  final bool showAdmissions;
   final ValueChanged<String> onPreset;
   final VoidCallback onRetry;
   final ValueChanged<String> onOpen;
@@ -211,17 +215,23 @@ class EmployeeDashboardView extends StatelessWidget {
                   onPunchOut: () => onOpen('/attendance/punch-out'),
                 ),
                 const SizedBox(height: 12),
-                _AdmissionTargetCard(
-                  preset: preset,
-                  summary: summary ?? AdmissionTargetSummary.empty,
-                  loading: loading,
-                  error: error,
-                  onPreset: onPreset,
-                  onRetry: onRetry,
-                ),
-                const SizedBox(height: 12),
+                if (showAdmissions) ...[
+                  _AdmissionTargetCard(
+                    preset: preset,
+                    summary: summary ?? AdmissionTargetSummary.empty,
+                    loading: loading,
+                    error: error,
+                    onPreset: onPreset,
+                    onRetry: onRetry,
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 _EmployeeModuleGrid(
-                  modules: _modules,
+                  modules: showAdmissions
+                      ? _modules
+                      : _modules
+                          .where((module) => !module.path.startsWith('/admissions'))
+                          .toList(),
                   onOpen: onOpen,
                 ),
               ],

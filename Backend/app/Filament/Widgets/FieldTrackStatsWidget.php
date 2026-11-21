@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Attendance;
+use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Filament\Widgets\StatsOverviewWidget;
@@ -24,7 +25,14 @@ class FieldTrackStatsWidget extends StatsOverviewWidget
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
         $today = AttendanceCalendar::today()->toDateString();
-        $employeeIds = $access->employeeQuery($user)->where('status', true)->pluck('id');
+        $centerId = $user instanceof \App\Models\User
+            ? app(AdminCenterContext::class)->idFor($user)
+            : null;
+        $employeeIds = $access->employeeQuery($user)->where('status', true);
+        if ($centerId !== null) {
+            $employeeIds->where('center_id', $centerId);
+        }
+        $employeeIds = $employeeIds->pluck('id');
 
         $punchedIn = Attendance::query()
             ->whereIn('employee_id', $employeeIds)
@@ -40,8 +48,12 @@ class FieldTrackStatsWidget extends StatsOverviewWidget
             ->count();
 
         return [
-            Stat::make('Schemes', (string) $access->schemeQuery($user)->count()),
-            Stat::make('Centers', (string) $access->centerQuery($user)->count()),
+            Stat::make('Schemes', (string) ($centerId === null
+                ? $access->schemeQuery($user)->count()
+                : $access->centerQuery($user)->whereKey($centerId)->distinct()->count('scheme_id'))),
+            Stat::make('Centers', (string) ($centerId === null
+                ? $access->centerQuery($user)->count()
+                : $access->centerQuery($user)->whereKey($centerId)->count())),
             Stat::make('Employees', (string) $employeeIds->count()),
             Stat::make('Punched In Today', (string) $punchedIn),
             Stat::make('Active Routes', (string) $active),

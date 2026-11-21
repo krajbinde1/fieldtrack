@@ -6,6 +6,7 @@ enum UserRole: string
 {
     case Admin = 'admin';
     case Director = 'director';
+    case CenterCoordinator = 'center_coordinator';
     case ProjectHead = 'project_head';
     case CenterManager = 'center_manager';
     case Employee = 'employee';
@@ -15,6 +16,7 @@ enum UserRole: string
         return match ($this) {
             self::Admin => 'Admin',
             self::Director => 'Director',
+            self::CenterCoordinator => 'Center Coordinator',
             self::ProjectHead => 'Project Manager',
             self::CenterManager => 'Center Manager',
             self::Employee => 'Employee',
@@ -54,6 +56,7 @@ enum UserRole: string
         return [
             self::Admin->value,
             self::Director->value,
+            self::CenterCoordinator->value,
             self::ProjectHead->value,
             self::CenterManager->value,
         ];
@@ -75,7 +78,13 @@ enum UserRole: string
 
     public function canAccessWeb(): bool
     {
-        return in_array($this, [self::Admin, self::Director, self::ProjectHead, self::CenterManager], true);
+        return in_array($this, [
+            self::Admin,
+            self::Director,
+            self::CenterCoordinator,
+            self::ProjectHead,
+            self::CenterManager,
+        ], true);
     }
 
     public function canViewAllOrganization(): bool
@@ -89,6 +98,14 @@ enum UserRole: string
     public function mobilePermissions(): array
     {
         return match ($this) {
+            self::CenterCoordinator => [
+                'coordinator_dashboard',
+                'attendance_view_assigned',
+                'route_tracking_view_assigned',
+                'leave_view_assigned',
+                'admissions_view_assigned',
+                'admission_target_view_assigned',
+            ],
             self::Employee => [
                 'attendance',
                 'route_tracking',

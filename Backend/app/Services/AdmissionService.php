@@ -91,6 +91,13 @@ final class AdmissionService
                 ]);
             }
 
+            $locked->loadMissing('employee');
+            if ($locked->employee?->staffRoleEnum()->canSubmitAdmissions() === false) {
+                throw ValidationException::withMessages([
+                    'admission' => 'Food & Hostel Supervisors cannot submit admissions.',
+                ]);
+            }
+
             $this->assertReadyToSubmit($locked);
 
             $locked->status = AdmissionStatus::Submitted;

@@ -25,7 +25,10 @@ class DirectorTodayTeamActivityWidget extends TableWidget
 
     public static function canView(): bool
     {
-        return auth()->user()?->isAdminOrDirector() === true;
+        $user = auth()->user();
+
+        return $user instanceof User
+            && ($user->isAdminOrDirector() || $user->isCenterCoordinator());
     }
 
     public function table(Table $table): Table
@@ -33,7 +36,7 @@ class DirectorTodayTeamActivityWidget extends TableWidget
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
         $today = AttendanceCalendar::today()->toDateString();
-        $centerId = $user instanceof User && $user->isAdmin()
+        $centerId = $user instanceof User
             ? app(AdminCenterContext::class)->idFor($user)
             : null;
         $employees = $access->employeeQuery($user)->where('status', true);

@@ -78,6 +78,12 @@ class Center extends Model
             ->withTimestamps();
     }
 
+    public function coordinators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'center_coordinator_assignments')
+            ->withTimestamps();
+    }
+
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);

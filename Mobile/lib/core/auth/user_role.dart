@@ -1,6 +1,7 @@
 enum UserRole {
   employee('employee'),
   centerManager('center_manager'),
+  centerCoordinator('center_coordinator'),
   projectHead('project_head'),
   director('director'),
   admin('admin');
@@ -18,6 +19,7 @@ enum UserRole {
   String get label => switch (this) {
         UserRole.employee => 'Employee',
         UserRole.centerManager => 'Center Manager',
+        UserRole.centerCoordinator => 'Center Coordinator',
         UserRole.projectHead => 'Project Manager',
         UserRole.director => 'Director',
         UserRole.admin => 'Admin',
@@ -25,6 +27,7 @@ enum UserRole {
 
   bool get isEmployee => this == UserRole.employee;
   bool get isCenterManager => this == UserRole.centerManager;
+  bool get isCenterCoordinator => this == UserRole.centerCoordinator;
   bool get isProjectHead => this == UserRole.projectHead;
   bool get isDirector => this == UserRole.director;
   bool get isAdmin => this == UserRole.admin;
@@ -33,5 +36,6 @@ enum UserRole {
   bool canAccessEmployeeWorkflow() => isEmployee;
   bool canAccessOwnAttendance() => isEmployee || isCenterManager || isProjectHead;
   bool canAccessManagerRoutes() => isProjectHead || isCenterManager;
-  bool canAccessDirectorRoutes() => isAdmin || isDirector || isProjectHead;
+  bool canAccessDirectorRoutes() =>
+      isAdmin || isDirector || isCenterCoordinator || isProjectHead;
 }

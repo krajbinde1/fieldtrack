@@ -14,6 +14,7 @@ class RoleDashboardScreen extends StatelessWidget {
     return switch (auth.userRole) {
       UserRole.employee => EmployeeDashboardScreen(auth: auth),
       UserRole.centerManager => SupervisorDashboardScreen(auth: auth),
+      UserRole.centerCoordinator ||
       UserRole.projectHead ||
       UserRole.director ||
       UserRole.admin =>

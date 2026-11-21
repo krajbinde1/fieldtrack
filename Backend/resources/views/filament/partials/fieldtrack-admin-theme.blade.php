@@ -214,7 +214,7 @@
         background: rgba(11, 27, 58, 0.45);
     }
 
-    /* Main Dashboard card — only the custom top-of-nav link, not other items. */
+    /* Top sidebar dashboard card. Only the custom link above the nav. */
     html.fieldtrack-admin .fi-sidebar-nav .ft-main-dashboard-link {
         display: flex;
         align-items: center;

@@ -75,7 +75,7 @@ final class AdminCenterContext
             return null;
         }
 
-        if (! $user?->isAdmin()) {
+        if (! $this->usesSelectedCenter($user)) {
             return null;
         }
 
@@ -111,7 +111,7 @@ final class AdminCenterContext
      */
     public function workforceCenterId(?User $user): ?int
     {
-        if (! $user?->isAdmin()) {
+        if (! $this->usesSelectedCenter($user)) {
             return null;
         }
 
@@ -120,7 +120,7 @@ final class AdminCenterContext
 
     public function select(User $user, int $centerId): Center
     {
-        abort_unless($user->isAdmin(), 403);
+        abort_unless($this->usesSelectedCenter($user), 403);
 
         $center = app(OrganizationAccessService::class)
             ->centerQuery($user)
@@ -197,7 +197,7 @@ final class AdminCenterContext
 
     public function applyToResourceQuery(Builder $query, ?User $user, string $model): Builder
     {
-        if (! $user?->isAdmin()) {
+        if (! $this->usesSelectedCenter($user)) {
             return $query;
         }
 
@@ -247,6 +247,12 @@ final class AdminCenterContext
         return (int) $raw;
     }
 
+    private function usesSelectedCenter(?User $user): bool
+    {
+        return $user instanceof User
+            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager());
+    }
+
     /**
      * @param  callable(Builder, int): Builder  $apply
      */
@@ -254,7 +260,7 @@ final class AdminCenterContext
     {
         $user ??= auth()->user();
 
-        if (! $user instanceof User || ! $user->isAdmin()) {
+        if (! $user instanceof User || ! $this->usesSelectedCenter($user)) {
             return $query;
         }
 

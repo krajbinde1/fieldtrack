@@ -84,7 +84,7 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
             ->whereNumber('fieldActivity');
     });
 
-    Route::middleware('role:admin,director,project_head')->prefix('director')->group(function () {
+    Route::middleware('role:admin,director,center_coordinator,project_head')->prefix('director')->group(function () {
         Route::get('centers', [DirectorCenterController::class, 'index']);
         Route::get('centers/{center}', [DirectorCenterController::class, 'show'])
             ->whereNumber('center');

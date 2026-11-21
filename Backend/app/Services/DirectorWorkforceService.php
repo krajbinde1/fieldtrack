@@ -182,9 +182,9 @@ final class DirectorWorkforceService
     private function orgUsers(User $viewer, ?int $centerId, ?int $schemeId): Collection
     {
         $visibleCenterIds = $this->access->visibleCenterIds($viewer);
-        $roles = $viewer->isProjectHead()
+        $roles = ($viewer->isProjectHead() || $viewer->isCenterCoordinator())
             ? [UserRole::CenterManager->value]
-            : [UserRole::ProjectHead->value, UserRole::CenterManager->value];
+            : [UserRole::CenterCoordinator->value, UserRole::ProjectHead->value, UserRole::CenterManager->value];
 
         return User::query()
             ->where('is_active', true)
@@ -352,6 +352,7 @@ final class DirectorWorkforceService
             ['value' => CenterStaffRole::Mis->value, 'label' => CenterStaffRole::Mis->label()],
             ['value' => CenterStaffRole::Trainer->value, 'label' => CenterStaffRole::Trainer->label()],
             ['value' => CenterStaffRole::Mobilizer->value, 'label' => CenterStaffRole::Mobilizer->label()],
+            ['value' => CenterStaffRole::FoodHostelSupervisor->value, 'label' => CenterStaffRole::FoodHostelSupervisor->label()],
             ['value' => 'other', 'label' => 'Other'],
         ];
     }

@@ -8,6 +8,7 @@ use App\Filament\Widgets\DirectorConfirmedAdmissionsByCenterWidget;
 use App\Filament\Widgets\DirectorTodayTeamActivityWidget;
 use App\Filament\Widgets\FieldTrackStatsWidget;
 use App\Models\User;
+use App\Services\AdminCenterContext;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Widgets\Widget;
 use Filament\Widgets\WidgetConfiguration;
@@ -28,7 +29,7 @@ class Dashboard extends BaseDashboard
     {
         $user = auth()->user();
 
-        if ($user instanceof User && $user->isAdmin()) {
+        if ($user instanceof User && ($user->isAdmin() || $user->isCenterCoordinator())) {
             return 'Main Dashboard';
         }
 
@@ -55,7 +56,20 @@ class Dashboard extends BaseDashboard
             return 'Main Admin Dashboard';
         }
 
+        if ($user instanceof User && $user->isCenterCoordinator()) {
+            return 'Coordinator Dashboard';
+        }
+
         return 'Dashboard';
+    }
+
+    public function mount(): void
+    {
+        $user = auth()->user();
+
+        if ($user instanceof User && ($user->isCenterCoordinator() || $user->isCenterManager())) {
+            app(AdminCenterContext::class)->forget();
+        }
     }
 
     public function getColumns(): int|array
@@ -68,12 +82,36 @@ class Dashboard extends BaseDashboard
      */
     public function getWidgets(): array
     {
+        $user = auth()->user();
         $organizationWide = $this->showsOrganizationWideDashboard();
         $scope = function (string $widget) use ($organizationWide): string|WidgetConfiguration {
             return $organizationWide
                 ? $widget::make(['organizationWide' => true])
                 : $widget;
         };
+
+        if ($user instanceof User && $user->isCenterCoordinator()) {
+            return [
+                $scope(DirectorAdminStatsWidget::class),
+                AdmissionTargetPerformanceWidget::class,
+                $scope(DirectorConfirmedAdmissionsByCenterWidget::class),
+                $scope(DirectorTodayTeamActivityWidget::class),
+            ];
+        }
+
+        if ($user instanceof User && $user->isCenterManager() && ! $organizationWide) {
+            return [
+                FieldTrackStatsWidget::class,
+                AdmissionTargetPerformanceWidget::class,
+            ];
+        }
+
+        if ($user instanceof User && $user->isCenterManager()) {
+            return [
+                FieldTrackStatsWidget::class,
+                AdmissionTargetPerformanceWidget::class,
+            ];
+        }
 
         return [
             $scope(DirectorAdminStatsWidget::class),

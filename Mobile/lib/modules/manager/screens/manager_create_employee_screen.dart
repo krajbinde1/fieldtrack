@@ -33,13 +33,12 @@ class _ManagerCreateEmployeeScreenState
   bool _saving = false;
   String? _error;
   int? _centerId;
-  String _staffRole = 'mobilizer';
+  String _staffRole = 'trainer';
   List<Map<String, dynamic>> _centers = const [];
   Map<String, String> _roles = const {
-    'mis': 'MIS',
-    'mobilizer': 'Mobilizer',
-    'housekeeper': 'Housekeeper',
     'trainer': 'Trainer',
+    'mobilizer': 'Mobilizer',
+    'food_hostel_supervisor': 'Food & Hostel Supervisor',
   };
 
   @override
@@ -217,7 +216,7 @@ class _ManagerCreateEmployeeScreenState
                 const SizedBox(height: AppSpacing.md),
                 FilledButton(
                   onPressed: _saving ? null : _save,
-                  child: Text(_saving ? 'Savingâ€¦' : 'Create User'),
+                  child: Text(_saving ? 'Saving…' : 'Create User'),
                 ),
               ],
             ),

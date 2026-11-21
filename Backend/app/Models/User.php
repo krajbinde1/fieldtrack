@@ -89,6 +89,12 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
             ->withTimestamps();
     }
 
+    public function coordinatedCenters(): BelongsToMany
+    {
+        return $this->belongsToMany(Center::class, 'center_coordinator_assignments')
+            ->withTimestamps();
+    }
+
     public function centerLogin(): HasOne
     {
         return $this->hasOne(Center::class, 'login_user_id');
@@ -132,6 +138,11 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
         return $this->isAdmin() || $this->isDirector();
     }
 
+    public function isCenterCoordinator(): bool
+    {
+        return $this->hasRole(UserRole::CenterCoordinator);
+    }
+
     public function isProjectHead(): bool
     {
         return $this->hasRole(UserRole::ProjectHead);
@@ -161,6 +172,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
     {
         $centers = match (true) {
             $this->isCenterLogin() => collect([$this->centerLogin])->filter(),
+            $this->isCenterCoordinator() => $this->coordinatedCenters,
             $this->isProjectHead() => $this->headedCenters,
             $this->isCenterManager() => $this->managedCenters,
             $this->isEmployeeUser() => collect([$this->employee?->center])->filter(),
@@ -183,6 +195,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
     public function shouldLockMobileDevice(): bool
     {
         return $this->isDirector()
+            || $this->isCenterCoordinator()
             || $this->isProjectHead()
             || $this->isCenterManager()
             || $this->isEmployeeUser();

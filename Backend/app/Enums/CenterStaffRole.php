@@ -8,6 +8,7 @@ enum CenterStaffRole: string
     case Mobilizer = 'mobilizer';
     case Housekeeper = 'housekeeper';
     case Trainer = 'trainer';
+    case FoodHostelSupervisor = 'food_hostel_supervisor';
 
     public function label(): string
     {
@@ -16,7 +17,46 @@ enum CenterStaffRole: string
             self::Mobilizer => 'Mobilizer',
             self::Housekeeper => 'Housekeeper',
             self::Trainer => 'Trainer',
+            self::FoodHostelSupervisor => 'Food & Hostel Supervisor',
         };
+    }
+
+    public function canSubmitAdmissions(): bool
+    {
+        return $this !== self::FoodHostelSupervisor;
+    }
+
+    /**
+     * Reserved for later modules. No Food or Hostel screens are registered from these keys.
+     *
+     * @return list<string>
+     */
+    public function reservedPermissions(): array
+    {
+        if ($this !== self::FoodHostelSupervisor) {
+            return [];
+        }
+
+        return [
+            'food_expenses',
+            'hostel_expenses',
+            'daily_food_consumption',
+            'hostel_occupancy',
+        ];
+    }
+
+    /**
+     * Roles that can be assigned to new staff. Existing MIS and Housekeeper values still resolve.
+     *
+     * @return array<string, string>
+     */
+    public static function assignableOptions(): array
+    {
+        return [
+            self::Trainer->value => self::Trainer->label(),
+            self::Mobilizer->value => self::Mobilizer->label(),
+            self::FoodHostelSupervisor->value => self::FoodHostelSupervisor->label(),
+        ];
     }
 
     /**
@@ -24,13 +64,7 @@ enum CenterStaffRole: string
      */
     public static function options(): array
     {
-        $options = [];
-
-        foreach (self::cases() as $case) {
-            $options[$case->value] = $case->label();
-        }
-
-        return $options;
+        return self::assignableOptions();
     }
 
     /**
