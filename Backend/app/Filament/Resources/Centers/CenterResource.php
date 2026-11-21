@@ -154,12 +154,6 @@ class CenterResource extends Resource
                         }),
                 ),
             TextInput::make('name')->required()->maxLength(255),
-            TextInput::make('login_id')
-                ->label('Center Login ID')
-                ->disabled()
-                ->dehydrated(false)
-                ->hiddenOn('create')
-                ->helperText('Sign-in ID for this center.'),
             TextInput::make('address')->maxLength(255),
             CenterCoordinatorSelect::make(),
             CenterManagerSelect::make()->live()->visibleOn('edit'),
@@ -224,7 +218,9 @@ class CenterResource extends Resource
 
                         return ($managers->firstWhere('is_active', true) ?? $managers->sortBy('name')->first())?->name;
                     })
-                    ->placeholder('Not Assigned'),
+                    ->placeholder('Not Assigned')
+                    ->action(CenterManagerSelect::assignAction())
+                    ->disabledClick(fn (Center $record): bool => ! CenterManagerSelect::canAssign($record)),
                 TextColumn::make('employees_count')
                     ->counts('employees')
                     ->label('Employees'),

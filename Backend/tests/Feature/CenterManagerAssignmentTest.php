@@ -155,7 +155,8 @@ it('creates a center manager from the center form modal, auto-selects them, and 
         ->and($manager->role)->toBe(UserRole::CenterManager->value)
         ->and($manager->email)->toBe('9123456790@fieldtrack.local')
         ->and(Hash::check('6790', $manager->password))->toBeTrue()
-        ->and($manager->getRawOriginal('password'))->not->toBe('6790');
+        ->and($manager->getRawOriginal('password'))->not->toBe('6790')
+        ->and($manager->must_change_password)->toBeTrue();
 
     expect($center->fresh()->centerManagers->pluck('id')->all())->toContain($manager->id)
         ->and($manager->managedCenters()->pluck('centers.id')->all())->toContain($center->id)
@@ -239,16 +240,30 @@ it('adds and removes center managers on edit without wiping other centers', func
 
 it('rejects a duplicate mobile number when creating a center manager from the center form', function () {
     $org = seedOrg();
-    $org['centerManager']->update(['login_id' => '9123456799']);
+    User::query()->create([
+        'name' => 'Taken Coordinator',
+        'email' => 'takencoord@fieldtrack.local',
+        'login_id' => '9123456799',
+        'password' => Hash::make('6799'),
+        'role' => UserRole::CenterCoordinator->value,
+        'is_active' => true,
+        'is_center_login' => false,
+    ]);
 
     Livewire::actingAs($org['admin'])
         ->test(EditCenter::class, ['record' => $org['centerA']->getKey()])
+        ->fillForm([
+            'address' => 'Kept Address',
+        ])
         ->callAction(TestAction::make('createOption')->schemaComponent('centerManagers'), [
             'name' => 'Duplicate CM',
             'mobile' => '9123456799',
             'email' => null,
         ])
-        ->assertHasActionErrors(['mobile']);
+        ->assertHasActionErrors(['mobile'])
+        ->assertSet('data.address', 'Kept Address');
 
-    expect(User::query()->where('name', 'Duplicate CM')->exists())->toBeFalse();
+    expect(User::query()->where('name', 'Duplicate CM')->exists())->toBeFalse()
+        ->and($org['centerA']->fresh()->name)->toBe('Center A')
+        ->and($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$org['centerManager']->id]);
 });

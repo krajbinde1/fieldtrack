@@ -69,8 +69,10 @@ class ChangePassword extends Page
 
         $data = $this->form->getState();
         $user = Filament::auth()->user();
+        $forced = $user->must_change_password === true;
         $user->forceFill([
             'password' => $data['password'],
+            'must_change_password' => false,
         ])->save();
 
         if (request()->hasSession()) {
@@ -85,5 +87,9 @@ class ChangePassword extends Page
             ->title('Password updated')
             ->success()
             ->send();
+
+        if ($forced) {
+            $this->redirect(Filament::getUrl());
+        }
     }
 }

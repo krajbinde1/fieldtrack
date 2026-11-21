@@ -2,14 +2,21 @@
 
 namespace App\Filament\Resources\Centers\Pages;
 
+use App\Filament\Concerns\HoldsPendingCenterAccounts;
 use App\Filament\Resources\Centers\CenterResource;
-use App\Models\Center;
 use App\Services\CenterLoginService;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateCenter extends CreateRecord
 {
+    use HoldsPendingCenterAccounts;
+
     protected static string $resource = CenterResource::class;
+
+    public function hasDatabaseTransactions(): bool
+    {
+        return true;
+    }
 
     public function mount(): void
     {
@@ -35,9 +42,5 @@ class CreateCenter extends CreateRecord
             $user->headedCenters()->syncWithoutDetaching([$this->record->id]);
         }
 
-        $record = $this->getRecord();
-        if ($record instanceof Center) {
-            app(CenterLoginService::class)->syncAccount($record);
-        }
     }
 }

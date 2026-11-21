@@ -526,7 +526,7 @@ final class OrganizationAccessService
 
     public function canManageCenters(User $user, Scheme|Center|null $scope = null): bool
     {
-        if ($user->isAdmin()) {
+        if ($this->hasOrganizationWideAccess($user)) {
             return true;
         }
 
@@ -551,21 +551,27 @@ final class OrganizationAccessService
 
     public function canManageCenterManagers(User $user, ?Center $center = null): bool
     {
-        if ($user->isAdmin()) {
+        if ($this->hasOrganizationWideAccess($user)) {
             return true;
         }
 
-        if (! $user->isProjectHead()) {
-            return false;
+        if ($user->isProjectHead()) {
+            if ($center === null) {
+                return true;
+            }
+
+            $ids = $this->visibleCenterIds($user) ?? [];
+
+            return in_array((int) $center->id, $ids, true);
         }
 
-        if ($center === null) {
-            return true;
+        if ($user->isCenterCoordinator() && $center instanceof Center) {
+            $ids = $this->visibleCenterIds($user) ?? [];
+
+            return in_array((int) $center->id, $ids, true);
         }
 
-        $ids = $this->visibleCenterIds($user) ?? [];
-
-        return in_array((int) $center->id, $ids, true);
+        return false;
     }
 
     public function canManageEmployees(User $user, ?Center $center = null): bool

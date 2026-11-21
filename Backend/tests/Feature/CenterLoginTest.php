@@ -73,7 +73,7 @@ it('builds a stable unique snake_case center login id', function () {
     ]))->toThrow(QueryException::class);
 });
 
-it('creates a center login from the primary manager mobile without changing that manager', function () {
+it('does not create a center login when a center and its manager are saved', function () {
     $org = seedOrg();
     $manager = managerWithMobile('9123456701', 'Primary CM', 'primarycm@fieldtrack.local');
     $managerPassword = $manager->getRawOriginal('password');
@@ -94,10 +94,14 @@ it('creates a center login from the primary manager mobile without changing that
         ->and($center->primary_center_manager_id)->toBeNull()
         ->and($center->login_user_id)->toBeNull()
         ->and($center->centerManagers)->toHaveCount(0)
+        ->and(User::query()->where('is_center_login', true)->exists())->toBeFalse()
         ->and($manager->fresh()->getRawOriginal('password'))->toBe($managerPassword);
 
     Livewire::actingAs($org['admin'])
         ->test(EditCenter::class, ['record' => $center->getKey()])
+        ->assertDontSee('Center Login ID')
+        ->assertDontSee('Reset Password')
+        ->assertDontSee('Default password')
         ->fillForm([
             'centerManagers' => [$manager->id],
         ])
@@ -105,33 +109,26 @@ it('creates a center login from the primary manager mobile without changing that
         ->assertHasNoFormErrors();
 
     $center->refresh();
-    $account = $center->loginUser;
 
     expect($center->primary_center_manager_id)->toBe($manager->id)
-        ->and($account)->not->toBeNull()
-        ->and($account->is_center_login)->toBeTrue()
-        ->and($account->role)->toBe(UserRole::CenterManager->value)
-        ->and($account->login_id)->toBe('khultabad_4_0')
-        ->and($account->id)->not->toBe($manager->id)
-        ->and(Hash::check('6701', $account->password))->toBeTrue()
-        ->and($account->getRawOriginal('password'))->not->toBe('6701')
+        ->and($center->login_user_id)->toBeNull()
+        ->and($center->loginUser)->toBeNull()
+        ->and(User::query()->where('is_center_login', true)->where('login_id', 'khultabad_4_0')->exists())->toBeFalse()
         ->and($manager->fresh()->getRawOriginal('password'))->toBe($managerPassword)
         ->and($manager->fresh()->login_id)->toBe('9123456701')
         ->and($center->centerManagers()->pluck('users.id')->all())->toBe([$manager->id]);
 
     Livewire::actingAs($org['admin'])
         ->test(EditCenter::class, ['record' => $center->getKey()])
-        ->assertFormSet(['login_id' => 'khultabad_4_0'])
-        ->assertSee('Center Login ID')
+        ->assertDontSee('Center Login ID')
         ->assertDontSee('Default password')
         ->fillForm(['name' => 'Khultabad Renamed'])
         ->call('save')
         ->assertHasNoFormErrors();
 
     expect($center->fresh()->login_id)->toBe('khultabad_4_0')
-        ->and($center->fresh()->loginUser->login_id)->toBe('khultabad_4_0')
-        ->and($center->fresh()->loginUser->name)->toBe('Khultabad Renamed')
-        ->and(Hash::check('6701', $center->fresh()->loginUser->password))->toBeTrue()
+        ->and($center->fresh()->login_user_id)->toBeNull()
+        ->and($center->fresh()->name)->toBe('Khultabad Renamed')
         ->and($manager->fresh()->getRawOriginal('password'))->toBe($managerPassword);
 });
 
@@ -177,28 +174,30 @@ it('rejects a second active manager on the same center', function () {
 
     expect($center->fresh()->primary_center_manager_id)->toBe($second->id)
         ->and($center->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$second->id])
-        ->and(Hash::check('6702', $center->fresh()->loginUser->password))->toBeTrue()
-        ->and(Hash::check('6701', $center->fresh()->loginUser->password))->toBeFalse()
+        ->and($center->fresh()->login_user_id)->toBeNull()
+        ->and(User::query()->where('is_center_login', true)->exists())->toBeFalse()
         ->and($first->fresh()->getRawOriginal('password'))->toBe($firstPassword)
         ->and($second->fresh()->getRawOriginal('password'))->toBe($secondPassword);
 });
 
-it('resets the center password for admins only and does not reveal it', function () {
+it('does not delete or overwrite an existing center login when the center is saved', function () {
     $org = seedOrg();
     $manager = managerWithMobile('9123456701', 'Primary CM', 'primarycm@fieldtrack.local');
     $managerPassword = $manager->getRawOriginal('password');
     $center = centerWithManager($org['projectA']->id, 'Reset Center', $manager);
     $account = $center->loginUser;
     $account->forceFill(['password' => 'replaced-secret'])->save();
+    $hash = $account->fresh()->getRawOriginal('password');
+    $loginUserId = $center->login_user_id;
 
     $org['projectHead']->headedCenters()->attach($center->id);
 
     Livewire::actingAs($org['projectHead'])
         ->test(EditCenter::class, ['record' => $center->getKey()])
-        ->assertActionHidden('resetCenterPassword')
-        ->assertDontSee('Reset Password');
+        ->assertDontSee('Reset Password')
+        ->assertDontSee('Center Login ID');
 
-    expect(Hash::check('replaced-secret', $account->fresh()->password))->toBeTrue()
+    expect($account->fresh()->getRawOriginal('password'))->toBe($hash)
         ->and($manager->fresh()->getRawOriginal('password'))->toBe($managerPassword);
 
     Livewire::actingAs($org['centerManager'])
@@ -207,13 +206,18 @@ it('resets the center password for admins only and does not reveal it', function
 
     Livewire::actingAs($org['admin'])
         ->test(EditCenter::class, ['record' => $center->getKey()])
-        ->assertActionVisible('resetCenterPassword')
+        ->assertDontSee('Reset Password')
+        ->assertDontSee('Center Login ID')
         ->assertDontSee('Default password')
-        ->callAction('resetCenterPassword')
-        ->assertNotified('Center password was reset.');
+        ->fillForm(['name' => 'Reset Center Renamed'])
+        ->call('save')
+        ->assertHasNoFormErrors();
 
-    expect(Hash::check('6701', $account->fresh()->password))->toBeTrue()
-        ->and(Hash::check('replaced-secret', $account->fresh()->password))->toBeFalse()
+    expect($center->fresh()->login_user_id)->toBe($loginUserId)
+        ->and(User::query()->whereKey($loginUserId)->exists())->toBeTrue()
+        ->and($center->fresh()->loginUser->is_center_login)->toBeTrue()
+        ->and($center->fresh()->loginUser->getRawOriginal('password'))->toBe($hash)
+        ->and(Hash::check('replaced-secret', $account->fresh()->password))->toBeTrue()
         ->and($account->fresh()->getRawOriginal('password'))->not->toBe('6701')
         ->and($manager->fresh()->getRawOriginal('password'))->toBe($managerPassword)
         ->and($manager->fresh()->login_id)->toBe('9123456701');

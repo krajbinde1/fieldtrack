@@ -108,7 +108,7 @@ it('assigns coordinators from the list modal and the edit form without changing 
         ->test(EditCenter::class, ['record' => $org['centerA']->getKey()])
         ->assertFormFieldVisible('coordinators')
         ->assertFormFieldVisible('centerManagers')
-        ->assertSee('Center Login ID');
+        ->assertDontSee('Center Login ID');
 
     $editIds = collect($edit->get('data.coordinators'))->map(fn ($id): int => (int) $id)->all();
     expect($editIds)->toEqualCanonicalizing([$first->id]);

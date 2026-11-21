@@ -6,15 +6,13 @@ use App\Enums\UserRole;
 use App\Models\Center;
 use App\Models\User;
 use App\Services\OrganizationAccessService;
-use App\Support\LoginId;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 final class CenterCoordinatorSelect
 {
@@ -46,6 +44,7 @@ final class CenterCoordinatorSelect
                 },
             )
             ->getOptionLabelFromRecordUsing(fn (User $record): string => trim($record->name.' ('.$record->login_id.')'))
+            ->getOptionLabelsUsing(fn (Select $component): array => PendingCenterAccount::labelsFor($component, PendingCenterAccount::COORDINATORS))
             ->multiple()
             ->preload()
             ->searchable()
@@ -54,7 +53,17 @@ final class CenterCoordinatorSelect
             ->visible(fn (string $operation): bool => $operation === 'create' || self::canAssign())
             ->createOptionModalHeading('Create New Coordinator')
             ->createOptionForm(self::createForm())
-            ->createOptionUsing(fn (array $data): int => self::createCoordinator($data))
+            ->createOptionUsing(function (array $data, Select $component): int|string {
+                abort_unless(self::canCreateCoordinator(), 403);
+
+                return PendingCenterAccount::remember(
+                    $component->getLivewire(),
+                    PendingCenterAccount::COORDINATORS,
+                    $data,
+                    UserRole::CenterCoordinator,
+                    reuseManager: false,
+                );
+            })
             ->createOptionAction(fn (Action $action): Action => $action
                 ->label('+ Create New Coordinator')
                 ->iconButton(false)
@@ -68,7 +77,7 @@ final class CenterCoordinatorSelect
                     abort_unless(self::canAssign(), 403);
                 }
 
-                self::sync($record, $state);
+                self::sync($component, $record, $state);
             });
     }
 
@@ -109,24 +118,6 @@ final class CenterCoordinatorSelect
                     ->success()
                     ->send();
             });
-    }
-
-    private static function sync(Center $record, mixed $state): void
-    {
-        $selected = array_values(array_unique(array_map(
-            'intval',
-            array_filter(is_array($state) ? $state : [], fn ($id): bool => filled($id)),
-        )));
-        $ids = $selected === []
-            ? []
-            : User::query()
-                ->where('role', UserRole::CenterCoordinator->value)
-                ->where('is_center_login', false)
-                ->whereIn('id', $selected)
-                ->pluck('id')
-                ->all();
-
-        $record->coordinators()->sync($ids);
     }
 
     public static function canCreateCoordinator(): bool
@@ -170,52 +161,45 @@ final class CenterCoordinatorSelect
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    public static function createCoordinator(array $data): int
+    private static function sync(Select $component, Center $record, mixed $state): void
     {
-        abort_unless(self::canCreateCoordinator(), 403);
+        $selected = array_values(array_filter(
+            is_array($state) ? $state : [],
+            fn ($id): bool => filled($id),
+        ));
 
-        $name = trim((string) ($data['name'] ?? ''));
-        $mobile = trim((string) ($data['mobile'] ?? ''));
-        $email = trim((string) ($data['email'] ?? ''));
+        DB::transaction(function () use ($component, $record, $selected): void {
+            $ids = [];
 
-        if ($name === '') {
-            throw ValidationException::withMessages([
-                'name' => 'Name is required.',
-            ]);
-        }
+            foreach ($selected as $value) {
+                if (PendingCenterAccount::isPending($value)) {
+                    abort_unless(self::canCreateCoordinator(), 403);
+                    $ids[] = PendingCenterAccount::materialize(
+                        $component->getLivewire(),
+                        PendingCenterAccount::COORDINATORS,
+                        (string) $value,
+                        UserRole::CenterCoordinator,
+                        reuseManager: false,
+                        errorKey: 'coordinators',
+                    );
 
-        if (! preg_match('/^[6-9][0-9]{9}$/', $mobile)) {
-            throw ValidationException::withMessages([
-                'mobile' => 'Enter a valid 10-digit mobile number.',
-            ]);
-        }
+                    continue;
+                }
 
-        LoginId::assertUnique($mobile, attribute: 'mobile');
+                $ids[] = (int) $value;
+            }
 
-        if ($email === '') {
-            $email = $mobile.'@fieldtrack.local';
-        }
+            $ids = array_values(array_unique($ids));
+            $valid = $ids === []
+                ? []
+                : User::query()
+                    ->where('role', UserRole::CenterCoordinator->value)
+                    ->where('is_center_login', false)
+                    ->whereIn('id', $ids)
+                    ->pluck('id')
+                    ->all();
 
-        if (User::query()->where('email', $email)->exists()) {
-            throw ValidationException::withMessages([
-                'email' => 'This email is already taken.',
-            ]);
-        }
-
-        $user = User::query()->create([
-            'name' => $name,
-            'email' => $email,
-            'login_id' => $mobile,
-            'password' => Hash::make(LoginId::defaultPasswordFromMobile($mobile)),
-            'role' => UserRole::CenterCoordinator->value,
-            'is_active' => true,
-            'is_center_login' => false,
-            'must_change_password' => true,
-        ]);
-
-        return (int) $user->id;
+            $record->coordinators()->sync($valid);
+        });
     }
 }

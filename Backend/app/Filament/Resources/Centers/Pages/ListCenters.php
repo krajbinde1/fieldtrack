@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Centers\Pages;
 
+use App\Filament\Concerns\HoldsPendingCenterAccounts;
 use App\Filament\Resources\Centers\CenterResource;
 use App\Models\User;
 use Filament\Actions\CreateAction;
@@ -11,6 +12,8 @@ use Illuminate\Contracts\Support\Htmlable;
 
 class ListCenters extends ListRecords
 {
+    use HoldsPendingCenterAccounts;
+
     protected static string $resource = CenterResource::class;
 
     public function getSubheading(): string|Htmlable|null
