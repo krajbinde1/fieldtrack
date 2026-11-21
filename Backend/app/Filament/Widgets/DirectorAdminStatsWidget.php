@@ -90,7 +90,7 @@ class DirectorAdminStatsWidget extends Widget
         return [
             [
                 'label' => 'Total Centers',
-                'value' => (string) $context->scopeCenters($access->centerQuery($user), $user)->count(),
+                'value' => (string) $access->centerQuery($user)->count(),
                 'hint' => null,
                 'url' => CenterResource::getUrl(),
                 'tone' => 'lavender',

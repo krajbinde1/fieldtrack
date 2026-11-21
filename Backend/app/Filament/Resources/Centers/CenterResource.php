@@ -3,12 +3,15 @@
 namespace App\Filament\Resources\Centers;
 
 use App\Filament\Concerns\ScopesRecordsByOrganization;
+use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\Centers\Pages\CreateCenter;
 use App\Filament\Resources\Centers\Pages\EditCenter;
 use App\Filament\Resources\Centers\Pages\ListCenters;
 use App\Filament\Support\CenterManagerSelect;
 use App\Models\Center;
 use App\Models\Scheme;
+use App\Models\User;
+use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -123,6 +126,17 @@ class CenterResource extends Resource
                 SelectFilter::make('scheme_id')->label('Scheme / Project')->relationship('scheme', 'name')->preload(),
             ])
             ->recordActions([
+                Action::make('openDashboard')
+                    ->label('Open Dashboard')
+                    ->visible(fn (): bool => auth()->user()?->isAdmin() === true)
+                    ->action(function (Center $record) {
+                        $user = auth()->user();
+                        abort_unless($user instanceof User && $user->isAdmin(), 403);
+
+                        app(AdminCenterContext::class)->select($user, (int) $record->id);
+
+                        return redirect()->to(Dashboard::getUrl());
+                    }),
                 EditAction::make(),
             ]);
     }

@@ -326,10 +326,28 @@
         white-space: nowrap;
     }
 
+    .ft-change-center-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
     .ft-change-center-action {
         color: #6d5ef6;
         font-size: 0.68rem;
         font-weight: 700;
+        background: transparent;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .ft-clear-center {
+        display: inline-flex;
+        margin: 0;
+        padding-left: 0.4rem;
+        border-left: 1px solid var(--ft-border);
     }
 
     .ft-topbar-bell {

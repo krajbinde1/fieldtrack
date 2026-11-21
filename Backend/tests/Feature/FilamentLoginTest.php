@@ -39,7 +39,7 @@ it('lets the existing top-level login sign in as admin', function () {
         ])
         ->call('authenticate')
         ->assertHasNoFormErrors()
-        ->assertRedirect('/admin/select-center');
+        ->assertRedirect('/admin');
 
     $this->assertAuthenticatedAs($user);
 });
@@ -47,7 +47,11 @@ it('lets the existing top-level login sign in as admin', function () {
 it('lets an admin open organization, people, and field-operation pages', function () {
     $admin = User::query()->where('login_id', 'admin')->firstOrFail();
 
-    $this->actingAs($admin)->get('/admin')->assertRedirect('/admin/select-center');
+    $this->actingAs($admin)
+        ->get('/admin')
+        ->assertOk()
+        ->assertSee('Main Admin Dashboard')
+        ->assertDontSee('Change Center');
 
     $this->withSession([
         AdminCenterContext::SESSION_KEY => Center::query()->where('code', 'C1')->value('id'),
@@ -58,7 +62,8 @@ it('lets an admin open organization, people, and field-operation pages', functio
         ->assertOk()
         ->assertSee('Param FieldTrack')
         ->assertDontSee('Scheme Master')
-        ->assertSee('Change Center');
+        ->assertSee('Change Center')
+        ->assertSee('Back to All Centers');
 
     $html = $dashboard->getContent();
     expect(substr_count($html, 'class="ft-topbar-search"'))->toBe(1)

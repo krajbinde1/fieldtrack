@@ -11,7 +11,9 @@ use App\Filament\Resources\Centers\Pages\ListCenters;
 use App\Filament\Resources\LeaveRequests\Pages\ListLeaveRequests;
 use App\Filament\Resources\OrgUsers\Pages\ListOrgUsers;
 use App\Filament\Resources\Schemes\Pages\ListSchemes;
+use App\Filament\Widgets\DirectorAdminStatsWidget;
 use App\Filament\Widgets\DirectorConfirmedAdmissionsByCenterWidget;
+use Filament\Actions\Testing\TestAction;
 use App\Models\Admission;
 use App\Models\AdmissionTarget;
 use App\Models\Attendance;
@@ -29,28 +31,40 @@ function rememberAdminCenter(int $centerId): array
     return [AdminCenterContext::SESSION_KEY => $centerId];
 }
 
-it('blocks an admin from the dashboard and center modules until a center is selected', function () {
+it('opens the main admin dashboard across all authorized centers', function () {
     $org = seedOrg();
 
-    $this->actingAs($org['admin'])->get('/admin/select-center')
+    $this->actingAs($org['admin'])->get('/admin')
         ->assertOk()
-        ->assertSee('Select Center')
-        ->assertSee('Center A')
-        ->assertSee('Center B');
+        ->assertSee('Main Admin Dashboard')
+        ->assertDontSee('Change Center')
+        ->assertDontSee('Back to All Centers');
 
     foreach ([
-        '/admin',
         '/admin/users',
         '/admin/attendances',
         '/admin/employee-routes',
         '/admin/admissions',
         '/admin/admission-targets',
         '/admin/leave-requests',
+        '/admin/centers',
     ] as $uri) {
-        $this->actingAs($org['admin'])->get($uri)->assertRedirect('/admin/select-center');
+        $this->actingAs($org['admin'])->get($uri)->assertOk();
     }
 
-    $this->actingAs($org['admin'])->get('/admin/centers')->assertOk();
+    $cards = Livewire::actingAs($org['admin'])
+        ->test(DirectorAdminStatsWidget::class)
+        ->instance()
+        ->getCards();
+
+    expect($cards[0]['label'])->toBe('Total Centers')
+        ->and($cards[0]['value'])->toBe('2')
+        ->and($cards[0]['url'])->toContain('/admin/centers');
+
+    Livewire::actingAs($org['admin'])
+        ->test(DirectorConfirmedAdmissionsByCenterWidget::class)
+        ->assertSee('Center A')
+        ->assertSee('Center B');
 });
 
 it('persists the selected center and scopes lists, filters, and direct urls', function () {
@@ -158,7 +172,8 @@ it('persists the selected center and scopes lists, filters, and direct urls', fu
         ->get('/admin')
         ->assertOk()
         ->assertSee('Change Center')
-        ->assertSee($org['centerA']->name);
+        ->assertSee('Back to All Centers')
+        ->assertSee($org['centerA']->name.' Dashboard');
 
     Livewire::actingAs($org['admin'])
         ->test(ListAttendances::class)
@@ -236,8 +251,58 @@ it('rejects a center the admin is not authorized to use', function () {
     $this->actingAs($org['admin'])
         ->withSession([AdminCenterContext::SESSION_KEY => 999999])
         ->get('/admin')
-        ->assertRedirect('/admin/select-center')
+        ->assertOk()
+        ->assertSee('Main Admin Dashboard')
         ->assertSessionMissing(AdminCenterContext::SESSION_KEY);
+});
+
+it('selects a center from the centers list and can return to every center', function () {
+    $org = seedOrg();
+
+    $cards = Livewire::actingAs($org['admin'])
+        ->test(DirectorAdminStatsWidget::class)
+        ->instance()
+        ->getCards();
+    $allEmployees = (int) $cards[1]['value'];
+
+    Livewire::actingAs($org['admin'])
+        ->test(ListCenters::class)
+        ->assertSee('Center A')
+        ->assertSee('Center B')
+        ->callAction(TestAction::make('openDashboard')->table($org['centerA']))
+        ->assertRedirect('/admin');
+
+    expect(session(AdminCenterContext::SESSION_KEY))->toBe($org['centerA']->id);
+
+    $this->withSession(rememberAdminCenter($org['centerA']->id));
+
+    $scoped = Livewire::actingAs($org['admin'])
+        ->test(DirectorAdminStatsWidget::class)
+        ->instance()
+        ->getCards();
+
+    expect($scoped[0]['value'])->toBe('2')
+        ->and((int) $scoped[1]['value'])->toBeLessThan($allEmployees);
+
+    Livewire::actingAs($org['admin'])
+        ->test(DirectorConfirmedAdmissionsByCenterWidget::class)
+        ->assertSee('Center A')
+        ->assertDontSee('Center B');
+
+    $this->actingAs($org['admin'])
+        ->post(route('admin.clear-center'))
+        ->assertRedirect('/admin')
+        ->assertSessionMissing(AdminCenterContext::SESSION_KEY);
+
+    $this->actingAs($org['admin'])
+        ->get('/admin')
+        ->assertOk()
+        ->assertSee('Main Admin Dashboard')
+        ->assertDontSee('Back to All Centers');
+
+    Livewire::actingAs($org['centerManager'])
+        ->test(ListCenters::class)
+        ->assertActionHidden(TestAction::make('openDashboard')->table($org['centerA']));
 });
 
 it('clears the selected center when an admin logs out', function () {

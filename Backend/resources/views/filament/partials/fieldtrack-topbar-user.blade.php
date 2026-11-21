@@ -25,10 +25,16 @@ use Filament\Facades\Filament;
 @if ($user)
 <div class="ft-topbar-user" data-ft-topbar-user>
     @if ($selectedCenter && filled($changeCenterUrl))
-        <a class="ft-change-center" href="{{ $changeCenterUrl }}">
+        <div class="ft-change-center">
             <span class="ft-change-center-name">{{ $selectedCenter->name }}</span>
-            <span class="ft-change-center-action">Change Center</span>
-        </a>
+            <span class="ft-change-center-actions">
+                <a class="ft-change-center-action" href="{{ $changeCenterUrl }}">Change Center</a>
+                <form class="ft-clear-center" method="POST" action="{{ route('admin.clear-center') }}">
+                    @csrf
+                    <button type="submit" class="ft-change-center-action">Back to All Centers</button>
+                </form>
+            </span>
+        </div>
     @endif
 
     <button type="button" class="ft-topbar-bell" aria-label="Notifications" title="No new notifications">

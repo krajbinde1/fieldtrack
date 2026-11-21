@@ -49,7 +49,7 @@ class SelectCenter extends Page
                 Section::make('Select Center')
                     ->description($current instanceof Center
                         ? 'You are working in '.$current->name.'. Choose another authorized center to switch.'
-                        : 'Choose an authorized center before opening the dashboard. Records stay limited to that center until you change it.')
+                        : 'Choose an authorized center to open its dashboard. The main dashboard keeps every authorized center until you do.')
                     ->schema([
                         Select::make('center_id')
                             ->label('Center')

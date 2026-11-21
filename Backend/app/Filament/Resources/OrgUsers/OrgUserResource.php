@@ -83,7 +83,7 @@ class OrgUserResource extends Resource
                 $centerId = app(AdminCenterContext::class)->idFor($user);
 
                 return $centerId === null
-                    ? $query->whereRaw('1 = 0')
+                    ? $query
                     : self::constrainUsersByCenterId($query, $centerId);
             }
 

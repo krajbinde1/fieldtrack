@@ -7,6 +7,8 @@ use App\Filament\Widgets\DirectorAdminStatsWidget;
 use App\Filament\Widgets\DirectorConfirmedAdmissionsByCenterWidget;
 use App\Filament\Widgets\DirectorTodayTeamActivityWidget;
 use App\Filament\Widgets\FieldTrackStatsWidget;
+use App\Models\User;
+use App\Services\AdminCenterContext;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
@@ -24,6 +26,19 @@ class Dashboard extends BaseDashboard
     /**
      * @return int | array<string, ?int>
      */
+    public function getTitle(): string
+    {
+        $user = auth()->user();
+
+        if ($user instanceof User && $user->isAdmin()) {
+            $center = app(AdminCenterContext::class)->centerFor($user);
+
+            return $center ? $center->name.' Dashboard' : 'Main Admin Dashboard';
+        }
+
+        return 'Dashboard';
+    }
+
     public function getColumns(): int | array
     {
         return 1;

@@ -66,7 +66,7 @@ final class AdminCenterContext
 
     /**
      * Center id passed to workforce summaries.
-     * Null keeps organization-wide results. Zero matches no center.
+     * Null keeps organization-wide results for the main admin dashboard.
      */
     public function workforceCenterId(?User $user): ?int
     {
@@ -74,7 +74,7 @@ final class AdminCenterContext
             return null;
         }
 
-        return $this->idFor($user) ?? 0;
+        return $this->idFor($user);
     }
 
     public function select(User $user, int $centerId): Center
@@ -183,10 +183,11 @@ final class AdminCenterContext
 
         $centerId = $this->idFor($user);
 
-        abort_unless(
-            $centerId !== null && (int) $employee->center_id === $centerId,
-            404,
-        );
+        if ($centerId === null) {
+            return;
+        }
+
+        abort_unless((int) $employee->center_id === $centerId, 404);
     }
 
     private function rawId(): ?int
@@ -218,7 +219,7 @@ final class AdminCenterContext
 
         $id = $this->idFor($user);
         if ($id === null) {
-            return $query->whereRaw('1 = 0');
+            return $query;
         }
 
         return $apply($query, $id);
