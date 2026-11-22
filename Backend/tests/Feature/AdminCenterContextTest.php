@@ -49,6 +49,7 @@ it('opens the main admin dashboard across all authorized centers', function () {
         ->assertSee('Main Dashboard')
         ->assertSee('Center Dashboard')
         ->assertSee('Centers')
+        ->assertSee('Team Management')
         ->assertDontSee('Change Center')
         ->assertDontSee('Back to All Centers');
 
@@ -59,19 +60,20 @@ it('opens the main admin dashboard across all authorized centers', function () {
         ->and(CenterResource::shouldRegisterNavigation())->toBeTrue()
         ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeTrue()
         ->and(DeviceManagement::shouldRegisterNavigation())->toBeTrue()
-        ->and(OrgUserResource::shouldRegisterNavigation())->toBeFalse()
+        ->and(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
+        ->and(OrgUserResource::getNavigationLabel())->toBe('Team Management')
         ->and(AdmissionResource::shouldRegisterNavigation())->toBeFalse()
         ->and(Reports::shouldRegisterNavigation())->toBeFalse();
 
+    $this->actingAs($org['admin'])->get('/admin/users')->assertOk()->assertSee('Team Management');
+
     foreach ([
-        '/admin/users',
         '/admin/attendances',
         '/admin/employee-routes',
         '/admin/admissions',
         '/admin/admission-targets',
         '/admin/leave-requests',
         '/admin/reports',
-        '/admin/users/1/edit',
     ] as $uri) {
         $this->actingAs($org['admin'])->get($uri)->assertRedirect('/admin/centers');
     }
@@ -539,7 +541,8 @@ it('does not force center selection on a director', function () {
         ->assertSee('Dashboard')
         ->assertDontSee('Change Center')
         ->assertDontSee('Main Dashboard')
-        ->assertSee('Center Dashboard');
+        ->assertSee('Center Dashboard')
+        ->assertSee('Team Management');
 
     $this->actingAs($org['director'])->get('/admin/center-dashboard')->assertForbidden();
     expect(CenterDashboard::shouldRegisterNavigation())->toBeFalse()

@@ -12,9 +12,9 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureAdminCenterSelected
 {
     /**
-     * Admins without a selected center stay on the main dashboard, Centers, and
-     * global settings. The center dashboard and center-specific modules
-     * redirect to the Centers list.
+     * Admins without a selected center stay on the main dashboard, Centers,
+     * Team Management, and global settings. The center dashboard and
+     * center-specific modules redirect to the Centers list.
      *
      * @param  Closure(Request): (Response)  $next
      */
@@ -44,7 +44,6 @@ class EnsureAdminCenterSelected
 
         foreach ([
             'center-dashboard',
-            'users',
             'attendances',
             'employee-routes',
             'admissions',

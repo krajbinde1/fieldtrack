@@ -38,11 +38,11 @@ class OrgUserResource extends Resource
 
     protected static ?string $slug = 'users';
 
-    protected static ?string $navigationLabel = 'Users';
+    protected static ?string $navigationLabel = 'Team Management';
 
     protected static ?string $modelLabel = 'User';
 
-    protected static ?string $pluralModelLabel = 'Users';
+    protected static ?string $pluralModelLabel = 'Team Management';
 
     protected static string|\UnitEnum|null $navigationGroup = 'People';
 
@@ -55,6 +55,11 @@ class OrgUserResource extends Resource
         $user = auth()->user();
 
         return (bool) ($user && app(OrganizationAccessService::class)->canAccessOrgUsers($user));
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
     }
 
     public static function canCreate(): bool
