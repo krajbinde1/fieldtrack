@@ -28,7 +28,7 @@ class RoutePermissions {
     }
 
     if (path.startsWith('/manager')) {
-      return role.isProjectHead || role.isCenterManager;
+      return role.isCenterManager;
     }
 
     if (path.startsWith('/director')) {

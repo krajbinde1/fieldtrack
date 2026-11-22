@@ -2,6 +2,7 @@
 
 use App\Enums\FieldActivityType;
 use App\Models\FieldActivity;
+use App\Models\User;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -52,7 +53,7 @@ it('requires a camera photo when submitting a field activity', function () {
 it('lets an employee list and view only their own field activities', function () {
     Storage::fake('public');
     $org = seedOrg();
-    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $otherUser = User::query()->where('login_id', '9000000002')->firstOrFail();
 
     $ownId = $this->actingAs($org['userA'], 'sanctum')
         ->post('/api/field-activities', fieldActivityPayload(), ['Accept' => 'application/json'])
@@ -79,7 +80,7 @@ it('lets an employee list and view only their own field activities', function ()
 it('lets center manager view assigned-center activities and filter by employee', function () {
     Storage::fake('public');
     $org = seedOrg();
-    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $otherUser = User::query()->where('login_id', '9000000002')->firstOrFail();
 
     $ownId = $this->actingAs($org['userA'], 'sanctum')
         ->post('/api/field-activities', fieldActivityPayload(), ['Accept' => 'application/json'])
@@ -112,7 +113,7 @@ it('lets center manager view assigned-center activities and filter by employee',
 it('lets project head view assigned project activities and director view all', function () {
     Storage::fake('public');
     $org = seedOrg();
-    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $otherUser = User::query()->where('login_id', '9000000002')->firstOrFail();
 
     $ownId = $this->actingAs($org['userA'], 'sanctum')
         ->post('/api/field-activities', fieldActivityPayload(), ['Accept' => 'application/json'])
@@ -125,7 +126,7 @@ it('lets project head view assigned project activities and director view all', f
         ->json('data.id');
 
     Sanctum::actingAs($org['projectHead']);
-    $this->getJson('/api/manager/field-activities/'.$ownId)->assertOk();
+    $this->getJson('/api/manager/field-activities/'.$ownId)->assertForbidden();
     $this->getJson('/api/manager/field-activities/'.$otherId)->assertForbidden();
 
     Sanctum::actingAs($org['director']);

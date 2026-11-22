@@ -31,11 +31,10 @@ enum UserRole {
   bool get isProjectHead => this == UserRole.projectHead;
   bool get isDirector => this == UserRole.director;
   bool get isAdmin => this == UserRole.admin;
-  bool get isManager => isProjectHead || isCenterManager;
+  bool get isManager => isCenterManager;
 
   bool canAccessEmployeeWorkflow() => isEmployee;
-  bool canAccessOwnAttendance() => isEmployee || isCenterManager || isProjectHead;
-  bool canAccessManagerRoutes() => isProjectHead || isCenterManager;
-  bool canAccessDirectorRoutes() =>
-      isAdmin || isDirector || isCenterCoordinator || isProjectHead;
+  bool canAccessOwnAttendance() => isEmployee || isCenterManager;
+  bool canAccessManagerRoutes() => isCenterManager;
+  bool canAccessDirectorRoutes() => isAdmin || isDirector || isCenterCoordinator;
 }

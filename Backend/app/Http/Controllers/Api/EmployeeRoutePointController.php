@@ -26,7 +26,7 @@ class EmployeeRoutePointController extends Controller
         $user = $request->user();
         $employee = $user->employee;
 
-        if ($employee === null && ($user->isCenterManager() || $user->isProjectHead())) {
+        if ($employee === null && $user->isCenterManager()) {
             $employee = app(CenterManagerAttendanceProfile::class)->employeeFor($user);
         }
 

@@ -261,31 +261,32 @@ it('lets admin create a director from the people users module', function () {
         ->and($created->directedProjects()->count())->toBe(0);
 });
 
-it('lets admin assign a project head to selected centers across projects', function () {
+it('does not let admin create a project manager login', function () {
     $admin = User::query()->where('login_id', 'admin')->firstOrFail();
     $demoCenter = Center::query()->where('code', 'C1')->firstOrFail();
     $otherCenter = Center::query()->where('code', 'C9')->firstOrFail();
 
-    Livewire::actingAs($admin)
-        ->test(CreateOrgUser::class)
-        ->fillForm([
-            'role' => UserRole::ProjectHead->value,
-            'name' => 'PH Across Centers',
-            'login_id' => 'phcenters',
-            'email' => 'phcenters@fieldtrack.local',
-            'password' => 'ProjectHead@123',
-            'headedCenters' => [$demoCenter->id, $otherCenter->id],
-            'is_active' => true,
-            'must_change_password' => true,
-        ])
-        ->call('create')
-        ->assertHasNoFormErrors();
+    expect(UserRole::options())->not->toHaveKey(UserRole::ProjectHead->value);
 
-    $created = User::query()->where('login_id', 'phcenters')->first();
-    expect($created)->not->toBeNull()
-        ->and($created->role)->toBe(UserRole::ProjectHead->value)
-        ->and($created->headedCenters()->pluck('centers.id')->sort()->values()->all())
-        ->toEqual(collect([$demoCenter->id, $otherCenter->id])->sort()->values()->all());
+    try {
+        Livewire::actingAs($admin)
+            ->test(CreateOrgUser::class)
+            ->fillForm([
+                'role' => UserRole::ProjectHead->value,
+                'name' => 'PH Across Centers',
+                'login_id' => 'phcenters',
+                'email' => 'phcenters@fieldtrack.local',
+                'password' => 'ProjectHead@123',
+                'managedCenters' => [$demoCenter->id, $otherCenter->id],
+                'is_active' => true,
+                'must_change_password' => true,
+            ])
+            ->call('create');
+    } catch (Throwable $exception) {
+        expect($exception)->toBeInstanceOf(Throwable::class);
+    }
+
+    expect(User::query()->where('login_id', 'phcenters')->exists())->toBeFalse();
 });
 
 it('uses email as login id when admin leaves login id blank for a director', function () {

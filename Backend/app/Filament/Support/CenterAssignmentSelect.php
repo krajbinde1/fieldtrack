@@ -41,9 +41,7 @@ final class CenterAssignmentSelect
             ->helperText(
                 $name === 'managedCenters'
                     ? 'A manager can cover several centers. Each center can have only one active manager.'
-                    : ($name === 'coordinatedCenters'
-                        ? 'Coordinators can view only the selected centers. A center can have more than one coordinator.'
-                        : 'Project Manager can access only the selected Centers, even when they belong to the same Scheme.'),
+                    : 'Coordinators can view only the selected centers. A center can have more than one coordinator.',
             )
             ->saveRelationshipsUsing(function (User $record, $state) use ($access, $user, $name): void {
                 $selected = array_map('intval', $state ?? []);

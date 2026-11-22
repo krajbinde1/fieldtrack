@@ -135,7 +135,7 @@ it('creates a scheme from the center form and selects it without clearing entere
 
     Livewire::actingAs($org['projectHead'])
         ->test(CreateCenter::class)
-        ->assertActionHidden(TestAction::make('createOption')->schemaComponent('scheme_id'));
+        ->assertForbidden();
 
     Livewire::actingAs($org['admin'])
         ->test(EditCenter::class, ['record' => $org['centerA']->getKey()])

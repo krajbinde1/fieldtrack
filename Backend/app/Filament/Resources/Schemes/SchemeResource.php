@@ -48,7 +48,7 @@ class SchemeResource extends Resource
     {
         $user = auth()->user();
 
-        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isProjectHead());
+        return (bool) ($user?->isAdmin() || $user?->isDirector());
     }
 
     public static function canCreate(): bool

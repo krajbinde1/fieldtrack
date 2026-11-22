@@ -201,17 +201,7 @@ it('hides and forbids scheme deletion for coordinators, project heads, and cente
 
     Livewire::actingAs($org['projectHead'])
         ->test(CreateCenter::class)
-        ->assertActionHidden(TestAction::make('deleteScheme')->schemaComponent('scheme_id'))
-        ->fillForm([
-            'name' => 'Project Head Center',
-            'scheme_id' => $org['projectA']->id,
-        ])
-        ->call('mountAction', 'deleteScheme', [], [
-            'schemaComponent' => 'form.scheme_id',
-        ])
-        ->call('callMountedAction')
-        ->assertSet('data.name', 'Project Head Center')
-        ->assertSet('data.scheme_id', $org['projectA']->id);
+        ->assertForbidden();
 
     expect(Scheme::query()->whereKey($unused->id)->exists())->toBeTrue()
         ->and(Scheme::query()->whereKey($org['projectA']->id)->exists())->toBeTrue();

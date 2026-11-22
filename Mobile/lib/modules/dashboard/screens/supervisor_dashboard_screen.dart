@@ -73,15 +73,7 @@ class _SupervisorDashboardScreenState
       }
     } catch (_) {}
 
-    TeamAttendancePulse? pulse;
-    if (widget.auth.userRole.isProjectHead) {
-      try {
-        final result = await api.listTeamAttendance();
-        pulse = TeamAttendancePulse.fromRows(result.rows, result.meta);
-      } catch (_) {}
-    }
-
-    return _DashboardSnapshot(data: data, pulse: pulse, centers: centers);
+    return _DashboardSnapshot(data: data, pulse: null, centers: centers);
   }
 
   Future<void> _refresh({bool refreshOwnAttendance = true}) async {
@@ -220,7 +212,7 @@ class SupervisorDashboardView extends StatelessWidget {
         value: '${_count('employees')}',
         path: _centerScopedDirector
             ? _path('/director/employees')
-            : (role.isCenterManager || role.isProjectHead
+            : (role.isCenterManager
                 ? _path('/manager/employees')
                 : '$_prefix/team-attendance'),
         color: const Color(0xFF2563EB),
@@ -265,7 +257,7 @@ class SupervisorDashboardView extends StatelessWidget {
         value: '${_count('admission_targets')}',
         path: _centerScopedDirector
             ? _path('/director/admission-targets')
-            : (role.isCenterManager || role.isProjectHead
+            : (role.isCenterManager
                 ? _path('/manager/admission-targets')
                 : '$_prefix/admissions'),
         color: const Color(0xFFDB2777),
@@ -368,7 +360,7 @@ class SupervisorDashboardView extends StatelessWidget {
         color: const Color(0xFFEA580C),
         background: const Color(0xFFFFF6E5),
       ),
-      if (role.isCenterManager || role.isProjectHead || _centerScopedDirector)
+      if (role.isCenterManager || _centerScopedDirector)
         _DashboardTile(
           icon: const Icon(Icons.photo_camera_outlined),
           label: 'Field Activities',
@@ -381,7 +373,7 @@ class SupervisorDashboardView extends StatelessWidget {
           color: const Color(0xFF0F766E),
           background: const Color(0xFFE6F7F1),
         ),
-      if (role.isCenterManager || role.isProjectHead || _centerScopedDirector)
+      if (role.isCenterManager || _centerScopedDirector)
         _DashboardTile(
           icon: const Icon(Icons.analytics_rounded),
           label: 'Reports',

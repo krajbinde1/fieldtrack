@@ -31,8 +31,8 @@ class DemoOrganizationSeeder extends Seeder
                 'email' => 'projecthead@fieldtrack.local',
                 'password' => Hash::make('ProjectHead@123'),
                 'role' => UserRole::ProjectHead->value,
-                'is_active' => true,
-                'must_change_password' => false,
+                'is_active' => false,
+                'must_change_password' => true,
             ],
         );
         $director = User::query()->updateOrCreate(

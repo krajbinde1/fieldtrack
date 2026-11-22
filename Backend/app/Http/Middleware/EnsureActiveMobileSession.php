@@ -26,7 +26,10 @@ class EnsureActiveMobileSession
         }
 
         if (! in_array($user->role, UserRole::mobileValues(), true)) {
-            return $next($request);
+            return response()->json([
+                'success' => false,
+                'message' => 'This account cannot access the mobile application.',
+            ], 403);
         }
 
         $token = $user->currentAccessToken();

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\CenterLoginService;
 use App\Services\OrganizationAccessService;
 use App\Support\CenterLoginIdGenerator;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -192,10 +193,9 @@ it('does not delete or overwrite an existing center login when the center is sav
 
     $org['projectHead']->headedCenters()->attach($center->id);
 
-    Livewire::actingAs($org['projectHead'])
-        ->test(EditCenter::class, ['record' => $center->getKey()])
-        ->assertDontSee('Reset Password')
-        ->assertDontSee('Center Login ID');
+    expect(fn () => Livewire::actingAs($org['projectHead'])
+        ->test(EditCenter::class, ['record' => $center->getKey()]))
+        ->toThrow(ModelNotFoundException::class);
 
     expect($account->fresh()->getRawOriginal('password'))->toBe($hash)
         ->and($manager->fresh()->getRawOriginal('password'))->toBe($managerPassword);

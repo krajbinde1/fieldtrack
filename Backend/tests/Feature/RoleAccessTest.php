@@ -137,7 +137,7 @@ it('lets project head view assigned project attendance and blocks unrelated empl
 
     Sanctum::actingAs($org['projectHead']);
 
-    $this->getJson('/api/manager/team-attendance/'.$own->id)->assertOk();
+    $this->getJson('/api/manager/team-attendance/'.$own->id)->assertForbidden();
     $this->getJson('/api/manager/team-attendance/'.$other->id)->assertForbidden();
 });
 
@@ -273,8 +273,8 @@ it('scopes project head access to assigned centers and not every center in the p
     $access = app(OrganizationAccessService::class);
     $ph = $org['projectHead'];
 
-    expect($access->visibleCenterIds($ph))->toBe([(int) $org['centerA']->id])
-        ->and($access->canViewEmployee($ph, $org['empA']))->toBeTrue()
+    expect($access->visibleCenterIds($ph))->toBe([])
+        ->and($access->canViewEmployee($ph, $org['empA']))->toBeFalse()
         ->and($access->canViewEmployee($ph, $empSameProject))->toBeFalse()
         ->and($access->canViewEmployee($ph, $org['empB']))->toBeFalse();
 
@@ -294,7 +294,7 @@ it('scopes project head access to assigned centers and not every center in the p
     ]);
 
     Sanctum::actingAs($ph);
-    $this->getJson('/api/manager/team-attendance/'.$ownAttendance->id)->assertOk();
+    $this->getJson('/api/manager/team-attendance/'.$ownAttendance->id)->assertForbidden();
     $this->getJson('/api/manager/team-attendance/'.$hiddenAttendance->id)->assertForbidden();
     $this->getJson('/api/manager/route-tracking/'.$hiddenAttendance->id)->assertForbidden();
 
@@ -316,7 +316,7 @@ it('scopes project head access to assigned centers and not every center in the p
         ->json('data.id');
 
     Sanctum::actingAs($ph);
-    $this->getJson('/api/manager/leaves/'.$ownLeave)->assertOk();
+    $this->getJson('/api/manager/leaves/'.$ownLeave)->assertForbidden();
     $this->getJson('/api/manager/leaves/'.$hiddenLeave)->assertForbidden();
 
     $ownAdmission = Admission::create([
@@ -335,7 +335,7 @@ it('scopes project head access to assigned centers and not every center in the p
     ]);
 
     Sanctum::actingAs($ph);
-    $this->getJson('/api/manager/admissions/'.$ownAdmission->id)->assertOk();
+    $this->getJson('/api/manager/admissions/'.$ownAdmission->id)->assertForbidden();
     $this->getJson('/api/manager/admissions/'.$hiddenAdmission->id)->assertForbidden();
 
     $ownTarget = AdmissionTarget::create([
@@ -357,15 +357,13 @@ it('scopes project head access to assigned centers and not every center in the p
         'target_count' => 5,
     ]);
 
-    expect($access->canViewAdmissionTarget($ph, $ownTarget->load('employee')))->toBeTrue()
+    expect($access->canViewAdmissionTarget($ph, $ownTarget->load('employee')))->toBeFalse()
         ->and($access->canViewAdmissionTarget($ph, $hiddenTarget->load('employee')))->toBeFalse()
-        ->and($access->admissionTargetQuery($ph)->pluck('id')->all())->toContain($ownTarget->id)
-        ->and($access->admissionTargetQuery($ph)->pluck('id')->all())->not->toContain($hiddenTarget->id);
+        ->and($access->admissionTargetQuery($ph)->pluck('id')->all())->toBe([]);
 
     Livewire::actingAs($ph)
         ->test(ListCenters::class)
-        ->assertCanSeeTableRecords([$org['centerA']])
-        ->assertCanNotSeeTableRecords([$sameProjectOther, $org['centerB']]);
+        ->assertForbidden();
 });
 
 it('lets a project head access centers from different projects when those centers are assigned', function () {
@@ -375,10 +373,11 @@ it('lets a project head access centers from different projects when those center
     $access = app(OrganizationAccessService::class);
     $ids = $access->visibleCenterIds($org['projectHead']);
 
-    expect($ids)->toContain((int) $org['centerA']->id)
-        ->and($ids)->toContain((int) $org['centerB']->id)
-        ->and($access->canViewEmployee($org['projectHead'], $org['empA']))->toBeTrue()
-        ->and($access->canViewEmployee($org['projectHead'], $org['empB']))->toBeTrue();
+    expect($ids)->toBe([])
+        ->and($org['projectHead']->fresh()->headedCenters()->pluck('centers.id')->all())
+        ->toContain((int) $org['centerA']->id, (int) $org['centerB']->id)
+        ->and($access->canViewEmployee($org['projectHead'], $org['empA']))->toBeFalse()
+        ->and($access->canViewEmployee($org['projectHead'], $org['empB']))->toBeFalse();
 });
 
 it('gives a director organization-wide access without project or center assignment', function () {

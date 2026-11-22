@@ -12,7 +12,7 @@ final class CenterManagerAttendanceProfile
 {
     public function employeeFor(User $user): Employee
     {
-        if (! $user->isCenterManager() && ! $user->isProjectHead()) {
+        if (! $user->isCenterManager()) {
             throw ValidationException::withMessages([
                 'employee' => 'Employee profile is not linked to this account.',
             ]);
@@ -26,19 +26,14 @@ final class CenterManagerAttendanceProfile
                 return $existing;
             }
 
-            $isProjectHead = $fresh->isProjectHead();
-            $centerId = $isProjectHead
-                ? $fresh->headedCenters()->orderBy('centers.id')->value('centers.id')
-                : $fresh->managedCenters()->orderBy('centers.id')->value('centers.id');
+            $centerId = $fresh->managedCenters()->orderBy('centers.id')->value('centers.id');
             if ($centerId === null) {
                 throw ValidationException::withMessages([
-                    'employee' => $isProjectHead
-                        ? 'No assigned center found for this Project Manager.'
-                        : 'No assigned center found for this Center Manager.',
+                    'employee' => 'No assigned center found for this Center Manager.',
                 ]);
             }
 
-            $roleLabel = $isProjectHead ? UserRole::ProjectHead->label() : UserRole::CenterManager->label();
+            $roleLabel = UserRole::CenterManager->label();
             $name = trim((string) $fresh->name);
             if ($name === '' || str_contains($name, '@')) {
                 $name = $roleLabel;

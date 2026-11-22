@@ -20,7 +20,7 @@ class AdmissionTargetPerformanceWidget extends StatsOverviewWidget
     {
         $user = auth()->user();
 
-        return (bool) ($user?->isCenterCoordinator() || $user?->isProjectHead() || $user?->isCenterManager());
+        return (bool) ($user?->isCenterCoordinator() || $user?->isCenterManager());
     }
 
     protected function getStats(): array

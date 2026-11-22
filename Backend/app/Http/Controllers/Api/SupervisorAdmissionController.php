@@ -100,7 +100,7 @@ class SupervisorAdmissionController extends Controller
     public function confirmedByCenter(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user->isAdminOrDirector() || $user->isCenterCoordinator() || $user->isProjectHead(), 403);
+        abort_unless($user->isAdminOrDirector() || $user->isCenterCoordinator(), 403);
 
         $query = $this->access->admissionQuery($user)
             ->where('status', AdmissionStatus::Confirmed);

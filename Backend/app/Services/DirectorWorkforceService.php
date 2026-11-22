@@ -19,7 +19,7 @@ final class DirectorWorkforceService
      * @return list<string>
      */
     public const ROLE_PRIORITY = [
-        UserRole::ProjectHead->value,
+        UserRole::CenterCoordinator->value,
         UserRole::CenterManager->value,
         CenterStaffRole::Mis->value,
         CenterStaffRole::Trainer->value,
@@ -182,9 +182,9 @@ final class DirectorWorkforceService
     private function orgUsers(User $viewer, ?int $centerId, ?int $schemeId): Collection
     {
         $visibleCenterIds = $this->access->visibleCenterIds($viewer);
-        $roles = ($viewer->isProjectHead() || $viewer->isCenterCoordinator())
+        $roles = $viewer->isCenterCoordinator()
             ? [UserRole::CenterManager->value]
-            : [UserRole::CenterCoordinator->value, UserRole::ProjectHead->value, UserRole::CenterManager->value];
+            : [UserRole::CenterCoordinator->value, UserRole::CenterManager->value];
 
         return User::query()
             ->where('is_active', true)
@@ -192,24 +192,24 @@ final class DirectorWorkforceService
             ->whereIn('role', $roles)
             ->with([
                 'employee:id,employee_code,center_id',
-                'headedCenters' => fn ($query) => $query->with('scheme:id,name')->orderBy('name'),
+                'coordinatedCenters' => fn ($query) => $query->with('scheme:id,name')->orderBy('name'),
                 'managedCenters' => fn ($query) => $query->with('scheme:id,name')->orderBy('name'),
             ])
             ->when($centerId !== null, function ($query) use ($centerId): void {
                 $query->where(function ($inner) use ($centerId): void {
-                    $inner->whereHas('headedCenters', fn ($centers) => $centers->where('centers.id', $centerId))
+                    $inner->whereHas('coordinatedCenters', fn ($centers) => $centers->where('centers.id', $centerId))
                         ->orWhereHas('managedCenters', fn ($centers) => $centers->where('centers.id', $centerId));
                 });
             })
             ->when($visibleCenterIds !== null, function ($query) use ($visibleCenterIds): void {
                 $query->where(function ($inner) use ($visibleCenterIds): void {
-                    $inner->whereHas('headedCenters', fn ($centers) => $centers->whereIn('centers.id', $visibleCenterIds))
+                    $inner->whereHas('coordinatedCenters', fn ($centers) => $centers->whereIn('centers.id', $visibleCenterIds))
                         ->orWhereHas('managedCenters', fn ($centers) => $centers->whereIn('centers.id', $visibleCenterIds));
                 });
             })
             ->when($schemeId !== null, function ($query) use ($schemeId): void {
                 $query->where(function ($inner) use ($schemeId): void {
-                    $inner->whereHas('headedCenters', fn ($centers) => $centers->where('centers.scheme_id', $schemeId))
+                    $inner->whereHas('coordinatedCenters', fn ($centers) => $centers->where('centers.scheme_id', $schemeId))
                         ->orWhereHas('managedCenters', fn ($centers) => $centers->where('centers.scheme_id', $schemeId));
                 });
             })
@@ -237,7 +237,7 @@ final class DirectorWorkforceService
      */
     private function orgUserRow(User $user, ?Attendance $attendance): array
     {
-        $centers = $user->isProjectHead() ? $user->headedCenters : $user->managedCenters;
+        $centers = $user->isCenterCoordinator() ? $user->coordinatedCenters : $user->managedCenters;
         $center = $centers->first();
 
         return $this->personPayload(
@@ -347,7 +347,7 @@ final class DirectorWorkforceService
     private function roleFilterOptions(): array
     {
         return [
-            ['value' => UserRole::ProjectHead->value, 'label' => UserRole::ProjectHead->label()],
+            ['value' => UserRole::CenterCoordinator->value, 'label' => UserRole::CenterCoordinator->label()],
             ['value' => UserRole::CenterManager->value, 'label' => UserRole::CenterManager->label()],
             ['value' => CenterStaffRole::Mis->value, 'label' => CenterStaffRole::Mis->label()],
             ['value' => CenterStaffRole::Trainer->value, 'label' => CenterStaffRole::Trainer->label()],

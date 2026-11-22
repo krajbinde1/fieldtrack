@@ -2,11 +2,13 @@
 
 use App\Enums\AdmissionStatus;
 use App\Enums\CenterStaffRole;
+use App\Enums\LeaveStatus;
 use App\Enums\UserRole;
 use App\Filament\Resources\Centers\Pages\CreateCenter;
 use App\Filament\Resources\Centers\Pages\ListCenters;
 use App\Models\Admission;
 use App\Models\Attendance;
+use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
@@ -45,7 +47,9 @@ it('scopes a center coordinator to assigned centers and keeps them read-only', f
         ->and($access->isReadOnlyCenterViewer($coordinator))->toBeTrue()
         ->and($access->canManageCenters($coordinator))->toBeFalse()
         ->and($access->canManageEmployees($coordinator))->toBeFalse()
-        ->and($access->creatableOrgUserRoles($coordinator))->toBe([]);
+        ->and($access->creatableOrgUserRoles($coordinator))->toBe(['center_manager'])
+        ->and($access->canManageCenterManagers($coordinator, $org['centerA']))->toBeTrue()
+        ->and($access->canManageCenterManagers($coordinator, $org['centerB']))->toBeFalse();
 
     $own = Attendance::create([
         'employee_id' => $org['empA']->id,
@@ -66,8 +70,8 @@ it('scopes a center coordinator to assigned centers and keeps them read-only', f
     $this->getJson('/api/director/team-attendance/'.$own->id)->assertOk();
     $this->getJson('/api/director/team-attendance/'.$other->id)->assertForbidden();
     $this->getJson('/api/director/centers/'.$org['centerB']->id)->assertForbidden();
-    expect($access->canApproveLeave($coordinator, new \App\Models\LeaveRequest([
-        'status' => \App\Enums\LeaveStatus::Pending,
+    expect($access->canApproveLeave($coordinator, new LeaveRequest([
+        'status' => LeaveStatus::Pending,
         'center_id' => $org['centerA']->id,
         'employee_id' => $org['empA']->id,
     ])))->toBeFalse();

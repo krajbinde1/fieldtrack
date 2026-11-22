@@ -100,7 +100,7 @@ it('creates a coordinator from the center form and assigns them without a center
 
     Livewire::actingAs($org['projectHead'])
         ->test(CreateCenter::class)
-        ->assertActionHidden(TestAction::make('createOption')->schemaComponent('coordinators'));
+        ->assertForbidden();
 
     Livewire::actingAs($org['admin'])
         ->test(CreateCenter::class)

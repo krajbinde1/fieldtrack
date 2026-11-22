@@ -169,40 +169,6 @@ it('creates a center manager from the center form modal, auto-selects them, and 
     ])->assertOk()->assertJsonPath('user.login_id', '9123456790');
 });
 
-it('lets a project head create a center manager from the center form', function () {
-    $org = seedOrg();
-
-    Livewire::actingAs($org['projectHead'])
-        ->test(CreateCenter::class)
-        ->fillForm([
-            'scheme_id' => $org['projectA']->id,
-            'name' => 'PH Modal Center',
-            'is_active' => true,
-        ])
-        ->call('create')
-        ->assertHasNoFormErrors();
-
-    $center = Center::query()->where('name', 'PH Modal Center')->firstOrFail();
-
-    Livewire::actingAs($org['projectHead'])
-        ->test(EditCenter::class, ['record' => $center->getKey()])
-        ->callAction(TestAction::make('createOption')->schemaComponent('centerManagers'), [
-            'name' => 'PH Created CM',
-            'mobile' => '9123456791',
-            'email' => 'phcreatedcm@fieldtrack.local',
-        ])
-        ->assertHasNoFormErrors()
-        ->call('save')
-        ->assertHasNoFormErrors();
-
-    $manager = User::query()->where('login_id', '9123456791')->firstOrFail();
-
-    expect($manager->email)->toBe('phcreatedcm@fieldtrack.local')
-        ->and(Hash::check('6791', $manager->password))->toBeTrue()
-        ->and($center->centerManagers->pluck('id')->all())->toContain($manager->id)
-        ->and($org['projectHead']->fresh()->headedCenters()->pluck('centers.id')->all())->toContain($center->id);
-});
-
 it('adds and removes center managers on edit without wiping other centers', function () {
     $org = seedOrg();
     $other = User::query()->create([

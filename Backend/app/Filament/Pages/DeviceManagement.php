@@ -53,7 +53,6 @@ class DeviceManagement extends Page implements HasTable
                     ->with('employee')
                     ->whereIn('role', [
                         UserRole::Director->value,
-                        UserRole::ProjectHead->value,
                         UserRole::CenterManager->value,
                         UserRole::Employee->value,
                     ])
@@ -88,7 +87,6 @@ class DeviceManagement extends Page implements HasTable
                 SelectFilter::make('role')
                     ->options([
                         UserRole::Director->value => UserRole::Director->label(),
-                        UserRole::ProjectHead->value => UserRole::ProjectHead->label(),
                         UserRole::CenterManager->value => UserRole::CenterManager->label(),
                         UserRole::Employee->value => UserRole::Employee->label(),
                     ]),

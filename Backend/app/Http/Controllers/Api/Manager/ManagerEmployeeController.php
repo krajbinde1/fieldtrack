@@ -26,7 +26,7 @@ class ManagerEmployeeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        if ($user->isAdminOrDirector() || $user->isProjectHead()) {
+        if ($user->isAdminOrDirector()) {
             $payload = $this->workforce->index($request);
 
             return response()->json([

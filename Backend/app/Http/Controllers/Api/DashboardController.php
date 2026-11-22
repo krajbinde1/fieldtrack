@@ -24,7 +24,7 @@ class DashboardController extends Controller
         }
         $employeeIds = (clone $employeeQuery)->pluck('id');
         $directorOrgDashboard = $user->isAdminOrDirector() && $centerId === null;
-        $projectHeadOrgDashboard = ($user->isProjectHead() || $user->isCenterCoordinator()) && $centerId === null;
+        $projectHeadOrgDashboard = $user->isCenterCoordinator() && $centerId === null;
         $workforceSummary = ($directorOrgDashboard || $projectHeadOrgDashboard)
             ? $workforce->summarize($user)
             : null;

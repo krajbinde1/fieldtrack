@@ -31,6 +31,10 @@ enum UserRole: string
         $options = [];
 
         foreach (self::cases() as $case) {
+            if ($case === self::ProjectHead) {
+                continue;
+            }
+
             $options[$case->value] = $case->label();
         }
 
@@ -42,10 +46,13 @@ enum UserRole: string
      */
     public static function mobileValues(): array
     {
-        return array_map(
-            static fn (self $role): string => $role->value,
-            self::cases(),
-        );
+        return array_values(array_filter(
+            array_map(
+                static fn (self $role): string => $role->value,
+                self::cases(),
+            ),
+            static fn (string $role): bool => $role !== self::ProjectHead->value,
+        ));
     }
 
     /**
@@ -57,7 +64,6 @@ enum UserRole: string
             self::Admin->value,
             self::Director->value,
             self::CenterCoordinator->value,
-            self::ProjectHead->value,
             self::CenterManager->value,
         ];
     }
@@ -73,7 +79,7 @@ enum UserRole: string
 
     public function canPunch(): bool
     {
-        return $this === self::Employee || $this === self::CenterManager || $this === self::ProjectHead;
+        return $this === self::Employee || $this === self::CenterManager;
     }
 
     public function canAccessWeb(): bool
@@ -82,7 +88,6 @@ enum UserRole: string
             self::Admin,
             self::Director,
             self::CenterCoordinator,
-            self::ProjectHead,
             self::CenterManager,
         ], true);
     }
@@ -121,15 +126,7 @@ enum UserRole: string
                 'admission_review_center',
                 'admission_target_manage_center',
             ],
-            self::ProjectHead => [
-                'project_head_dashboard',
-                'attendance',
-                'attendance_view_project',
-                'route_tracking_view_project',
-                'leave_view_project',
-                'admissions_view_project',
-                'admission_target_view_project',
-            ],
+            self::ProjectHead => [],
             self::Director => [
                 'director_dashboard',
                 'attendance_view_assigned',

@@ -48,7 +48,7 @@ it('returns director org dashboard counts without changing center-manager dashbo
     $dashboard = $this->getJson('/api/dashboard')->assertOk()->json('data');
 
     expect($dashboard['active_centers'])->toBe(2)
-        ->and($dashboard['employees'])->toBe(4)
+        ->and($dashboard['employees'])->toBe(3)
         ->and($dashboard['punched_in_today'])->toBe(1)
         ->and($dashboard['active_routes'])->toBe(1)
         ->and($dashboard['confirmed_admissions'])->toBe(1)
@@ -79,8 +79,8 @@ it('lists director workforce in role priority and includes today attendance stat
     $rows = collect($this->getJson('/api/director/employees')->assertOk()->json('data'));
     $roles = $rows->pluck('role')->all();
 
-    expect($roles[0])->toBe('project_head')
-        ->and($roles[1])->toBe('center_manager')
+    expect($roles[0])->toBe('center_manager')
+        ->and($roles)->not->toContain('project_head')
         ->and($roles)->toContain('trainer')
         ->and($roles)->toContain('mobilizer');
 

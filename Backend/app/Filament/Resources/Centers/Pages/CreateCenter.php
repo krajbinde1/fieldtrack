@@ -34,13 +34,4 @@ class CreateCenter extends CreateRecord
 
         return app(CenterLoginService::class)->applyManagerSelection($data, $state);
     }
-
-    protected function afterCreate(): void
-    {
-        $user = auth()->user();
-        if ($user?->isProjectHead()) {
-            $user->headedCenters()->syncWithoutDetaching([$this->record->id]);
-        }
-
-    }
 }

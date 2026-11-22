@@ -196,7 +196,6 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
     {
         return $this->isDirector()
             || $this->isCenterCoordinator()
-            || $this->isProjectHead()
             || $this->isCenterManager()
             || $this->isEmployeeUser();
     }

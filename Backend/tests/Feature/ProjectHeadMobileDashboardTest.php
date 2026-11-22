@@ -1,173 +1,73 @@
 <?php
 
-use App\Enums\AdmissionStatus;
-use App\Models\Admission;
-use App\Models\Attendance;
-use App\Models\User;
-use App\Support\AttendanceCalendar;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
+use App\Enums\UserRole;
+use App\Filament\Resources\OrgUsers\Pages\EditOrgUser;
+use App\Services\OrganizationAccessService;
 use Laravel\Sanctum\Sanctum;
+use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
-it('lets a project head use director monitoring APIs scoped to assigned centers only', function () {
+it('keeps a project manager record without mobile or organization access', function () {
     $org = seedOrg();
-    $today = AttendanceCalendar::today()->toDateString();
+    $projectHead = $org['projectHead']->fresh();
 
-    Attendance::create([
-        'employee_id' => $org['empA']->id,
-        'attendance_date' => $today,
-        'punch_in_time' => '09:00:00',
-        'attendance_status' => 'Punched In',
-        'approval_status' => 'Pending',
-    ]);
-    Attendance::create([
-        'employee_id' => $org['empB']->id,
-        'attendance_date' => $today,
-        'punch_in_time' => '09:15:00',
-        'attendance_status' => 'Punched In',
-        'approval_status' => 'Pending',
-    ]);
-    Admission::create([
-        'scheme_id' => $org['projectA']->id,
-        'center_id' => $org['centerA']->id,
-        'employee_id' => $org['empA']->id,
-        'first_name' => 'Assigned',
-        'last_name' => 'Confirm',
-        'full_name' => 'Assigned Confirm',
-        'status' => AdmissionStatus::Confirmed,
-        'confirmed_at' => now(),
-        'reviewed_by_user_id' => $org['centerManager']->id,
-    ]);
-    Admission::create([
-        'scheme_id' => $org['projectB']->id,
-        'center_id' => $org['centerB']->id,
-        'employee_id' => $org['empB']->id,
-        'first_name' => 'Other',
-        'last_name' => 'Confirm',
-        'full_name' => 'Other Confirm',
-        'status' => AdmissionStatus::Confirmed,
-        'confirmed_at' => now(),
-    ]);
+    expect($projectHead->role)->toBe(UserRole::ProjectHead->value)
+        ->and($projectHead->headedCenters()->pluck('centers.id')->all())->toContain($org['centerA']->id)
+        ->and($projectHead->roleEnum()->canAccessWeb())->toBeFalse()
+        ->and($projectHead->canLoginToMobile())->toBeFalse()
+        ->and(app(OrganizationAccessService::class)->visibleCenterIds($projectHead))->toBe([])
+        ->and(app(OrganizationAccessService::class)->creatableOrgUserRoles($projectHead))->toBe([]);
 
-    Sanctum::actingAs($org['projectHead']);
+    Sanctum::actingAs($projectHead);
 
-    $dashboard = $this->getJson('/api/dashboard')->assertOk()->json('data');
-    expect($dashboard['active_centers'])->toBe(1)
-        ->and($dashboard['centers'])->toBe(1)
-        ->and($dashboard['employees'])->toBe(2)
-        ->and($dashboard['punched_in_today'])->toBe(1)
-        ->and($dashboard['active_routes'])->toBe(1)
-        ->and($dashboard['confirmed_admissions'])->toBe(1);
+    $this->getJson('/api/me')->assertForbidden();
+    $this->getJson('/api/dashboard')->assertForbidden();
+    $this->getJson('/api/director/centers')->assertForbidden();
+    $this->getJson('/api/manager/employees')->assertForbidden();
+    $this->postJson('/api/attendance/punch-in', [
+        'latitude' => 18.52,
+        'longitude' => 73.85,
+        'location_address' => 'Pune',
+    ])->assertForbidden();
 
-    $centerIds = collect($this->getJson('/api/director/centers')->assertOk()->json('data'))
-        ->pluck('id')
-        ->all();
-    expect($centerIds)->toContain($org['centerA']->id)
-        ->and($centerIds)->not->toContain($org['centerB']->id);
-
-    $this->getJson('/api/director/centers/'.$org['centerA']->id)->assertOk();
-    $this->getJson('/api/director/centers/'.$org['centerB']->id)->assertForbidden();
-    $this->getJson('/api/dashboard?center_id='.$org['centerA']->id)
-        ->assertOk()
-        ->assertJsonPath('data.employees', 1)
-        ->assertJsonPath('data.center.id', $org['centerA']->id);
-    $this->getJson('/api/dashboard?center_id='.$org['centerB']->id)->assertForbidden();
-
-    $employeeIds = collect($this->getJson('/api/director/employees')->assertOk()->json('data'))
-        ->pluck('employee_id')
-        ->filter()
-        ->all();
-    expect($employeeIds)->toContain($org['empA']->id)
-        ->and($employeeIds)->not->toContain($org['empB']->id);
-
-    $confirmed = collect($this->getJson('/api/director/admissions/confirmed-by-center')->assertOk()->json('data'))
-        ->pluck('center_id')
-        ->all();
-    expect($confirmed)->toContain($org['centerA']->id)
-        ->and($confirmed)->not->toContain($org['centerB']->id);
-
-    $routes = collect($this->getJson('/api/director/route-tracking?active_only=1')->assertOk()->json('data'))
-        ->pluck('employee_id')
-        ->all();
-    expect($routes)->toContain($org['empA']->id)
-        ->and($routes)->not->toContain($org['empB']->id);
-
-    Sanctum::actingAs($org['director']);
-    $director = $this->getJson('/api/dashboard')->assertOk()->json('data');
-    expect($director['active_centers'])->toBe(2)
-        ->and($director['employees'])->toBe(4)
-        ->and($director['confirmed_admissions'])->toBe(2);
+    expect($projectHead->fresh()->headedCenters()->pluck('centers.id')->all())->toContain($org['centerA']->id);
 });
 
-it('lets a project head punch with camera attendance without joining assigned-center counts', function () {
-    Storage::fake('public');
+it('deactivates existing project manager accounts without deleting their records', function () {
     $org = seedOrg();
+    $org['projectHead']->createToken('mobile-session');
 
-    $this->actingAs($org['projectHead'], 'sanctum')
-        ->post('/api/attendance/punch-in', [
-            'latitude' => 18.52,
-            'longitude' => 73.85,
-            'location_address' => 'Pune',
-            'photo' => UploadedFile::fake()->image('ph-in.jpg'),
-        ], ['Accept' => 'application/json'])
-        ->assertCreated();
+    $migration = require database_path('migrations/2026_11_22_120000_deactivate_project_manager_accounts.php');
+    $migration->up();
 
-    $today = $this->actingAs($org['projectHead']->fresh(), 'sanctum')
-        ->getJson('/api/attendance/today')
-        ->assertOk();
+    $fresh = $org['projectHead']->fresh();
 
-    expect($today->json('data.attendance.punch_in_time'))->not->toBeNull()
-        ->and($today->json('data.punch_in_allowed'))->toBeFalse();
-
-    $dashboard = $this->actingAs($org['projectHead']->fresh(), 'sanctum')
-        ->getJson('/api/dashboard')
-        ->assertOk();
-
-    expect($dashboard->json('data.punched_in_today'))->toBe(0);
-
-    $employeeIds = collect(
-        $this->actingAs($org['projectHead']->fresh(), 'sanctum')
-            ->getJson('/api/director/employees')
-            ->assertOk()
-            ->json('data'),
-    )->pluck('employee_id')->all();
-
-    expect($employeeIds)->not->toContain($org['projectHead']->fresh()->employee_id);
+    expect($fresh)->not->toBeNull()
+        ->and($fresh->role)->toBe(UserRole::ProjectHead->value)
+        ->and($fresh->is_active)->toBeFalse()
+        ->and($fresh->tokens()->count())->toBe(0)
+        ->and($fresh->headedCenters()->pluck('centers.id')->all())->toContain($org['centerA']->id)
+        ->and($fresh->canLoginToMobile())->toBeFalse()
+        ->and($fresh->canAccessPanel(filament()->getPanel('admin')))->toBeFalse();
 });
 
-it('never shows another project head assigned center to a project head', function () {
+it('lets an admin reassign a former project manager instead of granting that role access', function () {
     $org = seedOrg();
-    $otherPh = User::create([
-        'name' => 'Other PH',
-        'email' => 'otherph@test.local',
-        'login_id' => 'otherph',
-        'password' => Hash::make('ProjectHead@123'),
-        'role' => \App\Enums\UserRole::ProjectHead->value,
-        'is_active' => true,
-    ]);
-    $otherPh->headedCenters()->attach($org['centerB']->id);
 
-    Attendance::create([
-        'employee_id' => $org['empB']->id,
-        'attendance_date' => AttendanceCalendar::today()->toDateString(),
-        'punch_in_time' => '09:00:00',
-        'attendance_status' => 'Punched In',
-        'approval_status' => 'Pending',
-    ]);
+    Livewire::actingAs($org['admin'])
+        ->test(EditOrgUser::class, ['record' => $org['projectHead']->getKey()])
+        ->fillForm([
+            'role' => UserRole::CenterManager->value,
+            'managedCenters' => [$org['centerB']->id],
+            'is_active' => true,
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
 
-    Sanctum::actingAs($org['projectHead']);
-    $this->getJson('/api/director/centers/'.$org['centerB']->id)->assertForbidden();
-    $this->getJson('/api/director/employees?center_id='.$org['centerB']->id)->assertForbidden();
-    $this->getJson('/api/director/team-attendance?center_id='.$org['centerB']->id)->assertForbidden();
+    $fresh = $org['projectHead']->fresh();
 
-    Sanctum::actingAs($otherPh);
-    $centerIds = collect($this->getJson('/api/director/centers')->assertOk()->json('data'))
-        ->pluck('id')
-        ->all();
-    expect($centerIds)->toContain($org['centerB']->id)
-        ->and($centerIds)->not->toContain($org['centerA']->id);
+    expect($fresh->role)->toBe(UserRole::CenterManager->value)
+        ->and($fresh->is_active)->toBeTrue()
+        ->and($fresh->managedCenters()->pluck('centers.id')->all())->toContain($org['centerB']->id)
+        ->and($fresh->headedCenters()->pluck('centers.id')->all())->toContain($org['centerA']->id)
+        ->and($fresh->canLoginToMobile())->toBeTrue();
 });

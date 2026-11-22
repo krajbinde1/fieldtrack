@@ -27,7 +27,7 @@ final class OrganizationAccessService
             return null;
         }
 
-        if ($user->isCenterCoordinator() || $user->isProjectHead()) {
+        if ($user->isCenterCoordinator()) {
             return Center::query()
                 ->whereIn('id', $this->visibleCenterIds($user) ?? [])
                 ->pluck('scheme_id')
@@ -73,10 +73,6 @@ final class OrganizationAccessService
 
         if ($user->isCenterCoordinator()) {
             return $user->coordinatedCenters()->pluck('centers.id')->map(fn ($id) => (int) $id)->all();
-        }
-
-        if ($user->isProjectHead()) {
-            return $user->headedCenters()->pluck('centers.id')->map(fn ($id) => (int) $id)->all();
         }
 
         if ($user->isCenterManager()) {
@@ -526,27 +522,7 @@ final class OrganizationAccessService
 
     public function canManageCenters(User $user, Scheme|Center|null $scope = null): bool
     {
-        if ($this->hasOrganizationWideAccess($user)) {
-            return true;
-        }
-
-        if (! $user->isProjectHead()) {
-            return false;
-        }
-
-        if ($scope === null) {
-            return true;
-        }
-
-        if ($scope instanceof Center) {
-            $ids = $this->visibleCenterIds($user) ?? [];
-
-            return in_array((int) $scope->id, $ids, true);
-        }
-
-        $ids = $this->visibleSchemeIds($user) ?? [];
-
-        return in_array((int) $scope->id, $ids, true);
+        return $this->hasOrganizationWideAccess($user);
     }
 
     public function canManageCenterManagers(User $user, ?Center $center = null): bool
@@ -555,23 +531,16 @@ final class OrganizationAccessService
             return true;
         }
 
-        if ($user->isProjectHead()) {
-            if ($center === null) {
-                return true;
-            }
-
-            $ids = $this->visibleCenterIds($user) ?? [];
-
-            return in_array((int) $center->id, $ids, true);
+        if (! $user->isCenterCoordinator()) {
+            return false;
         }
 
-        if ($user->isCenterCoordinator() && $center instanceof Center) {
-            $ids = $this->visibleCenterIds($user) ?? [];
-
-            return in_array((int) $center->id, $ids, true);
+        $ids = $this->visibleCenterIds($user) ?? [];
+        if ($center === null) {
+            return $ids !== [];
         }
 
-        return false;
+        return in_array((int) $center->id, $ids, true);
     }
 
     public function canManageEmployees(User $user, ?Center $center = null): bool
@@ -591,7 +560,7 @@ final class OrganizationAccessService
 
     public function canAccessOrgUsers(User $user): bool
     {
-        return $user->isAdmin() || $user->isDirector() || $user->isCenterCoordinator() || $user->isProjectHead();
+        return $user->isAdmin() || $user->isDirector() || $user->isCenterCoordinator();
     }
 
     public function isReadOnlyCenterViewer(User $user): bool
@@ -608,7 +577,6 @@ final class OrganizationAccessService
             return [
                 UserRole::Director->value,
                 UserRole::CenterCoordinator->value,
-                UserRole::ProjectHead->value,
                 UserRole::CenterManager->value,
             ];
         }
@@ -616,24 +584,61 @@ final class OrganizationAccessService
         if ($user->isDirector()) {
             return [
                 UserRole::CenterCoordinator->value,
-                UserRole::ProjectHead->value,
+                UserRole::CenterManager->value,
             ];
         }
 
-        if ($user->isProjectHead()) {
+        if ($user->isCenterCoordinator()) {
             return [UserRole::CenterManager->value];
         }
 
         return [];
     }
 
-    public function canManageOrgUser(User $actor, User $record): bool
+    /**
+     * Roles an actor may save on this account. Legacy Project Manager records
+     * can keep that stored role, which no longer grants login or permissions.
+     *
+     * @return list<string>
+     */
+    public function assignableOrgUserRoles(User $actor, User $record): array
     {
-        if ($record->isCenterLogin()) {
+        $roles = $this->creatableOrgUserRoles($actor);
+
+        if ($record->role === UserRole::ProjectHead->value) {
+            $roles[] = UserRole::ProjectHead->value;
+        }
+
+        return array_values(array_unique($roles));
+    }
+
+    public function canChangeOrgUserRole(User $actor, User $record): bool
+    {
+        return $actor->isAdminOrDirector() && $this->canManageOrgUser($actor, $record);
+    }
+
+    public function canDeleteOrgUser(User $actor, User $record): bool
+    {
+        if ($record->is($actor) || $record->isCenterLogin()) {
             return false;
         }
 
-        if ($actor->isCenterCoordinator()) {
+        if ($actor->isAdmin()) {
+            if ($record->isAdmin()) {
+                return User::query()->where('role', UserRole::Admin->value)->count() > 1;
+            }
+
+            return true;
+        }
+
+        return $actor->isDirector()
+            && ! $record->isAdmin()
+            && $this->canManageOrgUser($actor, $record);
+    }
+
+    public function canManageOrgUser(User $actor, User $record): bool
+    {
+        if ($record->isCenterLogin()) {
             return false;
         }
 
@@ -654,10 +659,11 @@ final class OrganizationAccessService
             return $record->isCenterCoordinator() || $record->isProjectHead() || $record->isCenterManager();
         }
 
-        if ($actor->isProjectHead() && $record->isCenterManager()) {
+        if ($actor->isCenterCoordinator() && $record->isCenterManager()) {
             $centerIds = $this->visibleCenterIds($actor) ?? [];
 
-            return $record->managedCenters()->whereIn('centers.id', $centerIds)->exists();
+            return $centerIds !== []
+                && $record->managedCenters()->whereIn('centers.id', $centerIds)->exists();
         }
 
         return false;
@@ -685,7 +691,7 @@ final class OrganizationAccessService
             ];
         }
 
-        if ($user->isCenterCoordinator() || $user->isProjectHead()) {
+        if ($user->isCenterCoordinator()) {
             return [UserRole::CenterManager->value];
         }
 
@@ -698,7 +704,6 @@ final class OrganizationAccessService
             UserRole::Admin->value,
             UserRole::Director->value,
             UserRole::CenterCoordinator->value,
-            UserRole::ProjectHead->value,
             UserRole::CenterManager->value,
         ];
     }

@@ -32,14 +32,14 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
     Route::post('profile-photo', [EmployeeAuthController::class, 'updateProfilePhoto']);
     Route::get('dashboard', DashboardController::class);
 
-    Route::middleware('role:employee,center_manager,project_head')->group(function () {
+    Route::middleware('role:employee,center_manager')->group(function () {
         if (! app()->environment('production')) {
             Route::post('employee/attendance/reset-today', [AttendanceController::class, 'resetToday']);
         }
         Route::post('employee/route-points/batch', [EmployeeRoutePointController::class, 'storeBatch']);
     });
 
-    Route::middleware('role:project_head,center_manager')->prefix('manager')->group(function () {
+    Route::middleware('role:center_manager')->prefix('manager')->group(function () {
         Route::get('centers', [DirectorCenterController::class, 'index']);
         Route::get('employees', [ManagerEmployeeController::class, 'index']);
         Route::post('employees', [ManagerEmployeeController::class, 'store']);
@@ -84,7 +84,7 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
             ->whereNumber('fieldActivity');
     });
 
-    Route::middleware('role:admin,director,center_coordinator,project_head')->prefix('director')->group(function () {
+    Route::middleware('role:admin,director,center_coordinator')->prefix('director')->group(function () {
         Route::get('centers', [DirectorCenterController::class, 'index']);
         Route::get('centers/{center}', [DirectorCenterController::class, 'show'])
             ->whereNumber('center');
@@ -115,7 +115,7 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
     });
 });
 
-Route::middleware(['auth:sanctum', 'role:employee,center_manager,project_head'])->prefix('attendance')->group(function () {
+Route::middleware(['auth:sanctum', 'role:employee,center_manager'])->prefix('attendance')->group(function () {
     Route::post('punch-in', [AttendanceController::class, 'punchIn']);
     Route::post('punch-out', [AttendanceController::class, 'punchOut']);
     Route::get('today', [AttendanceController::class, 'today']);
@@ -161,6 +161,6 @@ Route::middleware(['auth:sanctum', 'role:employee'])->prefix('leaves')->group(fu
     Route::delete('{leave}', [EmployeeLeaveController::class, 'destroy']);
 });
 
-Route::middleware(['auth:sanctum', 'role:admin,director,project_head,center_manager'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'role:admin,director,center_manager'])->prefix('admin')->group(function () {
     Route::get('employee-routes/{attendance}', [AdminEmployeeRouteController::class, 'show']);
 });

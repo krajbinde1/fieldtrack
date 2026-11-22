@@ -130,15 +130,24 @@ it('lets a director view assigned-scope pages but not admin-only management', fu
     $this->actingAs($director)->get('/admin/schemes/create')->assertForbidden();
 });
 
-it('blocks a project head from project-head administration', function () {
+it('blocks a project manager from the web application', function () {
     $projectHead = User::query()->where('login_id', 'projecthead')->firstOrFail();
 
-    $this->actingAs($projectHead)->get('/admin')->assertOk();
-    $this->actingAs($projectHead)->get('/admin/centers')->assertOk();
-    $this->actingAs($projectHead)->get('/admin/schemes')->assertOk();
-    $this->actingAs($projectHead)->get('/admin/users')->assertOk();
+    expect($projectHead->role)->toBe(UserRole::ProjectHead->value)
+        ->and($projectHead->is_active)->toBeFalse();
+
+    $this->actingAs($projectHead)->get('/admin')->assertForbidden();
+    $this->actingAs($projectHead)->get('/admin/centers')->assertForbidden();
+    $this->actingAs($projectHead)->get('/admin/schemes')->assertForbidden();
+    $this->actingAs($projectHead)->get('/admin/users')->assertForbidden();
     $this->actingAs($projectHead)->get('/admin/project-heads')->assertForbidden();
     $this->actingAs($projectHead)->get('/admin/directors')->assertForbidden();
+
+    $this->postJson('/api/login', [
+        'login_id' => 'projecthead',
+        'password' => 'ProjectHead@123',
+        'device_id' => 'device-retired-pm',
+    ])->assertStatus(422);
 });
 
 it('lets an admin open a full employee route map', function () {
@@ -190,23 +199,14 @@ it('blocks a center manager from project administration', function () {
     expect($response->status())->toBeIn([404, 405]);
 });
 
-it('lets admin and project manager create centers', function () {
+it('lets an admin create centers', function () {
     $admin = User::query()->where('login_id', 'admin')->firstOrFail();
-    $projectHead = User::query()->where('login_id', 'projecthead')->firstOrFail();
 
     Livewire::actingAs($admin)
         ->test(ListCenters::class)
         ->assertActionVisible('create');
 
-    Livewire::actingAs($projectHead)
-        ->test(ListCenters::class)
-        ->assertActionVisible('create');
-
     Livewire::actingAs($admin)
-        ->test(CreateCenter::class)
-        ->assertSuccessful();
-
-    Livewire::actingAs($projectHead)
         ->test(CreateCenter::class)
         ->assertSuccessful();
 });
@@ -255,7 +255,6 @@ it('shows a profile menu with logout for every web admin role', function (string
 })->with([
     'admin' => 'admin',
     'director' => 'fielddirector',
-    'project head' => 'projecthead',
     'center manager' => 'centermgr',
 ]);
 
@@ -287,7 +286,6 @@ it('logs every web admin role out through filament and blocks returning to admin
 })->with([
     'admin' => 'admin',
     'director' => 'fielddirector',
-    'project head' => 'projecthead',
     'center manager' => 'centermgr',
 ]);
 

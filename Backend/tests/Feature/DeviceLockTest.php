@@ -66,7 +66,6 @@ it('blocks login from another device until admin resets it', function (UserRole 
 })->with([
     UserRole::Employee,
     UserRole::CenterManager,
-    UserRole::ProjectHead,
     UserRole::Director,
 ]);
 

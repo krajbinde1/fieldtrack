@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Attendance;
+use App\Models\User;
 use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
@@ -17,7 +18,7 @@ class FieldTrackStatsWidget extends StatsOverviewWidget
     {
         $user = auth()->user();
 
-        return (bool) ($user?->isProjectHead() || $user?->isCenterManager());
+        return $user?->isCenterManager() === true;
     }
 
     protected function getStats(): array
@@ -25,7 +26,7 @@ class FieldTrackStatsWidget extends StatsOverviewWidget
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
         $today = AttendanceCalendar::today()->toDateString();
-        $centerId = $user instanceof \App\Models\User
+        $centerId = $user instanceof User
             ? app(AdminCenterContext::class)->idFor($user)
             : null;
         $employeeIds = $access->employeeQuery($user)->where('status', true);

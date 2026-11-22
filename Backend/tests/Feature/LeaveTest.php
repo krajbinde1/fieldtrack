@@ -3,6 +3,7 @@
 use App\Enums\LeaveStatus;
 use App\Models\Attendance;
 use App\Models\LeaveRequest;
+use App\Models\User;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -108,7 +109,7 @@ it('requires a rejection remark and keeps other center managers from acting', fu
     $this->postJson('/api/manager/leaves/'.$id.'/reject', [])
         ->assertStatus(422);
 
-    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $otherUser = User::query()->where('login_id', '9000000002')->firstOrFail();
     $otherId = $this->actingAs($otherUser, 'sanctum')
         ->postJson('/api/leaves', leavePayload())
         ->json('data.id');
@@ -125,13 +126,13 @@ it('lets project head view assigned project leave but not approve, director view
         ->postJson('/api/leaves', leavePayload())
         ->json('data.id');
 
-    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $otherUser = User::query()->where('login_id', '9000000002')->firstOrFail();
     $otherId = $this->actingAs($otherUser, 'sanctum')
         ->postJson('/api/leaves', leavePayload(['reason' => 'Other project']))
         ->json('data.id');
 
     Sanctum::actingAs($org['projectHead']);
-    $this->getJson('/api/manager/leaves/'.$ownId)->assertOk();
+    $this->getJson('/api/manager/leaves/'.$ownId)->assertForbidden();
     $this->getJson('/api/manager/leaves/'.$otherId)->assertForbidden();
     $this->postJson('/api/manager/leaves/'.$ownId.'/approve')->assertForbidden();
 

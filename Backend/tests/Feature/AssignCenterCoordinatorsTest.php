@@ -6,6 +6,7 @@ use App\Filament\Resources\Centers\Pages\ListCenters;
 use App\Models\User;
 use App\Services\OrganizationAccessService;
 use Filament\Actions\Testing\TestAction;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 
@@ -167,17 +168,11 @@ it('lets a director assign coordinators and rejects everyone else', function () 
 
     Livewire::actingAs($org['projectHead'])
         ->test(ListCenters::class)
-        ->assertActionHidden(TestAction::make('assignCoordinators')->table($org['centerA']));
+        ->assertForbidden();
 
-    Livewire::actingAs($org['projectHead'])
-        ->test(EditCenter::class, ['record' => $org['centerA']->getKey()])
-        ->assertFormFieldHidden('coordinators')
-        ->assertFormFieldVisible('centerManagers')
-        ->fillForm([
-            'coordinators' => [$other->id],
-        ])
-        ->call('save')
-        ->assertHasNoFormErrors();
+    expect(fn () => Livewire::actingAs($org['projectHead'])
+        ->test(EditCenter::class, ['record' => $org['centerA']->getKey()]))
+        ->toThrow(ModelNotFoundException::class);
 
     expect($org['centerA']->fresh()->coordinators()->pluck('users.id')->all())->toBe([$coordinator->id])
         ->and($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe($managerIds);

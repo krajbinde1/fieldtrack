@@ -3,9 +3,9 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Concerns\RequiresSelectedAdminCenter;
+use App\Filament\Support\TodayDateFilter;
 use App\Models\Attendance;
 use App\Services\OrganizationAccessService;
-use App\Support\AttendanceCalendar;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -33,7 +33,7 @@ class Reports extends Page implements HasTable
     {
         $user = auth()->user();
 
-        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isCenterCoordinator() || $user?->isProjectHead() || $user?->isCenterManager());
+        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isCenterCoordinator() || $user?->isCenterManager());
     }
 
     public function table(Table $table): Table
@@ -55,7 +55,7 @@ class Reports extends Page implements HasTable
                 TextColumn::make('total_route_distance_km')->label('Distance (km)'),
             ])
             ->filters([
-                \App\Filament\Support\TodayDateFilter::make('attendance_date', 'Date'),
+                TodayDateFilter::make('attendance_date', 'Date'),
                 SelectFilter::make('attendance_status')->options(Attendance::ATTENDANCE_STATUS_LABELS),
             ]);
     }

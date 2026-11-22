@@ -7,9 +7,12 @@ use App\Models\Attendance;
 use App\Models\EmployeeRoutePoint;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Services\CenterManagerAttendanceProfile;
+use App\Services\EmployeeRouteAnalysisService;
 use App\Support\AttendanceCalendar;
+use App\Support\PublicStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -52,7 +55,7 @@ class AttendanceController extends Controller
         $user = $request->user();
         $employee = $user->employee;
 
-        if ($employee === null && ($user->isCenterManager() || $user->isProjectHead())) {
+        if ($employee === null && $user->isCenterManager()) {
             $employee = app(CenterManagerAttendanceProfile::class)->employeeFor($user);
         }
 
@@ -127,7 +130,7 @@ class AttendanceController extends Controller
         ]);
 
         $fresh = $attendance->fresh();
-        app(\App\Services\EmployeeRouteAnalysisService::class)
+        app(EmployeeRouteAnalysisService::class)
             ->recalculateAndPersistDistance($fresh);
 
         return $this->ok('Punch out recorded.', $this->formatAttendance($fresh->fresh()));
@@ -285,15 +288,15 @@ class AttendanceController extends Controller
 
     private function photoUrl(?string $path): ?string
     {
-        return \App\Support\PublicStorage::url($path);
+        return PublicStorage::url($path);
     }
 
-    private function formatIstDateTime(?\Illuminate\Support\Carbon $value): ?string
+    private function formatIstDateTime(?Carbon $value): ?string
     {
         return $value?->timezone(AttendanceCalendar::TIMEZONE)->toIso8601String();
     }
 
-    private function formatIstTime(?\Illuminate\Support\Carbon $value): ?string
+    private function formatIstTime(?Carbon $value): ?string
     {
         return $value?->timezone(AttendanceCalendar::TIMEZONE)->format('h:i A');
     }

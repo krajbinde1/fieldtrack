@@ -563,14 +563,10 @@ it('does not show center switching to a project head', function () {
 
     $this->actingAs($org['projectHead'])
         ->get('/admin')
-        ->assertOk()
-        ->assertSee('Dashboard')
-        ->assertDontSee('Change Center')
-        ->assertDontSee('Main Dashboard')
-        ->assertSee('Center Dashboard');
+        ->assertForbidden();
 
     $this->actingAs($org['projectHead'])->get('/admin/center-dashboard')->assertForbidden();
-    $this->actingAs($org['projectHead'])->get('/admin/attendances')->assertOk();
+    $this->actingAs($org['projectHead'])->get('/admin/attendances')->assertForbidden();
 
     expect(SelectCenter::canAccess())->toBeFalse()
         ->and(CenterDashboard::shouldRegisterNavigation())->toBeFalse()

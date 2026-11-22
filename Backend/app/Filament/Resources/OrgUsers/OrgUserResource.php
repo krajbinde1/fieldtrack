@@ -4,17 +4,18 @@ namespace App\Filament\Resources\OrgUsers;
 
 use App\Enums\UserRole;
 use App\Filament\Concerns\RequiresSelectedAdminCenter;
-use App\Models\Employee;
 use App\Filament\Resources\OrgUsers\Pages\CreateOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\EditOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\ListOrgUsers;
 use App\Filament\Resources\OrgUsers\Pages\ViewCenterEmployee;
 use App\Filament\Support\CenterAssignmentSelect;
 use App\Filament\Support\LoginIdInput;
+use App\Models\Employee;
 use App\Models\User;
 use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -32,6 +33,7 @@ use Illuminate\Support\Facades\Hash;
 class OrgUserResource extends Resource
 {
     use RequiresSelectedAdminCenter;
+
     protected static ?string $model = User::class;
 
     protected static ?string $slug = 'users';
@@ -67,6 +69,13 @@ class OrgUserResource extends Resource
         $user = auth()->user();
 
         return (bool) ($user && $record instanceof User && app(OrganizationAccessService::class)->canManageOrgUser($user, $record));
+    }
+
+    public static function canDelete($record): bool
+    {
+        $user = auth()->user();
+
+        return (bool) ($user && $record instanceof User && app(OrganizationAccessService::class)->canDeleteOrgUser($user, $record));
     }
 
     public static function getEloquentQuery(): Builder
@@ -116,10 +125,16 @@ class OrgUserResource extends Resource
         return $schema->components([
             Select::make('role')
                 ->label('Login Role')
-                ->options(fn (): array => $roleOptions)
+                ->options(function (?User $record) use ($roleOptions): array {
+                    if ($record instanceof User && $record->role === UserRole::ProjectHead->value) {
+                        $roleOptions[UserRole::ProjectHead->value] = UserRole::ProjectHead->label();
+                    }
+
+                    return $roleOptions;
+                })
                 ->required()
                 ->live()
-                ->disabledOn('edit'),
+                ->disabled(fn (string $operation): bool => $operation === 'edit' && ! (auth()->user()?->isAdminOrDirector() ?? false)),
             TextInput::make('name')->required()->maxLength(255),
             LoginIdInput::emailWithLoginIdSync(),
             LoginIdInput::fromEmail(),
@@ -131,10 +146,8 @@ class OrgUserResource extends Resource
                 ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
             CenterAssignmentSelect::make('coordinatedCenters')
                 ->label('Assigned Centers')
-                ->helperText('This Center Coordinator can view only these centers.')
+                ->helperText('This Center Coordinator can view only these centers. A center can have more than one coordinator.')
                 ->visible(fn ($get): bool => $get('role') === UserRole::CenterCoordinator->value),
-            CenterAssignmentSelect::make()
-                ->visible(fn ($get): bool => $get('role') === UserRole::ProjectHead->value),
             CenterAssignmentSelect::make('managedCenters')
                 ->visible(fn ($get): bool => $get('role') === UserRole::CenterManager->value),
             Toggle::make('is_active')->label('Active')->default(true),
@@ -169,7 +182,7 @@ class OrgUserResource extends Resource
             ->filters([
                 SelectFilter::make('role')->options([
                     UserRole::Director->value => UserRole::Director->label(),
-                    UserRole::ProjectHead->value => UserRole::ProjectHead->label(),
+                    UserRole::CenterCoordinator->value => UserRole::CenterCoordinator->label(),
                     UserRole::CenterManager->value => UserRole::CenterManager->label(),
                 ]),
                 SelectFilter::make('center')
@@ -199,6 +212,11 @@ class OrgUserResource extends Resource
             ->recordActions([
                 EditAction::make()
                     ->visible(fn (User $record): bool => static::canEdit($record)),
+                DeleteAction::make()
+                    ->visible(fn (User $record): bool => static::canDelete($record))
+                    ->before(function (User $record): void {
+                        $record->tokens()->delete();
+                    }),
             ]);
     }
 
@@ -254,6 +272,7 @@ class OrgUserResource extends Resource
 
         return $query->where(function (Builder $inner) use ($term): void {
             $inner->whereHas('headedCenters', fn (Builder $centers) => $centers->where('centers.name', 'like', $term))
+                ->orWhereHas('coordinatedCenters', fn (Builder $centers) => $centers->where('centers.name', 'like', $term))
                 ->orWhereHas('managedCenters', fn (Builder $centers) => $centers->where('centers.name', 'like', $term))
                 ->orWhereHas('employee.center', fn (Builder $centers) => $centers->where('name', 'like', $term));
         });

@@ -2,10 +2,15 @@
 
 use App\Enums\AdmissionDocumentType;
 use App\Enums\AdmissionStatus;
+use App\Enums\AdmissionTargetType;
 use App\Models\Admission;
+use App\Models\AdmissionTarget;
 use App\Models\MaharashtraDistrict;
 use App\Models\MaharashtraTaluka;
 use App\Models\Scheme;
+use App\Models\User;
+use App\Support\AdmissionTargetPeriod;
+use App\Support\MaharashtraGeoCatalog;
 use Database\Seeders\MaharashtraGeoSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -71,12 +76,12 @@ it('returns every Maharashtra district and keeps Maharashtra as the state', func
         ->assertJsonPath('data.state', 'Maharashtra');
 
     $districts = collect($response->json('data.districts'));
-    expect($districts)->toHaveCount(\App\Support\MaharashtraGeoCatalog::districtCount())
+    expect($districts)->toHaveCount(MaharashtraGeoCatalog::districtCount())
         ->and($districts->pluck('name'))->toContain('Pune')
         ->and($districts->pluck('name'))->toContain('Nashik')
         ->and($districts->pluck('name'))->toContain('Chhatrapati Sambhajinagar')
-        ->and(\App\Models\MaharashtraDistrict::query()->count())->toBe(\App\Support\MaharashtraGeoCatalog::districtCount())
-        ->and(\App\Models\MaharashtraTaluka::query()->count())->toBe(\App\Support\MaharashtraGeoCatalog::talukaCount());
+        ->and(MaharashtraDistrict::query()->count())->toBe(MaharashtraGeoCatalog::districtCount())
+        ->and(MaharashtraTaluka::query()->count())->toBe(MaharashtraGeoCatalog::talukaCount());
 });
 
 it('seeds district master data without duplicates when the lookup table is empty', function () {
@@ -84,8 +89,8 @@ it('seeds district master data without duplicates when the lookup table is empty
     (new MaharashtraGeoSeeder)->run();
     (new MaharashtraGeoSeeder)->run();
 
-    expect(\App\Models\MaharashtraDistrict::query()->count())->toBe(\App\Support\MaharashtraGeoCatalog::districtCount())
-        ->and(\App\Models\MaharashtraTaluka::query()->count())->toBe(\App\Support\MaharashtraGeoCatalog::talukaCount());
+    expect(MaharashtraDistrict::query()->count())->toBe(MaharashtraGeoCatalog::districtCount())
+        ->and(MaharashtraTaluka::query()->count())->toBe(MaharashtraGeoCatalog::talukaCount());
 
     $this->actingAs($org['userA'], 'sanctum')
         ->getJson('/api/admissions/districts')
@@ -241,7 +246,7 @@ it('authorizes admission visibility by role hierarchy', function () {
         ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'Own']))
         ->json('data.id');
 
-    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $otherUser = User::query()->where('login_id', '9000000002')->firstOrFail();
     $otherId = $this->actingAs($otherUser, 'sanctum')
         ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'Other']))
         ->json('data.id');
@@ -255,7 +260,7 @@ it('authorizes admission visibility by role hierarchy', function () {
     $this->getJson('/api/manager/admissions/'.$otherId)->assertForbidden();
 
     Sanctum::actingAs($ctx['projectHead']);
-    $this->getJson('/api/manager/admissions/'.$ownId)->assertOk();
+    $this->getJson('/api/manager/admissions/'.$ownId)->assertForbidden();
     $this->getJson('/api/manager/admissions/'.$otherId)->assertForbidden();
 
     Sanctum::actingAs($ctx['director']);
@@ -291,7 +296,7 @@ it('serves admission documents only to authorized users and not as public files'
         ->get('/api/admissions/'.$id.'/documents/'.$docId)
         ->assertOk();
 
-    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $otherUser = User::query()->where('login_id', '9000000002')->firstOrFail();
     $this->actingAs($otherUser, 'sanctum')
         ->get('/api/admissions/'.$id.'/documents/'.$docId)
         ->assertForbidden();
@@ -303,7 +308,7 @@ it('serves admission documents only to authorized users and not as public files'
 it('keeps punch in working after admissions tables exist', function () {
     Storage::fake('public');
     seedAdmissionsContext();
-    $user = \App\Models\User::query()->where('login_id', '9000000001')->firstOrFail();
+    $user = User::query()->where('login_id', '9000000001')->firstOrFail();
 
     $this->actingAs($user, 'sanctum')
         ->post('/api/attendance/punch-in', [
@@ -512,7 +517,7 @@ it('keeps drafts out of review and scopes manager admissions to assigned centers
         ->assertJsonPath('data.can_revert', true)
         ->assertJsonPath('data.can_reject', true);
 
-    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $otherUser = User::query()->where('login_id', '9000000002')->firstOrFail();
     $hiddenId = $this->actingAs($otherUser, 'sanctum')
         ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'Hidden']))
         ->json('data.id');
@@ -529,7 +534,7 @@ it('exposes only the signed-in employee admission counts', function () {
         ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'Mine']));
     $submittedId = submitCompleteAdmission($ctx, ['first_name' => 'Ready']);
 
-    $otherUser = \App\Models\User::query()->where('login_id', '9000000002')->firstOrFail();
+    $otherUser = User::query()->where('login_id', '9000000002')->firstOrFail();
     $this->actingAs($otherUser, 'sanctum')
         ->postJson('/api/admissions/drafts', admissionPayload($ctx, ['first_name' => 'Other']));
 
@@ -566,13 +571,13 @@ it('exposes only the signed-in employee admission counts', function () {
 it('counts only confirmed admissions toward employee target achievement', function () {
     Storage::fake('local');
     $ctx = seedAdmissionsContext();
-    [$start] = \App\Support\AdmissionTargetPeriod::resolve('this_week');
+    [$start] = AdmissionTargetPeriod::resolve('this_week');
 
-    \App\Models\AdmissionTarget::create([
+    AdmissionTarget::create([
         'employee_id' => $ctx['empA']->id,
         'center_id' => $ctx['centerA']->id,
         'scheme_id' => $ctx['projectA']->id,
-        'target_type' => \App\Enums\AdmissionTargetType::Weekly,
+        'target_type' => AdmissionTargetType::Weekly,
         'period_start' => $start->toDateString(),
         'period_end' => $start->copy()->endOfWeek()->toDateString(),
         'target_count' => 5,

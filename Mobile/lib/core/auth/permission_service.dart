@@ -12,16 +12,12 @@ class PermissionService {
       has('attendance') || role.canAccessEmployeeWorkflow();
 
   bool get canViewManagerDashboard =>
-      has('project_head_dashboard') ||
-      has('center_manager_dashboard') ||
-      role.isProjectHead ||
-      role.isCenterManager;
+      has('center_manager_dashboard') || role.isCenterManager;
 
   bool get canViewDirectorDashboard =>
       has('director_dashboard') ||
       has('admin_dashboard') ||
-      has('project_head_dashboard') ||
       role.isDirector ||
       role.isAdmin ||
-      role.isProjectHead;
+      role.isCenterCoordinator;
 }

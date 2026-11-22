@@ -16,7 +16,6 @@ use App\Services\AdminCenterContext;
 use App\Services\CenterLoginService;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
-use Illuminate\Database\Eloquent\Builder;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -33,6 +32,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class CenterResource extends Resource
 {
@@ -52,7 +52,7 @@ class CenterResource extends Resource
     {
         $user = auth()->user();
 
-        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isCenterCoordinator() || $user?->isProjectHead() || $user?->isCenterManager());
+        return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isCenterCoordinator() || $user?->isCenterManager());
     }
 
     public static function canCreate(): bool
