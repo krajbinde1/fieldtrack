@@ -62,7 +62,7 @@ class AppUpdateSettings extends Page implements HasForms
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return static::canAccess();
     }
 
     public function mount(): void

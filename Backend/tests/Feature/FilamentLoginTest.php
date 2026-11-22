@@ -234,17 +234,24 @@ it('shows a profile menu with logout for every web admin role', function (string
         $response
             ->assertSee('Main Dashboard', false)
             ->assertSee('Center Dashboard', false)
-            ->assertSee('Main Admin Dashboard', false);
+            ->assertSee('Main Admin Dashboard', false)
+            ->assertSee('System', false)
+            ->assertSee('App Update Settings', false)
+            ->assertSee('Device Management', false);
     } elseif ($loginId === 'fielddirector') {
         $response
             ->assertSee('Main Dashboard', false)
             ->assertSee('Center Dashboard', false)
-            ->assertDontSee('Change Center', false);
+            ->assertDontSee('Change Center', false)
+            ->assertDontSee('App Update Settings', false)
+            ->assertDontSee('Device Management', false);
     } else {
         $response
-            ->assertDontSee('Main Dashboard', false)
+            ->assertSee('Main Dashboard', false)
             ->assertSee('Center Dashboard', false)
-            ->assertDontSee('Change Center', false);
+            ->assertDontSee('Change Center', false)
+            ->assertDontSee('App Update Settings', false)
+            ->assertDontSee('Device Management', false);
     }
 
     if (in_array($loginId, ['admin', 'fielddirector'], true)) {

@@ -54,9 +54,7 @@ function centerContextNavLabels(): array
 
     $user = auth()->user();
 
-    if ($user instanceof User
-        && $user->isAdmin()
-        && ! app(AdminCenterContext::class)->showsCenterModuleNavigation($user)) {
+    if ($user instanceof User && $user->isAdmin()) {
         $labels[] = Dashboard::getNavigationLabel();
     }
 
@@ -73,18 +71,33 @@ it('opens the main admin dashboard across all authorized centers', function () {
         ->assertSee('Center Dashboard')
         ->assertSee('Centers')
         ->assertSee('Team Management')
+        ->assertSee('System')
+        ->assertSee('App Update Settings')
+        ->assertSee('Device Management')
         ->assertDontSee('Change Center')
         ->assertDontSee('Back to All Centers');
 
     expect(Dashboard::getNavigationLabel())->toBe('Main Dashboard')
         ->and(CenterDashboard::getNavigationLabel())->toBe('Center Dashboard')
-        ->and(centerContextNavLabels())->toEqualCanonicalizing(['Main Dashboard', 'Center Dashboard', 'Team Management'])
+        ->and(centerContextNavLabels())->toEqualCanonicalizing([
+            'Main Dashboard',
+            'Center Dashboard',
+            'Team Management',
+            'App Update Settings',
+            'Device Management',
+        ])
         ->and(CenterResource::getNavigationLabel())->toBe('Center Dashboard')
         ->and(CenterResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeFalse()
-        ->and(DeviceManagement::shouldRegisterNavigation())->toBeFalse()
+        ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeTrue()
+        ->and(DeviceManagement::shouldRegisterNavigation())->toBeTrue()
         ->and(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
         ->and(OrgUserResource::getNavigationLabel())->toBe('Team Management');
+
+    $groupLabels = array_map(
+        fn ($group) => $group->getLabel(),
+        filament()->getNavigation(),
+    );
+    expect($groupLabels[array_key_last($groupLabels)])->toBe('System');
 
     $this->actingAs($org['admin'])->get('/admin/users')->assertOk()->assertSee('Team Management');
 
@@ -229,9 +242,13 @@ it('persists the selected center and scopes lists, filters, and direct urls', fu
         ->assertDontSee('Total Centers')
         ->assertDontSee('Main Admin Dashboard')
         ->assertDontSee('ft-coord-modules', false)
-        ->assertDontSee('Center modules', false);
+        ->assertDontSee('Center modules', false)
+        ->assertSee('System')
+        ->assertSee('App Update Settings')
+        ->assertSee('Device Management');
 
     expect(centerContextNavLabels())->toEqualCanonicalizing([
+        'Main Dashboard',
         'Center Dashboard',
         'Attendances',
         'Employee Routes',
@@ -239,6 +256,8 @@ it('persists the selected center and scopes lists, filters, and direct urls', fu
         'Admission Targets',
         'Leave Requests',
         'Reports',
+        'App Update Settings',
+        'Device Management',
     ]);
 
     $this->actingAs($org['admin'])
@@ -524,14 +543,13 @@ it('does not force center selection on a center manager', function () {
     $this->actingAs($org['centerManager'])
         ->get('/admin')
         ->assertOk()
-        ->assertSee('Dashboard')
+        ->assertSee('Main Dashboard')
         ->assertDontSee('Change Center')
-        ->assertDontSee('Main Dashboard')
         ->assertSee('Center Dashboard');
 
     $this->actingAs($org['centerManager'])->get('/admin/center-dashboard')->assertRedirect('/admin/centers');
-    expect(centerContextNavLabels())->toEqualCanonicalizing(['Dashboard', 'Center Dashboard', 'Users'])
-        ->and(Dashboard::getNavigationLabel())->toBe('Dashboard');
+    expect(centerContextNavLabels())->toEqualCanonicalizing(['Main Dashboard', 'Center Dashboard', 'Users'])
+        ->and(Dashboard::getNavigationLabel())->toBe('Main Dashboard');
 
     $this->actingAs($org['centerManager'])->get('/admin/attendances')->assertRedirect('/admin/centers');
     $this->actingAs($org['centerManager'])->get('/admin/centers')->assertOk();

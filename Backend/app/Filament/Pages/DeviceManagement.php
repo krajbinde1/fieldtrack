@@ -42,7 +42,7 @@ class DeviceManagement extends Page implements HasTable
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return static::canAccess();
     }
 
     public function mount(): void

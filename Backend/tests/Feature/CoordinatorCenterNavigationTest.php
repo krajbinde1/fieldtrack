@@ -1,8 +1,10 @@
 <?php
 
 use App\Enums\AdmissionStatus;
+use App\Filament\Pages\AppUpdateSettings;
 use App\Filament\Pages\CenterDashboard;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\DeviceManagement;
 use App\Filament\Pages\Reports;
 use App\Filament\Pages\SelectCenter;
 use App\Filament\Resources\Admissions\AdmissionResource;
@@ -48,9 +50,7 @@ function coordinatorSidebarLabels(): array
 
     $user = auth()->user();
 
-    if ($user instanceof User
-        && $user->isAdmin()
-        && ! app(AdminCenterContext::class)->showsCenterModuleNavigation($user)) {
+    if ($user instanceof User && $user->isAdmin()) {
         $labels[] = Dashboard::getNavigationLabel();
     }
 
@@ -60,6 +60,7 @@ function coordinatorSidebarLabels(): array
 function centerSidebarLabels(): array
 {
     return [
+        'Main Dashboard',
         'Center Dashboard',
         'Attendances',
         'Employee Routes',
@@ -76,6 +77,24 @@ function mainSidebarLabels(): array
         'Main Dashboard',
         'Center Dashboard',
         'Team Management',
+    ];
+}
+
+function adminMainSidebarLabels(): array
+{
+    return [
+        ...mainSidebarLabels(),
+        'App Update Settings',
+        'Device Management',
+    ];
+}
+
+function adminCenterSidebarLabels(): array
+{
+    return [
+        ...centerSidebarLabels(),
+        'App Update Settings',
+        'Device Management',
     ];
 }
 
@@ -114,6 +133,8 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
         ->assertDontSee('ft-coord-modules', false);
 
     expect(coordinatorSidebarLabels())->toEqualCanonicalizing(mainSidebarLabels())
+        ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeFalse()
+        ->and(DeviceManagement::shouldRegisterNavigation())->toBeFalse()
         ->and(AttendanceResource::canAccess())->toBeTrue()
         ->and(Reports::canAccess())->toBeTrue()
         ->and(EmployeeResource::shouldRegisterNavigation())->toBeTrue()
@@ -139,7 +160,7 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
     expect($centerPage->getContent())->toMatch('/<li[^>]*fi-active[^>]*>[\s\S]*?href="[^"]*\/admin\/attendances"/');
     expect(session(AdminCenterContext::SESSION_KEY))->toBe($org['centerA']->id);
     expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels())
-        ->and(array_values(array_intersect(mainSidebarLabels(), coordinatorSidebarLabels())))->toBe(['Center Dashboard']);
+        ->and(array_values(array_intersect(mainSidebarLabels(), coordinatorSidebarLabels())))->toBe(['Main Dashboard', 'Center Dashboard']);
 
     $this->actingAs($coordinator)
         ->post(route('admin.clear-center'))
@@ -153,8 +174,10 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
     $this->flushSession();
     $this->actingAs($org['admin'])->get('/admin')->assertOk();
 
-    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(mainSidebarLabels())
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(adminMainSidebarLabels())
         ->and(array_values(array_intersect($removed, coordinatorSidebarLabels())))->toBe([])
+        ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeTrue()
+        ->and(DeviceManagement::shouldRegisterNavigation())->toBeTrue()
         ->and(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
         ->and(OrgUserResource::getNavigationLabel())->toBe('Team Management')
         ->and(EmployeeResource::shouldRegisterNavigation())->toBeFalse();
@@ -170,7 +193,7 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
         ->assertDontSee('Back to Center Dashboard', false);
 
     expect($adminAttendance->getContent())->toMatch('/<li[^>]*fi-active[^>]*>[\s\S]*?href="[^"]*\/admin\/attendances"/');
-    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels())
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(adminCenterSidebarLabels())
         ->and(EmployeeResource::getNavigationLabel())->toBe('Users');
 
     $this->actingAs($org['admin'])
@@ -184,9 +207,11 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
         ->get('/admin')
         ->assertOk()
         ->assertSee('Main Dashboard')
+        ->assertSee('App Update Settings')
+        ->assertSee('Device Management')
         ->assertSessionMissing(AdminCenterContext::SESSION_KEY);
 
-    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(mainSidebarLabels());
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(adminMainSidebarLabels());
 
     $this->flushSession();
     $this->actingAs($org['director'])->get('/admin')->assertOk();
@@ -196,7 +221,9 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
         ->and(Dashboard::getNavigationLabel())->toBe('Main Dashboard')
         ->and(CenterDashboard::canAccess())->toBeTrue()
         ->and(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(EmployeeResource::shouldRegisterNavigation())->toBeFalse();
+        ->and(EmployeeResource::shouldRegisterNavigation())->toBeFalse()
+        ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeFalse()
+        ->and(DeviceManagement::shouldRegisterNavigation())->toBeFalse();
 
     $this->actingAs($org['director'])->get('/admin/center-dashboard')->assertRedirect('/admin/centers');
     $this->actingAs($org['director'])->get('/admin/reports')->assertRedirect('/admin/centers');
@@ -220,14 +247,14 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
     $this->actingAs($org['centerManager'])->get('/admin')->assertOk();
 
     expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
-        'Dashboard',
+        'Main Dashboard',
         'Center Dashboard',
         'Users',
     ])
         ->and(array_values(array_intersect(array_merge(['Team Management'], $removed), coordinatorSidebarLabels())))->toBe([])
         ->and(EmployeeResource::getNavigationLabel())->toBe('Users')
         ->and(EmployeeResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(Dashboard::getNavigationLabel())->toBe('Dashboard');
+        ->and(Dashboard::getNavigationLabel())->toBe('Main Dashboard');
 
     $this->actingAs($org['centerManager'])->get('/admin/attendances')->assertRedirect('/admin/centers');
 
@@ -255,7 +282,7 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
     $this->actingAs($org['centerManager'])->get('/admin/centers')->assertOk();
 
     expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
-        'Dashboard',
+        'Main Dashboard',
         'Center Dashboard',
         'Users',
     ]);

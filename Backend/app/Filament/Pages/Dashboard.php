@@ -10,13 +10,14 @@ use App\Filament\Widgets\DirectorTodayTeamActivityWidget;
 use App\Filament\Widgets\FieldTrackStatsWidget;
 use App\Models\User;
 use App\Services\AdminCenterContext;
-use Filament\Navigation\NavigationItem;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Widgets\Widget;
 use Filament\Widgets\WidgetConfiguration;
 
 class Dashboard extends BaseDashboard
 {
+    protected static ?int $navigationSort = -2;
+
     /**
      * @return array<string, mixed>
      */
@@ -31,7 +32,7 @@ class Dashboard extends BaseDashboard
     {
         $user = auth()->user();
 
-        if ($user instanceof User && ($user->isAdmin() || $user->isDirector() || $user->isCenterCoordinator())) {
+        if ($user instanceof User && app(AdminCenterContext::class)->participatesInCenterSelection($user)) {
             return 'Main Dashboard';
         }
 
@@ -48,19 +49,6 @@ class Dashboard extends BaseDashboard
         }
 
         return true;
-    }
-
-    /**
-     * @return array<NavigationItem>
-     */
-    public static function getNavigationItems(): array
-    {
-        return array_map(
-            fn (NavigationItem $item): NavigationItem => $item->visible(
-                fn (): bool => ! app(AdminCenterContext::class)->showsCenterModuleNavigation(),
-            ),
-            parent::getNavigationItems(),
-        );
     }
 
     public function getTitle(): string
