@@ -5,6 +5,8 @@ namespace App\Filament\Pages;
 use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Support\TodayDateFilter;
 use App\Models\Attendance;
+use App\Models\User;
+use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -39,9 +41,23 @@ class Reports extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => app(OrganizationAccessService::class)
-                ->attendanceQuery(auth()->user())
-                ->with(['employee.center.scheme']))
+            ->query(function (): Builder {
+                $user = auth()->user();
+                $query = app(OrganizationAccessService::class)
+                    ->attendanceQuery($user)
+                    ->with(['employee.center.scheme']);
+                $context = app(AdminCenterContext::class);
+
+                if ($context->coordinatorMustPickCenter($user)) {
+                    return $query->whereRaw('1 = 0');
+                }
+
+                if ($user instanceof User && $user->isCenterCoordinator()) {
+                    return $context->scopeByEmployeeCenter($query, $user);
+                }
+
+                return $query;
+            })
             ->defaultSort('attendance_date', 'desc')
             ->columns([
                 TextColumn::make('attendance_date')->date('d M Y')->sortable(),

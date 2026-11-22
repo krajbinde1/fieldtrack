@@ -11,6 +11,10 @@ trait RequiresSelectedAdminCenter
     {
         $user = auth()->user();
 
+        if ($user instanceof User && $user->isCenterCoordinator()) {
+            return false;
+        }
+
         if ($user instanceof User && $user->isAdmin() && ! app(AdminCenterContext::class)->hasValidSelection($user)) {
             return false;
         }

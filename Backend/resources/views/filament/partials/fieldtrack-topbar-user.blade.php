@@ -20,16 +20,33 @@ use Filament\Facades\Filament;
     $logoutUrl = Filament::getLogoutUrl();
     $selectedCenter = $user ? app(AdminCenterContext::class)->centerFor($user) : null;
     $changeCenterUrl = $selectedCenter ? SelectCenter::getUrl() : null;
+    $isCoordinator = $user instanceof \App\Models\User && $user->isCenterCoordinator();
+    $coordinatorCenterCount = $isCoordinator
+        ? count(app(\App\Services\OrganizationAccessService::class)->visibleCenterIds($user) ?? [])
+        : 0;
 @endphp
 
 @if ($user)
 <div class="ft-topbar-user" data-ft-topbar-user>
-    @if ($selectedCenter && filled($changeCenterUrl))
+    @if ($selectedCenter && filled($changeCenterUrl) && ! $isCoordinator)
         <div class="ft-change-center">
             <span class="ft-change-center-name">{{ $selectedCenter->name }}</span>
             <span class="ft-change-center-actions">
                 <a class="ft-change-center-action" href="{{ $changeCenterUrl }}">Change Center</a>
                 <form class="ft-clear-center" method="POST" action="{{ route('admin.clear-center') }}">
+                    @csrf
+                    <button type="submit" class="ft-change-center-action">Back to All Centers</button>
+                </form>
+            </span>
+        </div>
+    @elseif ($isCoordinator && $selectedCenter)
+        <div class="ft-change-center">
+            <span class="ft-change-center-name">{{ $selectedCenter->name }}</span>
+            <span class="ft-change-center-actions">
+                @if ($coordinatorCenterCount > 1)
+                    <a class="ft-change-center-action" href="{{ $changeCenterUrl }}">Change Center</a>
+                @endif
+                <form @class(['ft-clear-center' => $coordinatorCenterCount > 1]) method="POST" action="{{ route('admin.clear-center') }}">
                     @csrf
                     <button type="submit" class="ft-change-center-action">Back to All Centers</button>
                 </form>

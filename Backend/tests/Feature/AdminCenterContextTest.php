@@ -376,7 +376,7 @@ it('selects a center from the centers list and can return to every center', func
             'Total Admissions',
             'Today Confirmed Admissions',
             'This Month Confirmed Admissions',
-            'Pending Leaves',
+            'Pending Leave Requests',
         ])
         ->and($scoped[3]['hint'])->toBe('Present / Half Day / Absent / Running / On Leave')
         ->and($scoped[3]['value'])->toBe('0 / 0 / 0 / 0 / 0')

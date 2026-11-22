@@ -13,7 +13,7 @@ Route::get('/', function () {
 
 Route::post('/admin/clear-center', function () {
     $user = auth()->user();
-    abort_unless($user instanceof User && $user->isAdmin(), 403);
+    abort_unless($user instanceof User && ($user->isAdmin() || $user->isCenterCoordinator()), 403);
     app(AdminCenterContext::class)->forget();
 
     return redirect('/admin/centers');

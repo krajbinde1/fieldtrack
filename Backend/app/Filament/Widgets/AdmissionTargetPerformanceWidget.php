@@ -2,6 +2,8 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\User;
+use App\Services\AdminCenterContext;
 use App\Services\AdmissionTargetService;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -35,7 +37,11 @@ class AdmissionTargetPerformanceWidget extends StatsOverviewWidget
             ];
         }
 
-        $metrics = app(AdmissionTargetService::class)->teamPerformance($user, 'this_week');
+        $centerId = $user instanceof User
+            ? app(AdminCenterContext::class)->idFor($user)
+            : null;
+        $filters = $centerId === null ? [] : ['center_id' => $centerId];
+        $metrics = app(AdmissionTargetService::class)->teamPerformance($user, 'this_week', null, null, $filters);
 
         return [
             Stat::make('Target', (string) $metrics['target']),

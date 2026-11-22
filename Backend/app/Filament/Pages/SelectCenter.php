@@ -26,7 +26,9 @@ class SelectCenter extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->isAdmin() === true;
+        $user = auth()->user();
+
+        return $user instanceof User && ($user->isAdmin() || $user->isCenterCoordinator());
     }
 
     public function mount(): void

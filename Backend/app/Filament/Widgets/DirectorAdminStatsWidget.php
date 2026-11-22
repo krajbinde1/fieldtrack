@@ -97,7 +97,8 @@ class DirectorAdminStatsWidget extends Widget
             ->count();
 
         $todayDateFilter = ['attendance_date' => ['date' => $today]];
-        $centerId = $user instanceof User && $user->isAdmin() ? $context->idFor($user) : null;
+        // Null while the main dashboard runs in organization-wide scope.
+        $centerId = $user instanceof User ? $context->idFor($user) : null;
         $attendanceEmployees = $user instanceof User
             ? $access->fieldEmployeeQuery($user)
             : $access->employeeQuery($user)->where('status', true);
@@ -139,20 +140,30 @@ class DirectorAdminStatsWidget extends Widget
                     ->pluck('employee_id')
                     ->unique()
                     ->count();
+            $activeRoutes = $centerEmployeeIds->isEmpty()
+                ? 0
+                : Attendance::query()
+                    ->whereIn('employee_id', $centerEmployeeIds)
+                    ->whereDate('attendance_date', $today)
+                    ->whereNotNull('punch_in_time')
+                    ->whereNull('punch_out_time')
+                    ->count();
             $employeesCard['value'] = (string) $employeeTotal;
-            $employeesCard['url'] = OrgUserResource::getUrl('index', [
-                'employees' => 1,
-                'center' => $centerId,
-            ]);
+            $employeesCard['url'] = $user->isCenterCoordinator()
+                ? EmployeeResource::getUrl('index', ['center' => $centerId])
+                : OrgUserResource::getUrl('index', [
+                    'employees' => 1,
+                    'center' => $centerId,
+                ]);
         }
         $punchedCard = [
             'label' => 'Punched In Today',
             'value' => $punchedIn.' / '.$employeeTotal,
             'hint' => 'Punched in / total employees',
-            'url' => FilamentFilterUrl::for(AttendanceResource::class, [
+            'url' => self::centerDashboardUrl(AttendanceResource::class, [
                 ...$todayDateFilter,
                 'punched_in' => ['isActive' => true],
-            ]),
+            ], $centerId),
             'tone' => 'mint',
             'icon' => 'punched',
         ];
@@ -160,10 +171,10 @@ class DirectorAdminStatsWidget extends Widget
             'label' => 'Active Routes',
             'value' => (string) $activeRoutes,
             'hint' => null,
-            'url' => FilamentFilterUrl::for(EmployeeRouteResource::class, [
+            'url' => self::centerDashboardUrl(EmployeeRouteResource::class, [
                 ...$todayDateFilter,
                 'active_now' => ['isActive' => true],
-            ]),
+            ], $centerId),
             'tone' => 'peach',
             'icon' => 'routes',
         ];
@@ -171,7 +182,7 @@ class DirectorAdminStatsWidget extends Widget
             'label' => 'Attendance Today',
             'value' => $present.' / '.$halfDay.' / '.$absent.' / '.$running.' / '.$onLeave,
             'hint' => 'Present / Half Day / Absent / Running / On Leave',
-            'url' => FilamentFilterUrl::for(AttendanceResource::class, $todayDateFilter),
+            'url' => self::centerDashboardUrl(AttendanceResource::class, $todayDateFilter, $centerId),
             'tone' => 'sage',
             'icon' => 'attendance',
         ];
@@ -207,19 +218,19 @@ class DirectorAdminStatsWidget extends Widget
                     'label' => 'Total Admissions',
                     'value' => (string) $totalAdmissions,
                     'hint' => null,
-                    'url' => AdmissionResource::getUrl(),
+                    'url' => self::centerDashboardUrl(AdmissionResource::class, [], $centerId, true),
                     'tone' => 'lilac',
                     'icon' => 'admissions-today',
                 ],
                 $confirmedTodayCard,
                 $confirmedMonthCard,
                 [
-                    'label' => 'Pending Leaves',
+                    'label' => 'Pending Leave Requests',
                     'value' => (string) $pendingLeaves,
                     'hint' => null,
-                    'url' => FilamentFilterUrl::for(LeaveRequestResource::class, [
+                    'url' => self::centerDashboardUrl(LeaveRequestResource::class, [
                         'status' => ['value' => LeaveStatus::Pending->value],
-                    ]),
+                    ], $centerId, true),
                     'tone' => 'amber',
                     'icon' => 'leaves',
                 ],
@@ -239,7 +250,7 @@ class DirectorAdminStatsWidget extends Widget
             $punchedCard,
             $routesCard,
             [
-                'label' => 'Pending Project Manager Leaves',
+                'label' => 'Pending Leave Requests',
                 'value' => (string) $context->scopeByCenterId($access->projectHeadLeaveQuery($user), $user)
                     ->where('status', LeaveStatus::Pending->value)
                     ->count(),
@@ -272,5 +283,24 @@ class DirectorAdminStatsWidget extends Widget
         }
 
         return FilamentFilterUrl::for(AdmissionResource::class, $filters);
+    }
+
+    /**
+     * @param  class-string  $resource
+     * @param  array<string, mixed>  $filters
+     */
+    private static function centerDashboardUrl(string $resource, array $filters, ?int $centerId, bool $centerFilter = false): string
+    {
+        if ($centerId !== null && $centerFilter) {
+            $filters['center_id'] = ['value' => $centerId];
+        }
+
+        $parameters = $filters === [] ? [] : ['filters' => $filters];
+
+        if ($centerId !== null) {
+            $parameters['center'] = $centerId;
+        }
+
+        return $resource::getUrl('index', $parameters);
     }
 }

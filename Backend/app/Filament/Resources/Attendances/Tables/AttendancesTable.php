@@ -2,52 +2,51 @@
 
 namespace App\Filament\Resources\Attendances\Tables;
 
+use App\Filament\Resources\Attendances\AttendanceResource;
 use App\Models\Attendance;
-use App\Filament\Support\EmployeeSelect;
-use App\Filament\Support\TodayDateFilter;
-use App\Services\AdminCenterContext;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Support\AttendanceCalendar;
-use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class AttendancesTable
 {
     public static function configure(Table $table): Table
     {
         return $table
-            ->heading('Attendance (IST)')
-            ->defaultSort('attendance_date', 'desc')
+            ->heading('Daily Attendance')
             ->columns([
                 TextColumn::make('employee.full_name')
                     ->label('Employee')
-                    ->formatStateUsing(fn (Attendance $record): string => $record->employee?->displayLabel() ?? '-')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('employee.center.scheme.name')->label('Scheme / Project'),
-                TextColumn::make('employee.center.name')->label('Center'),
-                TextColumn::make('attendance_date')
-                    ->label('Attendance Date')
-                    ->date('d M Y')
-                    ->sortable(),
+                    ->formatStateUsing(fn (Attendance $record): string => $record->employee?->displayLabel() ?? '—')
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->where('employees.full_name', 'like', '%'.$search.'%');
+                    }),
+                TextColumn::make('employee.center.scheme.name')
+                    ->label('Scheme / Project')
+                    ->placeholder('—'),
+                TextColumn::make('employee.center.name')
+                    ->label('Center')
+                    ->placeholder('—'),
                 TextColumn::make('punch_in_time')
-                    ->label('Punch In Time')
-                    ->formatStateUsing(fn (Attendance $record): string => $record->punchInAt()?->timezone(AttendanceCalendar::TIMEZONE)->format('h:i A') ?? '-')
-                    ->placeholder('-'),
+                    ->label('Punch In')
+                    ->state(fn (Attendance $record): string => $record->punchInAt()?->timezone(AttendanceCalendar::TIMEZONE)->format('h:i A') ?? '—'),
                 TextColumn::make('punch_out_time')
-                    ->label('Punch Out Time')
-                    ->formatStateUsing(fn (Attendance $record): string => $record->punchOutAt()?->timezone(AttendanceCalendar::TIMEZONE)->format('h:i A') ?? '-')
-                    ->placeholder('-'),
+                    ->label('Punch Out')
+                    ->state(fn (Attendance $record): string => $record->punchOutAt()?->timezone(AttendanceCalendar::TIMEZONE)->format('h:i A') ?? '—'),
+                TextColumn::make('working_hours')
+                    ->label('Working Hours')
+                    ->state(fn (Attendance $record): string => app(AttendanceStatusCalculator::class)->formatWorkingHoursLabel(
+                        self::hasAttendance($record) ? $record : null,
+                    )),
                 TextColumn::make('attendance_status')
-                    ->label('Status')
+                    ->label('Attendance Status')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => Attendance::ATTENDANCE_STATUS_LABELS[$state] ?? $state)
+                    ->state(fn (Attendance $record): string => self::statusKey($record))
+                    ->formatStateUsing(fn (string $state): string => AttendanceStatusCalculator::statusLabels()[$state] ?? $state)
                     ->color(fn (string $state): string => match ($state) {
                         AttendanceStatusCalculator::STATUS_PRESENT => 'success',
                         AttendanceStatusCalculator::STATUS_ABSENT => 'danger',
@@ -57,41 +56,34 @@ class AttendancesTable
                         default => 'gray',
                     }),
             ])
-            ->filters([
-                TodayDateFilter::make('attendance_date', 'Date'),
-                SelectFilter::make('employee_id')
-                    ->label('Employee')
-                    ->relationship(
-                        name: 'employee',
-                        titleAttribute: 'full_name',
-                        modifyQueryUsing: fn ($query) => app(AdminCenterContext::class)->scopeEmployees($query),
-                    )
-                    ->tap(fn (SelectFilter $filter) => EmployeeSelect::applyRelationshipFilter($filter))
-                    ->preload(),
-                Filter::make('punched_in')
-                    ->label('Punched In')
-                    ->toggle()
-                    ->query(function (Builder $query, array $data): Builder {
-                        if (! ($data['isActive'] ?? false)) {
-                            return $query;
-                        }
-
-                        return $query->whereNotNull('punch_in_time');
-                    })
-                    ->indicateUsing(fn (array $data): ?string => ($data['isActive'] ?? false) ? 'Punched In' : null),
-                SelectFilter::make('attendance_status')
-                    ->label('Attendance Status')
-                    ->options(Attendance::ATTENDANCE_STATUS_LABELS),
-                SelectFilter::make('approval_status')
-                    ->label('Approval Status')
-                    ->options(Attendance::APPROVAL_STATUS_LABELS),
-                TrashedFilter::make(),
-            ])
+            ->recordUrl(fn (Attendance $record): ?string => self::hasAttendance($record)
+                ? AttendanceResource::getUrl('view', ['record' => $record])
+                : null)
             ->recordActions([
-                ViewAction::make()->label('View'),
+                ViewAction::make()
+                    ->label('View Details')
+                    ->visible(fn (Attendance $record): bool => self::hasAttendance($record)),
             ])
-            ->toolbarActions([
-                BulkActionGroup::make([]),
-            ]);
+            ->toolbarActions([])
+            ->emptyStateHeading('No employees for this day')
+            ->emptyStateDescription('Try another date or summary card.');
+    }
+
+    private static function hasAttendance(Attendance $record): bool
+    {
+        return (int) $record->getKey() > 0;
+    }
+
+    private static function statusKey(Attendance $record): string
+    {
+        $raw = $record->attendance_date;
+        $date = $raw instanceof Carbon
+            ? Carbon::parse($raw->toDateString(), AttendanceCalendar::TIMEZONE)->startOfDay()
+            : Carbon::parse((string) ($raw ?: AttendanceCalendar::today()->toDateString()), AttendanceCalendar::TIMEZONE)->startOfDay();
+
+        return app(AttendanceStatusCalculator::class)->classifyWorkingDay(
+            self::hasAttendance($record) ? $record : null,
+            $date,
+        );
     }
 }

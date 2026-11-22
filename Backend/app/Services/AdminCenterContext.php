@@ -206,12 +206,32 @@ final class AdminCenterContext
             return $query;
         }
 
+        if (
+            $this->coordinatorMustPickCenter($user)
+            && in_array($model, [Admission::class, Attendance::class, LeaveRequest::class, AdmissionTarget::class], true)
+        ) {
+            return $query->whereRaw('1 = 0');
+        }
+
         return match ($model) {
             Admission::class, Employee::class => $this->scopeByCenterId($query, $user),
             Attendance::class => $this->scopeByEmployeeCenter($query, $user),
             LeaveRequest::class, AdmissionTarget::class => $this->scopeOwnedByCenter($query, $user),
             default => $query,
         };
+    }
+
+    /**
+     * A coordinator with no selected center must not see every assigned center at once.
+     * Team Management stays on the assigned-center scope. Organization-wide dashboard
+     * widgets bypass this check.
+     */
+    public function coordinatorMustPickCenter(?User $user): bool
+    {
+        return $user instanceof User
+            && $user->isCenterCoordinator()
+            && $this->organizationWideDepth() === 0
+            && $this->idFor($user) === null;
     }
 
     public function abortUnlessEmployeeInAdminCenter(Employee $employee, ?User $user = null): void

@@ -2,10 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Filament\Support\CoordinatorCenterModules;
 use App\Models\User;
 use App\Services\AdminCenterContext;
 use Closure;
-use Filament\Facades\Filament;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -16,11 +16,22 @@ class EnsureAdminCenterSelected
      * Team Management, and global settings. The center dashboard and
      * center-specific modules redirect to the Centers list.
      *
+     * Coordinators use the same center modules only after they pick one
+     * assigned center. Other roles are unchanged.
+     *
      * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+
+        if ($user instanceof User && $user->isCenterCoordinator()) {
+            if ($this->isCenterModule($request) && ! app(AdminCenterContext::class)->hasValidSelection($user)) {
+                return redirect('/admin/centers');
+            }
+
+            return $next($request);
+        }
 
         if (! $user instanceof User || ! $user->isAdmin()) {
             return $next($request);
@@ -39,24 +50,6 @@ class EnsureAdminCenterSelected
 
     private function isCenterModule(Request $request): bool
     {
-        $panelPath = trim((string) (Filament::getCurrentPanel()?->getPath() ?? 'admin'), '/');
-        $path = trim($request->path(), '/');
-
-        foreach ([
-            'center-dashboard',
-            'attendances',
-            'employee-routes',
-            'admissions',
-            'admission-targets',
-            'leave-requests',
-            'reports',
-        ] as $module) {
-            $base = $panelPath.'/'.$module;
-            if ($path === $base || str_starts_with($path, $base.'/')) {
-                return true;
-            }
-        }
-
-        return false;
+        return CoordinatorCenterModules::requestMatches($request);
     }
 }

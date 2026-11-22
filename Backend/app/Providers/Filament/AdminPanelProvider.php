@@ -138,6 +138,13 @@ class AdminPanelProvider extends PanelProvider
             );
         }
 
+        if ($this->renderHookExists('PAGE_HEADER_ACTIONS_BEFORE')) {
+            $panel = $panel->renderHook(
+                constant(PanelsRenderHook::class.'::PAGE_HEADER_ACTIONS_BEFORE'),
+                fn () => view('filament.partials.coordinator-center-back'),
+            );
+        }
+
         if ($this->renderHookExists('HEAD_END')) {
             $panel = $panel->renderHook(
                 constant(PanelsRenderHook::class.'::HEAD_END'),

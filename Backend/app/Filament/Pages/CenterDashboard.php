@@ -2,10 +2,13 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\CoordinatorCenterModulesWidget;
 use App\Models\User;
 use App\Services\AdminCenterContext;
 use BackedEnum;
 use Filament\Support\Icons\Heroicon;
+use Filament\Widgets\Widget;
+use Filament\Widgets\WidgetConfiguration;
 
 class CenterDashboard extends Dashboard
 {
@@ -52,6 +55,21 @@ class CenterDashboard extends Dashboard
             : null;
 
         return $center ? $center->name.' Dashboard' : 'Center Dashboard';
+    }
+
+    /**
+     * @return array<class-string<Widget> | WidgetConfiguration>
+     */
+    public function getWidgets(): array
+    {
+        $widgets = parent::getWidgets();
+        $user = auth()->user();
+
+        if ($user instanceof User && $user->isCenterCoordinator()) {
+            array_unshift($widgets, CoordinatorCenterModulesWidget::class);
+        }
+
+        return $widgets;
     }
 
     protected function showsOrganizationWideDashboard(): bool
