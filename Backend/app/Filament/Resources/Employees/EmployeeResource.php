@@ -8,11 +8,13 @@ use App\Filament\Resources\Employees\Pages\CreateEmployee;
 use App\Filament\Resources\Employees\Pages\EditEmployee;
 use App\Filament\Resources\Employees\Pages\ListEmployees;
 use App\Models\Employee;
+use App\Models\User;
 use App\Services\CenterStaffCredentialService;
 use App\Services\OrganizationAccessService;
 use App\Support\LoginId;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -26,6 +28,8 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Model;
 
 class EmployeeResource extends Resource
 {
@@ -47,6 +51,24 @@ class EmployeeResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
+    public static function getNavigationLabel(): string
+    {
+        if (auth()->user()?->isCenterCoordinator() === true) {
+            return 'Team Management';
+        }
+
+        return static::$navigationLabel ?? 'Users';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        if (auth()->user()?->isCenterCoordinator() === true) {
+            return 'Team Management';
+        }
+
+        return static::$pluralModelLabel ?? 'Users';
+    }
+
     public static function canAccess(): bool
     {
         $user = auth()->user();
@@ -58,14 +80,42 @@ class EmployeeResource extends Resource
     {
         $user = auth()->user();
 
-        return (bool) ($user && app(OrganizationAccessService::class)->canManageEmployees($user));
+        return (bool) ($user && app(OrganizationAccessService::class)->canManageCenterUsers($user));
     }
 
     public static function canEdit($record): bool
     {
         $user = auth()->user();
 
-        return (bool) ($user && app(OrganizationAccessService::class)->canManageEmployees($user, $record->center));
+        return (bool) ($user && $record instanceof Employee && app(OrganizationAccessService::class)->canManageCenterUsers($user, $record->center));
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        $actor = auth()->user();
+
+        return $actor instanceof User
+            && $record instanceof Employee
+            && app(OrganizationAccessService::class)->canDeleteManagedEmployee($actor, $record);
+    }
+
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        return static::canDelete($record)
+            ? Response::allow()
+            : Response::deny('You cannot delete this user.');
+    }
+
+    public static function deleteManagedEmployee(Employee $employee): bool
+    {
+        $actor = auth()->user();
+
+        abort_unless(
+            $actor instanceof User && app(OrganizationAccessService::class)->canDeleteManagedEmployee($actor, $employee),
+            403,
+        );
+
+        return $employee->deleteIfUnused();
     }
 
     public static function form(Schema $schema): Schema
@@ -145,6 +195,7 @@ class EmployeeResource extends Resource
             ->recordActions([
                 EditAction::make(),
                 self::resetPasswordAction(),
+                self::deleteUserAction(),
             ]);
     }
 
@@ -173,7 +224,7 @@ class EmployeeResource extends Resource
                 return $record !== null
                     && $record->user !== null
                     && $user !== null
-                    && app(OrganizationAccessService::class)->canManageEmployees($user, $record->center);
+                    && app(OrganizationAccessService::class)->canManageCenterUsers($user, $record->center);
             })
             ->action(function (Employee $record): void {
                 $password = app(CenterStaffCredentialService::class)->resetPassword($record->loadMissing('user'));
@@ -182,6 +233,33 @@ class EmployeeResource extends Resource
                     ->title(LoginId::defaultPasswordResetMessage($password))
                     ->success()
                     ->persistent()
+                    ->send();
+            });
+    }
+
+    public static function deleteUserAction(): Action
+    {
+        return DeleteAction::make()
+            ->label('Delete')
+            ->icon('heroicon-o-trash')
+            ->color('danger')
+            ->modalHeading('Delete User')
+            ->modalDescription('Permanently delete this user? This cannot be undone. Users with related records cannot be deleted.')
+            ->modalSubmitActionLabel('Delete')
+            ->visible(fn (Employee $record): bool => static::canDelete($record))
+            ->action(function (Employee $record): void {
+                if (! static::deleteManagedEmployee($record)) {
+                    Notification::make()
+                        ->title(Employee::DELETE_BLOCKED_MESSAGE)
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+
+                Notification::make()
+                    ->title('User deleted.')
+                    ->success()
                     ->send();
             });
     }

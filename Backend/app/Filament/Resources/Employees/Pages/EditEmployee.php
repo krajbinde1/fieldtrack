@@ -38,7 +38,7 @@ class EditEmployee extends EditRecord
 
         $center = Center::query()->find($data['center_id'] ?? $this->record->center_id);
         abort_unless(
-            $center !== null && $access->canManageEmployees($actor, $center),
+            $center !== null && $access->canManageCenterUsers($actor, $center),
             403,
             'You can only manage users for your own Center.',
         );

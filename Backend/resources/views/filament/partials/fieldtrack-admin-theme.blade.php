@@ -56,6 +56,7 @@
         --ft-orange-fg: #c2410c;
         --ft-red-bg: #fee2e2;
         --ft-red-fg: #b91c1c;
+        --ft-header-height: 3.25rem;
         color-scheme: light;
         background: var(--ft-bg);
     }
@@ -101,7 +102,22 @@
     }
 
     html.fieldtrack-admin .fi-sidebar {
+        top: 0 !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
         border-right: 0 !important;
+        overflow: hidden;
+    }
+
+    html.fieldtrack-admin .fi-sidebar-nav {
+        flex: 1 1 auto;
+        min-height: 0;
+        gap: 0.4rem;
+        padding: 0.55rem 0.55rem 0.75rem;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
 
     html.fieldtrack-admin .fi-sidebar-header {
@@ -120,17 +136,27 @@
         font-size: 0.98rem;
     }
 
-    html.fieldtrack-admin .fi-sidebar-nav {
-        padding: 0.4rem 0.55rem 1rem;
+    html.fieldtrack-admin .fi-sidebar-nav-groups {
+        gap: 0.45rem;
+    }
+
+    html.fieldtrack-admin .fi-sidebar-group-btn,
+    html.fieldtrack-admin .fi-sidebar-group-button {
+        padding-top: 0.28rem;
+        padding-bottom: 0.28rem;
     }
 
     html.fieldtrack-admin .fi-sidebar-nav-groups,
     html.fieldtrack-admin .fi-sidebar-group {
-        margin-bottom: 0.45rem;
+        margin-bottom: 0;
+    }
+
+    html.fieldtrack-admin .fi-sidebar-group {
+        gap: 0.1rem;
     }
 
     html.fieldtrack-admin .fi-sidebar-group + .fi-sidebar-group {
-        margin-top: 0.15rem;
+        margin-top: 0;
     }
 
     html.fieldtrack-admin .fi-sidebar-group-label,
@@ -143,8 +169,8 @@
         font-size: 0.675rem !important;
         font-weight: 700 !important;
         padding-inline: 0.7rem;
-        margin-top: 0.35rem;
-        margin-bottom: 0.2rem;
+        margin-top: 0.15rem;
+        margin-bottom: 0.05rem;
     }
 
     html.fieldtrack-admin .fi-sidebar-item,
@@ -350,9 +376,11 @@
         background: var(--ft-header) !important;
         border-bottom: 1px solid var(--ft-border) !important;
         box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
-        min-height: 4rem;
+        min-height: var(--ft-header-height);
+        height: var(--ft-header-height);
+        padding-block: 0;
         padding-inline: 0.85rem;
-        gap: 0.75rem;
+        gap: 0.65rem;
         align-items: center;
     }
 
@@ -381,43 +409,6 @@
     html.fieldtrack-admin .fi-topbar .fi-logo,
     html.fieldtrack-admin .fi-topbar .fi-logo-text {
         display: none;
-    }
-
-    .ft-topbar-search {
-        display: flex;
-        align-items: center;
-        gap: 0.55rem;
-        flex: 1 1 18rem;
-        max-width: 32rem;
-        margin-inline: 0 0.75rem;
-        min-width: 10rem;
-        height: 2.55rem;
-        padding: 0 0.95rem;
-        border-radius: 999px;
-        background: #f4f6fb;
-        border: 1px solid #e5eaf3;
-        color: var(--ft-muted);
-    }
-
-    .ft-topbar-search-icon {
-        width: 1.05rem;
-        height: 1.05rem;
-        flex: 0 0 auto;
-    }
-
-    .ft-topbar-search-input {
-        flex: 1 1 auto;
-        min-width: 0;
-        border: 0;
-        outline: none;
-        background: transparent;
-        font-size: 0.9rem;
-        color: var(--ft-text);
-        height: 100%;
-    }
-
-    .ft-topbar-search-input::placeholder {
-        color: #94a3b8;
     }
 
     .ft-topbar-user {
@@ -610,11 +601,8 @@
     html.fieldtrack-admin .fi-global-search-ctn,
     html.fieldtrack-admin .fi-global-search,
     html.fieldtrack-admin .fi-topbar .fi-global-search-ctn,
-    html.fieldtrack-admin .fi-topbar .fi-global-search {
-        display: none !important;
-    }
-
-    html.fieldtrack-admin .fi-topbar .ft-topbar-search ~ .ft-topbar-search {
+    html.fieldtrack-admin .fi-topbar .fi-global-search,
+    html.fieldtrack-admin .ft-topbar-search {
         display: none !important;
     }
 
@@ -645,11 +633,50 @@
         .ft-topbar-identity {
             display: none;
         }
+    }
 
-        .ft-topbar-search {
-            max-width: none;
-            margin-inline: 0.25rem;
-            min-width: 0;
+    /*
+     * Desktop: sidebar is flush with the viewport and the compact account
+     * header sits only over the content column. Mobile keeps the header in
+     * flow so the menu button, close button, and account controls stay usable.
+     */
+    @media (max-width: 1023px) {
+        html.fieldtrack-admin .fi-body-has-topbar .fi-sidebar {
+            top: var(--ft-header-height) !important;
+            height: calc(100dvh - var(--ft-header-height)) !important;
+            max-height: calc(100dvh - var(--ft-header-height)) !important;
+        }
+
+        html.fieldtrack-admin .fi-topbar-ctn {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            overflow: visible;
+        }
+    }
+
+    @media (min-width: 1024px) {
+        html.fieldtrack-admin .fi-body-has-topbar.fi-body-has-navigation .fi-topbar-ctn {
+            position: fixed;
+            top: 0;
+            inset-inline-start: var(--sidebar-width);
+            inset-inline-end: 0;
+            z-index: 30;
+            width: auto;
+            overflow: visible;
+        }
+
+        html.fieldtrack-admin .fi-body-has-topbar.fi-body-has-navigation:has(.fi-main-sidebar:not(.fi-sidebar-open)) .fi-topbar-ctn {
+            inset-inline-start: var(--collapsed-sidebar-width);
+        }
+
+        html.fieldtrack-admin .fi-body-has-topbar.fi-body-has-navigation .fi-main-sidebar:not(.fi-sidebar-open) {
+            width: var(--collapsed-sidebar-width);
+        }
+
+        html.fieldtrack-admin .fi-body-has-topbar.fi-body-has-navigation .fi-main-ctn {
+            padding-top: var(--ft-header-height);
+            box-sizing: border-box;
         }
     }
 
@@ -1574,5 +1601,58 @@
         .admission-review-actions .fi-sc-actions {
             grid-template-columns: 1fr;
         }
+    }
+
+    .ft-cm-dash { display: flex; flex-direction: column; gap: 0.85rem; }
+    .ft-cm-head, .ft-cm-filters, .ft-cm-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+    .ft-cm-kicker { margin: 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #6d28d9; }
+    .ft-cm-name { margin: 0.1rem 0 0; font-size: 1.15rem; font-weight: 800; color: #0f172a; }
+    .ft-cm-meta, .ft-cm-date { margin: 0.15rem 0 0; font-size: 0.78rem; color: #64748b; }
+    .ft-cm-filters { flex-wrap: wrap; align-items: flex-end; }
+    .ft-cm-chip, .ft-cm-shortcut-link {
+        border: 1px solid #ddd6fe;
+        background: #fff;
+        color: #5b21b6;
+        border-radius: 999px;
+        padding: 0.32rem 0.7rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .ft-cm-chip.is-active, .ft-cm-shortcut-link { background: #5b21b6; color: #fff; border-color: #5b21b6; }
+    .ft-cm-center { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.68rem; font-weight: 700; color: #64748b; }
+    .ft-cm-center select, .ft-cm-center input { border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.3rem 0.45rem; font-size: 0.78rem; color: #0f172a; background: #fff; }
+    .ft-cm-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.7rem; }
+    .ft-cm-dash .ft-dash-card { min-height: 4.55rem; padding: 0.65rem 0.7rem; }
+    .ft-cm-dash .ft-dash-card-value { font-size: 1.12rem; }
+    .ft-cm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+    .ft-cm-panel { border: 1px solid #e8ecf4; border-radius: 14px; background: #fff; padding: 0.75rem 0.85rem; min-width: 0; }
+    .ft-cm-panel h3 { margin: 0; font-size: 0.86rem; font-weight: 800; color: #0f172a; }
+    .ft-cm-panel-head span, .ft-cm-panel-head a { font-size: 0.72rem; font-weight: 700; color: #6d28d9; text-decoration: none; }
+    .ft-cm-chart { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.65rem; }
+    .ft-cm-bar { display: grid; grid-template-columns: 4.2rem 1fr 2.6rem; grid-template-rows: auto auto; column-gap: 0.4rem; row-gap: 0.18rem; align-items: center; }
+    .ft-cm-bar-label, .ft-cm-bar-n { font-size: 0.68rem; font-weight: 700; color: #475569; }
+    .ft-cm-bar-n { grid-column: 3; grid-row: 1 / span 2; text-align: right; }
+    .ft-cm-track { grid-column: 2; height: 0.38rem; border-radius: 999px; background: #f1f5f9; overflow: hidden; }
+    .ft-cm-fill { display: block; height: 100%; border-radius: inherit; }
+    .ft-cm-fill.is-target { background: #c4b5fd; }
+    .ft-cm-fill.is-achieved { background: #6d28d9; }
+    .ft-cm-legend { display: flex; align-items: center; gap: 0.35rem; margin: 0.55rem 0 0; font-size: 0.68rem; color: #64748b; }
+    .ft-cm-legend span { width: 0.7rem; height: 0.35rem; border-radius: 999px; display: inline-block; }
+    .ft-cm-legend .is-target { background: #c4b5fd; }
+    .ft-cm-legend .is-achieved { background: #6d28d9; }
+    .ft-cm-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+    .ft-cm-table th, .ft-cm-table td { text-align: left; padding: 0.35rem 0.25rem; border-bottom: 1px solid #f1f5f9; color: #0f172a; }
+    .ft-cm-table th { font-size: 0.68rem; color: #64748b; }
+    .ft-cm-row { display: flex; flex-wrap: wrap; gap: 0.25rem 0.6rem; align-items: baseline; padding: 0.4rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.75rem; }
+    .ft-cm-row strong { color: #0f172a; }
+    .ft-cm-row span, .ft-cm-row em { color: #64748b; font-style: normal; }
+    .ft-cm-empty { margin: 0.45rem 0 0; font-size: 0.75rem; color: #64748b; }
+    .ft-cm-shortcut { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+    .ft-cm-shortcut p { margin: 0.2rem 0 0; font-size: 0.75rem; color: #64748b; }
+    @media (max-width: 1199px) {
+        .ft-cm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .ft-cm-grid { grid-template-columns: 1fr; }
     }
 </style>

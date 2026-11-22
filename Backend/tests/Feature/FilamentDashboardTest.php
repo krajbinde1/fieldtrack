@@ -1,13 +1,16 @@
 <?php
 
 use App\Enums\AdmissionStatus;
+use App\Enums\LeaveStatus;
 use App\Filament\Widgets\AdmissionTargetPerformanceWidget;
+use App\Filament\Widgets\CenterManagerDashboardWidget;
 use App\Filament\Widgets\DirectorAdminStatsWidget;
 use App\Filament\Widgets\DirectorConfirmedAdmissionsByCenterWidget;
 use App\Filament\Widgets\DirectorTodayTeamActivityWidget;
 use App\Filament\Widgets\FieldTrackStatsWidget;
 use App\Models\Admission;
 use App\Models\Attendance;
+use App\Models\LeaveRequest;
 use App\Support\AttendanceCalendar;
 use Livewire\Livewire;
 
@@ -93,35 +96,95 @@ it('shows director admin management summary without scheme count or admission ta
         ->assertSee('Status');
 });
 
-it('keeps scheme count and admission targets on the center manager dashboard', function () {
+it('shows the center manager dashboard for assigned centers only', function () {
     $org = seedOrg();
+    $today = AttendanceCalendar::today()->toDateString();
+
+    Attendance::create([
+        'employee_id' => $org['empA']->id,
+        'attendance_date' => $today,
+        'punch_in_time' => '09:00:00',
+        'attendance_status' => 'Punched In',
+        'approval_status' => 'Pending',
+    ]);
+    Admission::create([
+        'scheme_id' => $org['projectA']->id,
+        'center_id' => $org['centerA']->id,
+        'employee_id' => $org['empA']->id,
+        'first_name' => 'Waiting',
+        'last_name' => 'One',
+        'full_name' => 'Waiting One',
+        'status' => AdmissionStatus::Submitted,
+        'submitted_at' => now(),
+    ]);
+    Admission::create([
+        'scheme_id' => $org['projectB']->id,
+        'center_id' => $org['centerB']->id,
+        'employee_id' => $org['empB']->id,
+        'first_name' => 'Other',
+        'last_name' => 'Center',
+        'full_name' => 'Other Center',
+        'status' => AdmissionStatus::Submitted,
+        'submitted_at' => now(),
+    ]);
+    LeaveRequest::create([
+        'employee_id' => $org['empA']->id,
+        'scheme_id' => $org['projectA']->id,
+        'center_id' => $org['centerA']->id,
+        'leave_type' => 'casual',
+        'from_date' => $today,
+        'to_date' => $today,
+        'total_days' => 1,
+        'reason' => 'Center A leave',
+        'status' => LeaveStatus::Pending->value,
+    ]);
 
     $this->actingAs($org['centerManager']);
-    expect(DirectorAdminStatsWidget::canView())->toBeFalse()
-        ->and(DirectorConfirmedAdmissionsByCenterWidget::canView())->toBeFalse()
-        ->and(DirectorTodayTeamActivityWidget::canView())->toBeFalse()
+    expect(CenterManagerDashboardWidget::canView())->toBeTrue()
+        ->and(DirectorAdminStatsWidget::canView())->toBeFalse()
         ->and(FieldTrackStatsWidget::canView())->toBeTrue()
         ->and(AdmissionTargetPerformanceWidget::canView())->toBeTrue();
 
-    $this->actingAs($org['centerManager'])
+    $this->actingAs($org['director']);
+    expect(CenterManagerDashboardWidget::canView())->toBeFalse();
+
+    $page = $this->actingAs($org['centerManager'])
         ->get('/admin')
         ->assertOk()
-        ->assertSee(FieldTrackStatsWidget::class, false)
-        ->assertSee(AdmissionTargetPerformanceWidget::class, false)
+        ->assertSee('Center Manager Dashboard')
+        ->assertSee(CenterManagerDashboardWidget::class, false)
         ->assertDontSee(DirectorAdminStatsWidget::class, false)
         ->assertDontSee(DirectorConfirmedAdmissionsByCenterWidget::class, false)
         ->assertDontSee(DirectorTodayTeamActivityWidget::class, false)
-        ->assertDontSee('Welcome,')
-        ->assertDontSee('Attendance, punch photos, GPS')
-        ->assertDontSee('ft-welcome-widget');
+        ->assertDontSee('Admission Target Performance')
+        ->assertDontSee('Welcome,');
 
     Livewire::actingAs($org['centerManager'])
-        ->test(FieldTrackStatsWidget::class)
-        ->assertSee('Schemes')
-        ->assertSee('Centers')
-        ->assertSee('Employees');
+        ->test(CenterManagerDashboardWidget::class)
+        ->assertSee('CM')
+        ->assertSee('Center A')
+        ->assertDontSee('Center B')
+        ->assertSee('Total Employees')
+        ->assertSee('Present Today')
+        ->assertSee('Absent Today')
+        ->assertSee('On Leave Today')
+        ->assertSee('Monthly Admission Target')
+        ->assertSee('Confirmed Admissions')
+        ->assertSee('Pending Admissions')
+        ->assertSee('Target Achievement %')
+        ->assertSee('Waiting One')
+        ->assertDontSee('Other Center')
+        ->assertSee('Emp A')
+        ->assertDontSee('Emp B')
+        ->assertSee('Employee Route Tracking')
+        ->assertSee('/admin/center-users')
+        ->assertSee('/admin/attendances')
+        ->assertSee('/admin/admissions')
+        ->assertSee('/admin/leave-requests')
+        ->assertSee('/admin/admission-targets')
+        ->assertSee('/admin/employee-routes')
+        ->call('setPreset', 'this_month')
+        ->assertSet('preset', 'this_month');
 
-    Livewire::actingAs($org['centerManager'])
-        ->test(AdmissionTargetPerformanceWidget::class)
-        ->assertSee('Admission Target Performance');
+    expect($page->getContent())->not->toContain('Coordinator Dashboard');
 });

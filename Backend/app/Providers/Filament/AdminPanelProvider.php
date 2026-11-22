@@ -114,7 +114,6 @@ class AdminPanelProvider extends PanelProvider
 
     private function registerFieldTrackRenderHooks(Panel $panel): Panel
     {
-        $searchHook = $this->firstExistingRenderHook(['GLOBAL_SEARCH_BEFORE', 'TOPBAR_END']);
         $userHook = $this->firstExistingRenderHook(['USER_MENU_BEFORE', 'TOPBAR_END']);
         $sidebarNavHook = $this->firstExistingRenderHook(['SIDEBAR_NAV_START']);
 
@@ -122,13 +121,6 @@ class AdminPanelProvider extends PanelProvider
             $panel = $panel->renderHook(
                 constant(PanelsRenderHook::class.'::HEAD_END'),
                 fn () => view('filament.partials.fieldtrack-admin-theme'),
-            );
-        }
-
-        if ($searchHook !== null) {
-            $panel = $panel->renderHook(
-                constant(PanelsRenderHook::class.'::'.$searchHook),
-                fn () => view('filament.partials.fieldtrack-topbar-search'),
             );
         }
 

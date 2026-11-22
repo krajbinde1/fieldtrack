@@ -8,6 +8,7 @@ use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Resources\Attendances\AttendanceResource;
 use App\Filament\Resources\Centers\CenterResource;
 use App\Filament\Resources\EmployeeRoutes\EmployeeRouteResource;
+use App\Filament\Resources\Employees\EmployeeResource;
 use App\Filament\Resources\LeaveRequests\LeaveRequestResource;
 use App\Filament\Resources\OrgUsers\OrgUserResource;
 use App\Filament\Support\FilamentFilterUrl;
@@ -117,7 +118,9 @@ class DirectorAdminStatsWidget extends Widget
             'label' => 'Total Employees',
             'value' => (string) $employeeTotal,
             'hint' => null,
-            'url' => OrgUserResource::getUrl(),
+            'url' => $user instanceof User && $user->isCenterCoordinator()
+                ? EmployeeResource::getUrl()
+                : OrgUserResource::getUrl(),
             'tone' => 'sky',
             'icon' => 'employees',
         ];

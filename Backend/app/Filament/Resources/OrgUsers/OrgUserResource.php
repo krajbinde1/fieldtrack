@@ -59,6 +59,10 @@ class OrgUserResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
+        if (auth()->user()?->isCenterCoordinator() === true) {
+            return false;
+        }
+
         return static::canAccess();
     }
 

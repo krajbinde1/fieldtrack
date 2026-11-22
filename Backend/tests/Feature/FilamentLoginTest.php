@@ -82,14 +82,14 @@ it('lets an admin open organization, people, and field-operation pages', functio
         ->assertDontSee('Main Admin Dashboard');
 
     $html = $dashboard->getContent();
-    expect(substr_count($html, 'class="ft-topbar-search"'))->toBe(1)
+    expect(substr_count($html, 'class="ft-topbar-search"'))->toBe(0)
         ->and($html)->not->toContain('class="fi-global-search-ctn')
         ->and($html)->not->toContain('Filament\\Livewire\\GlobalSearch')
         ->and($html)->toContain('fi-page-header-main-ctn')
         ->and($html)->toContain('padding-top: 0.75rem !important');
 
     $users = $this->actingAs($admin)->get('/admin/users')->assertOk();
-    expect(substr_count($users->getContent(), 'class="ft-topbar-search"'))->toBe(1);
+    expect(substr_count($users->getContent(), 'class="ft-topbar-search"'))->toBe(0);
 
     $this->actingAs($admin)->get('/admin/center-users')->assertForbidden();
 

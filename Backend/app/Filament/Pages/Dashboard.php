@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Widgets\AdmissionTargetPerformanceWidget;
+use App\Filament\Widgets\CenterManagerDashboardWidget;
 use App\Filament\Widgets\DirectorAdminStatsWidget;
 use App\Filament\Widgets\DirectorConfirmedAdmissionsByCenterWidget;
 use App\Filament\Widgets\DirectorTodayTeamActivityWidget;
@@ -60,6 +61,10 @@ class Dashboard extends BaseDashboard
             return 'Coordinator Dashboard';
         }
 
+        if ($user instanceof User && $user->isCenterManager()) {
+            return 'Center Manager Dashboard';
+        }
+
         return 'Dashboard';
     }
 
@@ -99,17 +104,9 @@ class Dashboard extends BaseDashboard
             ];
         }
 
-        if ($user instanceof User && $user->isCenterManager() && ! $organizationWide) {
-            return [
-                FieldTrackStatsWidget::class,
-                AdmissionTargetPerformanceWidget::class,
-            ];
-        }
-
         if ($user instanceof User && $user->isCenterManager()) {
             return [
-                FieldTrackStatsWidget::class,
-                AdmissionTargetPerformanceWidget::class,
+                CenterManagerDashboardWidget::class,
             ];
         }
 

@@ -29,7 +29,7 @@ class CreateEmployee extends CreateRecord
 
         $center = Center::query()->find($data['center_id'] ?? null);
         abort_unless(
-            $center !== null && $access->canManageEmployees($actor, $center),
+            $center !== null && $access->canManageCenterUsers($actor, $center),
             403,
             'You can only create users for your own Center.',
         );

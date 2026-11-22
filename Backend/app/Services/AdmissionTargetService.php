@@ -229,11 +229,12 @@ final class AdmissionTargetService
     /**
      * Assigned-center (or org-wide) totals for a dashboard card.
      *
+     * @param  array<string, mixed>  $filters
      * @return array{target: int, achieved: int, remaining: int, percentage: float, period: array{preset: string, from: string, to: string}}
      */
-    public function teamPerformance(User $viewer, string $preset, ?string $from = null, ?string $to = null): array
+    public function teamPerformance(User $viewer, string $preset, ?string $from = null, ?string $to = null, array $filters = []): array
     {
-        $rows = $this->performance($viewer, $preset, $from, $to);
+        $rows = $this->performance($viewer, $preset, $from, $to, $filters);
         [$start, $end] = AdmissionTargetPeriod::resolve($preset, $from, $to);
 
         return array_merge(

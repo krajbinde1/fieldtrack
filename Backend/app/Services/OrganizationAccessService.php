@@ -558,6 +558,55 @@ final class OrganizationAccessService
         return in_array((int) $center->id, $ids, true);
     }
 
+    public function canManageCenterUsers(User $user, ?Center $center = null): bool
+    {
+        if ($this->canManageEmployees($user, $center)) {
+            return true;
+        }
+
+        if (! $user->isCenterCoordinator()) {
+            return false;
+        }
+
+        $ids = $this->visibleCenterIds($user) ?? [];
+
+        if ($center === null) {
+            return $ids !== [];
+        }
+
+        return in_array((int) $center->id, $ids, true);
+    }
+
+    public function canDeleteManagedEmployee(User $actor, Employee $employee): bool
+    {
+        $center = $employee->center;
+
+        if (! $center instanceof Center || ! $this->canManageCenterUsers($actor, $center)) {
+            return false;
+        }
+
+        if ($actor->employee_id !== null && (int) $actor->employee_id === (int) $employee->getKey()) {
+            return false;
+        }
+
+        $account = $employee->user;
+
+        if (! $account instanceof User) {
+            return true;
+        }
+
+        if ($account->is($actor)) {
+            return false;
+        }
+
+        return ! $account->hasAnyRole([
+            UserRole::Admin,
+            UserRole::Director,
+            UserRole::CenterCoordinator,
+            UserRole::CenterManager,
+        ]);
+    }
+
     public function canAccessOrgUsers(User $user): bool
     {
         return $user->isAdmin() || $user->isDirector() || $user->isCenterCoordinator();
