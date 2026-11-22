@@ -17,6 +17,7 @@ use App\Filament\Resources\EmployeeRoutes\Pages\ListEmployeeRoutes;
 use App\Filament\Resources\Employees\EmployeeResource;
 use App\Filament\Resources\Employees\Pages\ListEmployees;
 use App\Filament\Resources\LeaveRequests\LeaveRequestResource;
+use App\Filament\Resources\OrgUsers\OrgUserResource;
 use App\Models\Admission;
 use App\Models\Attendance;
 use App\Models\User;
@@ -26,6 +27,12 @@ use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+
+function resetFilamentNavigationRequest(): void
+{
+    app()->forgetInstance(\Filament\Navigation\NavigationManager::class);
+    app()->forgetInstance('originalRequest');
+}
 
 function coordinatorSidebarLabels(): array
 {
@@ -39,7 +46,37 @@ function coordinatorSidebarLabels(): array
         }
     }
 
+    $user = auth()->user();
+
+    if ($user instanceof User
+        && $user->isAdmin()
+        && ! app(AdminCenterContext::class)->showsCenterModuleNavigation($user)) {
+        $labels[] = Dashboard::getNavigationLabel();
+    }
+
     return $labels;
+}
+
+function centerSidebarLabels(): array
+{
+    return [
+        'Center Dashboard',
+        'Attendances',
+        'Employee Routes',
+        'Admissions',
+        'Admission Targets',
+        'Leave Requests',
+        'Reports',
+    ];
+}
+
+function mainSidebarLabels(): array
+{
+    return [
+        'Main Dashboard',
+        'Center Dashboard',
+        'Team Management',
+    ];
 }
 
 function navigationCoordinator(array $org): User
@@ -58,7 +95,7 @@ function navigationCoordinator(array $org): User
     return $coordinator;
 }
 
-it('shows coordinators only three sidebar items and keeps other roles unchanged', function () {
+it('switches the shared sidebar when a center is opened and restores it afterwards', function () {
     $org = seedOrg();
     $coordinator = navigationCoordinator($org);
     $removed = [
@@ -73,107 +110,155 @@ it('shows coordinators only three sidebar items and keeps other roles unchanged'
     $this->actingAs($coordinator)
         ->get('/admin')
         ->assertOk()
-        ->assertDontSee('Center modules', false);
+        ->assertDontSee('Center modules', false)
+        ->assertDontSee('ft-coord-modules', false);
 
-    expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
-        'Main Dashboard',
-        'Center Dashboard',
-        'Team Management',
-    ])
-        ->and(AttendanceResource::shouldRegisterNavigation())->toBeFalse()
-        ->and(EmployeeRouteResource::shouldRegisterNavigation())->toBeFalse()
-        ->and(AdmissionResource::shouldRegisterNavigation())->toBeFalse()
-        ->and(AdmissionTargetResource::shouldRegisterNavigation())->toBeFalse()
-        ->and(LeaveRequestResource::shouldRegisterNavigation())->toBeFalse()
-        ->and(Reports::shouldRegisterNavigation())->toBeFalse()
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(mainSidebarLabels())
         ->and(AttendanceResource::canAccess())->toBeTrue()
         ->and(Reports::canAccess())->toBeTrue()
         ->and(EmployeeResource::shouldRegisterNavigation())->toBeTrue()
         ->and(EmployeeResource::getNavigationLabel())->toBe('Team Management')
         ->and(CenterResource::shouldRegisterNavigation())->toBeTrue()
         ->and(CenterResource::getNavigationLabel())->toBe('Center Dashboard')
-        ->and(CenterDashboard::shouldRegisterNavigation())->toBeFalse()
+        ->and(CenterDashboard::canAccess())->toBeTrue()
         ->and(Dashboard::getNavigationLabel())->toBe('Main Dashboard');
 
     $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
+    resetFilamentNavigationRequest();
+
+    $centerPage = $this->actingAs($coordinator)
+        ->get('/admin/attendances')
+        ->assertOk()
+        ->assertSee('Change Center', false)
+        ->assertSee('Back to All Centers', false)
+        ->assertSee($org['centerA']->name, false)
+        ->assertDontSee('ft-coord-modules', false)
+        ->assertDontSee('Center modules', false)
+        ->assertDontSee('Switch center', false);
+
+    expect($centerPage->getContent())->toMatch('/<li[^>]*fi-active[^>]*>[\s\S]*?href="[^"]*\/admin\/attendances"/');
+    expect(session(AdminCenterContext::SESSION_KEY))->toBe($org['centerA']->id);
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels())
+        ->and(array_values(array_intersect(mainSidebarLabels(), coordinatorSidebarLabels())))->toBe(['Center Dashboard']);
 
     $this->actingAs($coordinator)
-        ->get('/admin/center-dashboard')
-        ->assertOk()
-        ->assertSee('ft-coord-modules', false)
-        ->assertSee('Attendances')
-        ->assertSee('Employee Routes')
-        ->assertSee('Admissions')
-        ->assertSee('Admission Targets')
-        ->assertSee('Leave Requests')
-        ->assertSee('Reports')
-        ->assertSee('/admin/attendances', false)
-        ->assertDontSee('Switch center', false)
-        ->assertDontSee('Change Center', false)
-        ->assertSee('Back to All Centers', false);
+        ->post(route('admin.clear-center'))
+        ->assertRedirect('/admin/centers')
+        ->assertSessionMissing(AdminCenterContext::SESSION_KEY);
 
-    expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
-        'Main Dashboard',
-        'Center Dashboard',
-        'Team Management',
-    ]);
+    $this->actingAs($coordinator)->get('/admin')->assertOk();
+
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(mainSidebarLabels());
 
     $this->flushSession();
     $this->actingAs($org['admin'])->get('/admin')->assertOk();
 
-    expect(array_values(array_intersect($removed, coordinatorSidebarLabels())))->toBe([])
-        ->and(AdmissionResource::shouldRegisterNavigation())->toBeFalse()
-        ->and(Reports::shouldRegisterNavigation())->toBeFalse();
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(mainSidebarLabels())
+        ->and(array_values(array_intersect($removed, coordinatorSidebarLabels())))->toBe([])
+        ->and(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
+        ->and(OrgUserResource::getNavigationLabel())->toBe('Team Management')
+        ->and(EmployeeResource::shouldRegisterNavigation())->toBeFalse();
 
     $this->flushSession();
     $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
-    $this->actingAs($org['admin'])->get('/admin')->assertOk();
-
-    expect(coordinatorSidebarLabels())->toContain(...$removed)
-        ->and(coordinatorSidebarLabels())->toContain('Team Management', 'Center Dashboard')
-        ->and(AdmissionResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(Reports::shouldRegisterNavigation())->toBeTrue()
-        ->and(EmployeeResource::getNavigationLabel())->toBe('Users');
-
-    $this->actingAs($org['admin'])
+    resetFilamentNavigationRequest();
+    $adminAttendance = $this->actingAs($org['admin'])
         ->get('/admin/attendances')
         ->assertOk()
+        ->assertSee('Change Center', false)
+        ->assertSee('Back to All Centers', false)
         ->assertDontSee('Back to Center Dashboard', false);
+
+    expect($adminAttendance->getContent())->toMatch('/<li[^>]*fi-active[^>]*>[\s\S]*?href="[^"]*\/admin\/attendances"/');
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels())
+        ->and(EmployeeResource::getNavigationLabel())->toBe('Users');
 
     $this->actingAs($org['admin'])
         ->get('/admin/center-dashboard')
         ->assertOk()
+        ->assertDontSee('ft-coord-modules', false)
         ->assertDontSee('Center modules', false)
         ->assertDontSee('Switch center', false);
+
+    $this->actingAs($org['admin'])
+        ->get('/admin')
+        ->assertOk()
+        ->assertSee('Main Dashboard')
+        ->assertSessionMissing(AdminCenterContext::SESSION_KEY);
+
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(mainSidebarLabels());
 
     $this->flushSession();
     $this->actingAs($org['director'])->get('/admin')->assertOk();
 
-    expect(coordinatorSidebarLabels())->toContain(...$removed)
-        ->and(coordinatorSidebarLabels())->toContain('Team Management')
-        ->and(Dashboard::getNavigationLabel())->toBe('Dashboard')
-        ->and(Reports::shouldRegisterNavigation())->toBeTrue()
-        ->and(CenterDashboard::canAccess())->toBeFalse();
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(mainSidebarLabels())
+        ->and(array_values(array_intersect($removed, coordinatorSidebarLabels())))->toBe([])
+        ->and(Dashboard::getNavigationLabel())->toBe('Main Dashboard')
+        ->and(CenterDashboard::canAccess())->toBeTrue()
+        ->and(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
+        ->and(EmployeeResource::shouldRegisterNavigation())->toBeFalse();
+
+    $this->actingAs($org['director'])->get('/admin/center-dashboard')->assertRedirect('/admin/centers');
+    $this->actingAs($org['director'])->get('/admin/reports')->assertRedirect('/admin/centers');
+
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
+
+    $this->actingAs($org['director'])
+        ->get('/admin/center-dashboard')
+        ->assertOk()
+        ->assertSee($org['centerA']->name.' Dashboard')
+        ->assertSee('Change Center', false)
+        ->assertSee('Back to All Centers', false)
+        ->assertDontSee('ft-coord-modules', false);
+
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels());
+
+    expect(fn () => app(AdminCenterContext::class)->select($org['director'], 999999))
+        ->toThrow(ValidationException::class);
 
     $this->flushSession();
     $this->actingAs($org['centerManager'])->get('/admin')->assertOk();
 
-    expect(coordinatorSidebarLabels())->toContain(...$removed)
-        ->and(coordinatorSidebarLabels())->toContain('Users', 'Center Dashboard', 'Dashboard')
-        ->and(coordinatorSidebarLabels())->not->toContain('Team Management')
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
+        'Dashboard',
+        'Center Dashboard',
+        'Users',
+    ])
+        ->and(array_values(array_intersect(array_merge(['Team Management'], $removed), coordinatorSidebarLabels())))->toBe([])
         ->and(EmployeeResource::getNavigationLabel())->toBe('Users')
         ->and(EmployeeResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(Reports::shouldRegisterNavigation())->toBeTrue()
         ->and(Dashboard::getNavigationLabel())->toBe('Dashboard');
 
+    $this->actingAs($org['centerManager'])->get('/admin/attendances')->assertRedirect('/admin/centers');
+
+    expect(fn () => app(AdminCenterContext::class)->select($org['centerManager'], $org['centerB']->id))
+        ->toThrow(ValidationException::class);
+
+    app(AdminCenterContext::class)->select($org['centerManager'], $org['centerA']->id);
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
+
     $this->actingAs($org['centerManager'])
-        ->get('/admin/attendances')
+        ->get('/admin/center-dashboard')
         ->assertOk()
-        ->assertDontSee('Back to Center Dashboard', false);
+        ->assertSee('Change Center', false)
+        ->assertSee('Back to All Centers', false)
+        ->assertSee($org['centerA']->name, false);
+
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels())
+        ->and(coordinatorSidebarLabels())->not->toContain('Users', 'Team Management');
 
     $this->actingAs($org['centerManager'])
         ->post(route('admin.clear-center'))
-        ->assertForbidden();
+        ->assertRedirect('/admin/centers')
+        ->assertSessionMissing(AdminCenterContext::SESSION_KEY);
+
+    $this->actingAs($org['centerManager'])->get('/admin/centers')->assertOk();
+
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
+        'Dashboard',
+        'Center Dashboard',
+        'Users',
+    ]);
 });
 
 it('scopes coordinator modules to the selected center and can switch assigned centers', function () {
@@ -223,10 +308,6 @@ it('scopes coordinator modules to the selected center and can switch assigned ce
         ->test(ListEmployees::class)
         ->assertCanSeeTableRecords([$org['empA'], $org['empB']]);
 
-    Livewire::actingAs($coordinator)
-        ->test(ListAttendances::class)
-        ->assertCanNotSeeTableRecords([$attendanceA, $attendanceB]);
-
     $this->actingAs($coordinator)->get('/admin/attendances')->assertRedirect('/admin/centers');
     $this->actingAs($coordinator)->get('/admin/employee-routes')->assertRedirect('/admin/centers');
     $this->actingAs($coordinator)->get('/admin/admissions')->assertRedirect('/admin/centers');
@@ -248,11 +329,14 @@ it('scopes coordinator modules to the selected center and can switch assigned ce
     $dashboard = $this->actingAs($coordinator)
         ->get('/admin/center-dashboard')
         ->assertOk()
-        ->assertSee('ft-coord-modules', false)
-        ->assertSee('Switch center', false)
+        ->assertDontSee('ft-coord-modules', false)
+        ->assertDontSee('Center modules', false)
+        ->assertDontSee('Switch center', false)
         ->assertSee('Change Center', false)
         ->assertSee('Back to All Centers', false)
         ->assertDontSee('Back to Center Dashboard', false);
+
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels());
 
     foreach ([
         AttendanceResource::getUrl(),
@@ -334,8 +418,4 @@ it('scopes coordinator modules to the selected center and can switch assigned ce
     Livewire::actingAs($coordinator)
         ->test(ListEmployees::class)
         ->assertCanSeeTableRecords([$org['empA'], $org['empB']]);
-
-    Livewire::actingAs($coordinator)
-        ->test(ListAttendances::class)
-        ->assertCanNotSeeTableRecords([$attendanceA, $attendanceB]);
 });

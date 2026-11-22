@@ -4,6 +4,7 @@ namespace App\Filament\Concerns;
 
 use App\Models\User;
 use App\Services\AdminCenterContext;
+use Filament\Navigation\NavigationItem;
 
 trait RequiresSelectedAdminCenter
 {
@@ -11,14 +12,21 @@ trait RequiresSelectedAdminCenter
     {
         $user = auth()->user();
 
-        if ($user instanceof User && $user->isCenterCoordinator()) {
-            return false;
-        }
+        return $user instanceof User
+            && app(AdminCenterContext::class)->participatesInCenterSelection($user)
+            && parent::shouldRegisterNavigation();
+    }
 
-        if ($user instanceof User && $user->isAdmin() && ! app(AdminCenterContext::class)->hasValidSelection($user)) {
-            return false;
-        }
-
-        return parent::shouldRegisterNavigation();
+    /**
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        return array_map(
+            fn (NavigationItem $item): NavigationItem => $item->visible(
+                fn (): bool => app(AdminCenterContext::class)->showsCenterModuleNavigation(),
+            ),
+            parent::getNavigationItems(),
+        );
     }
 }

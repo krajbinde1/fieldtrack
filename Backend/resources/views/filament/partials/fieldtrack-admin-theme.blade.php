@@ -1656,53 +1656,6 @@
         .ft-cm-grid { grid-template-columns: 1fr; }
     }
 
-    .ft-coord-modules {
-        display: flex;
-        flex-direction: column;
-        gap: 0.85rem;
-    }
-
-    .ft-coord-modules-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 0.75rem;
-    }
-
-    .ft-coord-modules-title {
-        margin: 0.1rem 0 0;
-        font-size: 1.05rem;
-        font-weight: 800;
-        color: #0f172a;
-    }
-
-    .ft-coord-module-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.65rem;
-    }
-
-    .ft-coord-module-link {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        padding: 0.85rem 0.95rem;
-        border: 1px solid #e8ecf4;
-        border-radius: 14px;
-        background: #fff;
-        color: #0f172a;
-        font-size: 0.9rem;
-        font-weight: 800;
-        text-decoration: none;
-    }
-
-    .ft-coord-module-link span {
-        color: #6d28d9;
-        font-size: 0.72rem;
-        font-weight: 700;
-    }
-
     .ft-coord-back {
         display: inline-flex;
         align-items: center;
@@ -1717,8 +1670,4 @@
         white-space: nowrap;
     }
 
-    @media (max-width: 900px) {
-        .ft-coord-module-grid { grid-template-columns: 1fr; }
-        .ft-coord-modules-head { flex-direction: column; }
-    }
 </style>

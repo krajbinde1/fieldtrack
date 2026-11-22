@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Filament\Concerns\HoldsPendingCenterAccounts;
 use App\Models\User;
 use App\Support\LoginId;
+use App\Support\UserIdentity;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -25,13 +26,11 @@ final class PendingCenterAccount
     {
         self::assertHolder($livewire);
         $payload = self::payload($data, 'mobile');
-        self::assertAvailable($livewire, $payload['mobile'], $payload['email'], $reuseManager);
+        self::assertAvailable($livewire, $payload, $role, $reuseManager);
 
-        if ($reuseManager) {
-            $existing = User::query()->where('login_id', $payload['mobile'])->first();
-            if ($existing instanceof User && self::canReuseManager($existing)) {
-                return (int) $existing->id;
-            }
+        $existing = self::reusableAccount($payload, $role, $reuseManager);
+        if ($existing instanceof User) {
+            return (int) $existing->id;
         }
 
         $key = ($role === UserRole::CenterCoordinator ? 'pending-coordinator-' : 'pending-manager-').$payload['mobile'];
@@ -53,15 +52,17 @@ final class PendingCenterAccount
         }
 
         $payload = self::payload($stored, $errorKey);
+        self::assertAvailable($livewire, $payload, $role, $reuseManager, $errorKey);
 
-        $existing = User::query()->where('login_id', $payload['mobile'])->lockForUpdate()->first();
+        $existing = User::query()->whereRaw('lower(login_id) = ?', [mb_strtolower($payload['mobile'])])->lockForUpdate()->first();
         if ($existing instanceof User) {
-            if ($reuseManager && self::canReuseManager($existing)) {
+            $reusable = self::reusableAccount($payload, $role, $reuseManager);
+            if ($reusable instanceof User && $reusable->is($existing)) {
                 return (int) $existing->id;
             }
 
             throw ValidationException::withMessages([
-                $errorKey => 'This Login ID is already taken.',
+                $errorKey => UserIdentity::LOGIN_TAKEN,
             ]);
         }
 
@@ -195,21 +196,47 @@ final class PendingCenterAccount
         ];
     }
 
-    private static function assertAvailable(object $livewire, string $mobile, string $email, bool $reuseManager): void
+    /**
+     * @param  array{name: string, mobile: string, email: string}  $payload
+     */
+    private static function reusableAccount(array $payload, UserRole $role, bool $reuseManager): ?User
     {
+        $existing = UserIdentity::userByLogin($payload['mobile']);
+        if (! $existing instanceof User || UserIdentity::nameKey($existing->name) !== UserIdentity::nameKey($payload['name'])) {
+            return null;
+        }
+
+        if ($reuseManager && $role === UserRole::CenterManager && self::canReuseManager($existing)) {
+            return $existing;
+        }
+
+        if ($role === UserRole::CenterCoordinator && $existing->isCenterCoordinator() && $existing->is_center_login !== true) {
+            return $existing;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array{name: string, mobile: string, email: string}  $payload
+     */
+    private static function assertAvailable(object $livewire, array $payload, UserRole $role, bool $reuseManager, string $attribute = 'mobile'): void
+    {
+        $mobile = $payload['mobile'];
+        $email = $payload['email'];
         foreach ([self::COORDINATORS, self::MANAGERS] as $bucket) {
-            foreach ($livewire->{$bucket} ?? [] as $payload) {
-                if (! is_array($payload)) {
+            foreach ($livewire->{$bucket} ?? [] as $pending) {
+                if (! is_array($pending)) {
                     continue;
                 }
 
-                if (($payload['mobile'] ?? null) === $mobile) {
+                if (($pending['mobile'] ?? null) === $mobile) {
                     throw ValidationException::withMessages([
                         'mobile' => 'This Login ID is already taken.',
                     ]);
                 }
 
-                if (($payload['email'] ?? null) === $email) {
+                if (($pending['email'] ?? null) === $email) {
                     throw ValidationException::withMessages([
                         'email' => 'This email is already taken.',
                     ]);
@@ -217,18 +244,17 @@ final class PendingCenterAccount
             }
         }
 
-        $existing = User::query()->where('login_id', $mobile)->first();
-        if ($existing instanceof User) {
-            if ($reuseManager && self::canReuseManager($existing)) {
-                return;
-            }
+        UserIdentity::assertAvailable(
+            $payload['name'],
+            $mobile,
+            allowManagerReuse: $reuseManager && $role === UserRole::CenterManager,
+            allowCoordinatorReuse: $role === UserRole::CenterCoordinator,
+            attribute: $attribute,
+        );
 
-            throw ValidationException::withMessages([
-                'mobile' => 'This Login ID is already taken.',
-            ]);
-        }
-
-        if (User::query()->where('email', $email)->exists()) {
+        $emailOwner = User::query()->where('email', $email)->first();
+        $reusable = self::reusableAccount($payload, $role, $reuseManager);
+        if ($emailOwner instanceof User && ! ($reusable instanceof User && $emailOwner->is($reusable))) {
             throw ValidationException::withMessages([
                 'email' => 'This email is already taken.',
             ]);

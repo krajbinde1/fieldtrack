@@ -10,6 +10,7 @@ use App\Filament\Widgets\DirectorTodayTeamActivityWidget;
 use App\Filament\Widgets\FieldTrackStatsWidget;
 use App\Models\User;
 use App\Services\AdminCenterContext;
+use Filament\Navigation\NavigationItem;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Widgets\Widget;
 use Filament\Widgets\WidgetConfiguration;
@@ -30,7 +31,7 @@ class Dashboard extends BaseDashboard
     {
         $user = auth()->user();
 
-        if ($user instanceof User && ($user->isAdmin() || $user->isCenterCoordinator())) {
+        if ($user instanceof User && ($user->isAdmin() || $user->isDirector() || $user->isCenterCoordinator())) {
             return 'Main Dashboard';
         }
 
@@ -42,11 +43,24 @@ class Dashboard extends BaseDashboard
         $user = auth()->user();
 
         // Admins get a single custom link in the sidebar start slot.
-        if ($user instanceof User && $user->isAdmin()) {
+        if (! $user instanceof User || $user->isAdmin()) {
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        return array_map(
+            fn (NavigationItem $item): NavigationItem => $item->visible(
+                fn (): bool => ! app(AdminCenterContext::class)->showsCenterModuleNavigation(),
+            ),
+            parent::getNavigationItems(),
+        );
     }
 
     public function getTitle(): string
@@ -72,7 +86,7 @@ class Dashboard extends BaseDashboard
     {
         $user = auth()->user();
 
-        if ($user instanceof User && ($user->isCenterCoordinator() || $user->isCenterManager())) {
+        if ($user instanceof User && app(AdminCenterContext::class)->participatesInCenterSelection($user)) {
             app(AdminCenterContext::class)->forget();
         }
     }

@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\OrgUsers;
 
 use App\Enums\UserRole;
-use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Resources\OrgUsers\Pages\CreateOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\EditOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\ListOrgUsers;
@@ -20,6 +19,7 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Navigation\NavigationItem;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -32,8 +32,6 @@ use Illuminate\Support\Facades\Hash;
 
 class OrgUserResource extends Resource
 {
-    use RequiresSelectedAdminCenter;
-
     protected static ?string $model = User::class;
 
     protected static ?string $slug = 'users';
@@ -59,11 +57,26 @@ class OrgUserResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        if (auth()->user()?->isCenterCoordinator() === true) {
+        $user = auth()->user();
+
+        if (! $user instanceof User || $user->isCenterCoordinator() || $user->isCenterManager()) {
             return false;
         }
 
         return static::canAccess();
+    }
+
+    /**
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        return array_map(
+            fn (NavigationItem $item): NavigationItem => $item->visible(
+                fn (): bool => ! app(AdminCenterContext::class)->showsCenterModuleNavigation(),
+            ),
+            parent::getNavigationItems(),
+        );
     }
 
     public static function canCreate(): bool

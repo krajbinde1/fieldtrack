@@ -149,15 +149,20 @@ class ListEmployees extends ListRecords
 
         $access = app(OrganizationAccessService::class);
         $employees = EmployeeResource::getEloquentQuery()
-            ->with(['user', 'center'])
+            ->with(['user', 'center', 'assignedCenters'])
             ->orderBy('full_name')
-            ->get()
-            ->groupBy('center_id');
+            ->get();
+        $employeesByCenter = [];
+        foreach ($employees as $employee) {
+            foreach ($employee->assignedCenterIds() as $centerId) {
+                $employeesByCenter[$centerId][] = $employee;
+            }
+        }
 
         return $access->centerQuery($actor)
             ->orderBy('name')
             ->get()
-            ->map(function ($center) use ($actor, $access, $employees): array {
+            ->map(function ($center) use ($actor, $access, $employeesByCenter): array {
                 $managers = $center->centerManagers()
                     ->where('users.role', UserRole::CenterManager->value)
                     ->where('users.is_center_login', false)
@@ -166,7 +171,7 @@ class ListEmployees extends ListRecords
                     ->map(fn (User $manager): array => $this->managerRow($actor, $access, $manager))
                     ->all();
 
-                $people = $employees->get($center->id, collect())
+                $people = collect($employeesByCenter[$center->id] ?? [])
                     ->map(fn (Employee $employee): array => $this->employeeRow($actor, $access, $employee))
                     ->all();
 

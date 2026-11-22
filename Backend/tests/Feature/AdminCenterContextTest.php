@@ -40,6 +40,29 @@ function rememberAdminCenter(int $centerId): array
     return [AdminCenterContext::SESSION_KEY => $centerId];
 }
 
+function centerContextNavLabels(): array
+{
+    app()->forgetInstance(\Filament\Navigation\NavigationManager::class);
+
+    $labels = [];
+
+    foreach (filament()->getNavigation() as $group) {
+        foreach ($group->getItems() as $item) {
+            $labels[] = $item->getLabel();
+        }
+    }
+
+    $user = auth()->user();
+
+    if ($user instanceof User
+        && $user->isAdmin()
+        && ! app(AdminCenterContext::class)->showsCenterModuleNavigation($user)) {
+        $labels[] = Dashboard::getNavigationLabel();
+    }
+
+    return $labels;
+}
+
 it('opens the main admin dashboard across all authorized centers', function () {
     $org = seedOrg();
 
@@ -55,15 +78,13 @@ it('opens the main admin dashboard across all authorized centers', function () {
 
     expect(Dashboard::getNavigationLabel())->toBe('Main Dashboard')
         ->and(CenterDashboard::getNavigationLabel())->toBe('Center Dashboard')
-        ->and(CenterDashboard::shouldRegisterNavigation())->toBeFalse()
+        ->and(centerContextNavLabels())->toEqualCanonicalizing(['Main Dashboard', 'Center Dashboard', 'Team Management'])
         ->and(CenterResource::getNavigationLabel())->toBe('Center Dashboard')
         ->and(CenterResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeTrue()
-        ->and(DeviceManagement::shouldRegisterNavigation())->toBeTrue()
+        ->and(AppUpdateSettings::shouldRegisterNavigation())->toBeFalse()
+        ->and(DeviceManagement::shouldRegisterNavigation())->toBeFalse()
         ->and(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(OrgUserResource::getNavigationLabel())->toBe('Team Management')
-        ->and(AdmissionResource::shouldRegisterNavigation())->toBeFalse()
-        ->and(Reports::shouldRegisterNavigation())->toBeFalse();
+        ->and(OrgUserResource::getNavigationLabel())->toBe('Team Management');
 
     $this->actingAs($org['admin'])->get('/admin/users')->assertOk()->assertSee('Team Management');
 
@@ -200,28 +221,37 @@ it('persists the selected center and scopes lists, filters, and direct urls', fu
     $this->withSession(rememberAdminCenter($org['centerA']->id));
 
     $this->actingAs($org['admin'])
-        ->get('/admin')
-        ->assertOk()
-        ->assertSee('Change Center')
-        ->assertSee('Back to All Centers')
-        ->assertSee('Main Admin Dashboard')
-        ->assertSee('Main Dashboard')
-        ->assertSee('Center Dashboard')
-        ->assertSee('Total Centers')
-        ->assertDontSee($org['centerA']->name.' Dashboard');
-
-    $this->actingAs($org['admin'])
         ->get('/admin/center-dashboard')
         ->assertOk()
         ->assertSee('Change Center')
         ->assertSee('Back to All Centers')
         ->assertSee($org['centerA']->name.' Dashboard')
         ->assertDontSee('Total Centers')
-        ->assertDontSee('Main Admin Dashboard');
+        ->assertDontSee('Main Admin Dashboard')
+        ->assertDontSee('ft-coord-modules', false)
+        ->assertDontSee('Center modules', false);
 
-    expect(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(AdmissionResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(Reports::shouldRegisterNavigation())->toBeTrue();
+    expect(centerContextNavLabels())->toEqualCanonicalizing([
+        'Center Dashboard',
+        'Attendances',
+        'Employee Routes',
+        'Admissions',
+        'Admission Targets',
+        'Leave Requests',
+        'Reports',
+    ]);
+
+    $this->actingAs($org['admin'])
+        ->get('/admin')
+        ->assertOk()
+        ->assertDontSee('Change Center')
+        ->assertSee('Main Admin Dashboard')
+        ->assertSee('Main Dashboard')
+        ->assertSee('Total Centers')
+        ->assertDontSee($org['centerA']->name.' Dashboard')
+        ->assertSessionMissing(AdminCenterContext::SESSION_KEY);
+
+    $this->withSession(rememberAdminCenter($org['centerA']->id));
 
     Livewire::actingAs($org['admin'])
         ->test(ListAttendances::class)
@@ -500,13 +530,13 @@ it('does not force center selection on a center manager', function () {
         ->assertSee('Center Dashboard');
 
     $this->actingAs($org['centerManager'])->get('/admin/center-dashboard')->assertRedirect('/admin/centers');
-    expect(CenterDashboard::shouldRegisterNavigation())->toBeFalse()
+    expect(centerContextNavLabels())->toEqualCanonicalizing(['Dashboard', 'Center Dashboard', 'Users'])
         ->and(Dashboard::getNavigationLabel())->toBe('Dashboard');
 
-    $this->actingAs($org['centerManager'])->get('/admin/attendances')->assertOk();
+    $this->actingAs($org['centerManager'])->get('/admin/attendances')->assertRedirect('/admin/centers');
     $this->actingAs($org['centerManager'])->get('/admin/centers')->assertOk();
 
-    expect(SelectCenter::canAccess())->toBeFalse();
+    expect(SelectCenter::canAccess())->toBeTrue();
 
     $this->withSession(rememberAdminCenter($org['centerB']->id));
 
@@ -538,27 +568,32 @@ it('does not force center selection on a director', function () {
     $this->actingAs($org['director'])
         ->get('/admin')
         ->assertOk()
-        ->assertSee('Dashboard')
+        ->assertSee('Main Dashboard')
         ->assertDontSee('Change Center')
-        ->assertDontSee('Main Dashboard')
         ->assertSee('Center Dashboard')
         ->assertSee('Team Management');
 
-    $this->actingAs($org['director'])->get('/admin/center-dashboard')->assertForbidden();
-    expect(CenterDashboard::shouldRegisterNavigation())->toBeFalse()
-        ->and(Dashboard::getNavigationLabel())->toBe('Dashboard');
+    $this->actingAs($org['director'])->get('/admin/center-dashboard')->assertRedirect('/admin/centers');
+    expect(CenterDashboard::canAccess())->toBeTrue()
+        ->and(centerContextNavLabels())->toEqualCanonicalizing(['Main Dashboard', 'Center Dashboard', 'Team Management'])
+        ->and(Dashboard::getNavigationLabel())->toBe('Main Dashboard');
 
-    expect(OrgUserResource::shouldRegisterNavigation())->toBeTrue()
-        ->and(Reports::shouldRegisterNavigation())->toBeTrue();
+    expect(OrgUserResource::shouldRegisterNavigation())->toBeTrue();
 
     $this->actingAs($org['director'])->get('/admin/users')->assertOk();
-    $this->actingAs($org['director'])->get('/admin/reports')->assertOk();
+    $this->actingAs($org['director'])->get('/admin/reports')->assertRedirect('/admin/centers');
 
     $this->withSession(rememberAdminCenter($org['centerA']->id));
 
+    $this->actingAs($org['director'])
+        ->get('/admin/center-dashboard')
+        ->assertOk()
+        ->assertSee($org['centerA']->name.' Dashboard');
+
     Livewire::actingAs($org['director'])
         ->test(ListAttendances::class)
-        ->assertCanSeeTableRecords([$attendanceA, $attendanceB]);
+        ->assertCanSeeTableRecords([$attendanceA])
+        ->assertCanNotSeeTableRecords([$attendanceB]);
 });
 
 it('does not show center switching to a project head', function () {
@@ -576,12 +611,21 @@ it('does not show center switching to a project head', function () {
         ->and(Dashboard::getNavigationLabel())->toBe('Dashboard');
 });
 
-it('rejects center selection for a center manager', function () {
+it('rejects a center the center manager is not assigned to', function () {
     $org = seedOrg();
 
     $this->actingAs($org['centerManager'])
         ->get('/admin/select-center')
-        ->assertForbidden();
+        ->assertOk();
+
+    expect(fn () => app(AdminCenterContext::class)->select($org['centerManager'], $org['centerB']->id))
+        ->toThrow(ValidationException::class);
+
+    Livewire::actingAs($org['centerManager'])
+        ->test(SelectCenter::class)
+        ->fillForm(['center_id' => $org['centerB']->id])
+        ->call('save')
+        ->assertHasFormErrors(['center_id']);
 });
 
 it('keeps center management global after an admin selects a center', function () {

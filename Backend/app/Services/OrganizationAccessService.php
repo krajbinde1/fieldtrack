@@ -49,8 +49,14 @@ final class OrganizationAccessService
                 ->all();
         }
 
-        if ($user->isEmployeeUser() && $user->employee?->center?->scheme_id) {
-            return [(int) $user->employee->center->scheme_id];
+        if ($user->isEmployeeUser() && $user->employee) {
+            return $user->employee->assignedCenterRecords()
+                ->pluck('scheme_id')
+                ->filter()
+                ->unique()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
         }
 
         return [];
@@ -79,8 +85,8 @@ final class OrganizationAccessService
             return $user->managedCenters()->pluck('centers.id')->map(fn ($id) => (int) $id)->all();
         }
 
-        if ($user->isEmployeeUser() && $user->employee?->center_id) {
-            return [(int) $user->employee->center_id];
+        if ($user->isEmployeeUser() && $user->employee) {
+            return $user->employee->assignedCenterIds();
         }
 
         return [];
@@ -102,7 +108,10 @@ final class OrganizationAccessService
         $centerIds = $this->visibleCenterIds($user) ?? [];
 
         return Employee::query()
-            ->whereIn('center_id', $centerIds)
+            ->where(function (Builder $query) use ($centerIds): void {
+                $query->whereIn('center_id', $centerIds)
+                    ->orWhereHas('assignedCenters', fn (Builder $centers) => $centers->whereIn('centers.id', $centerIds));
+            })
             ->whereDoesntHave('user', function (Builder $query) {
                 $query->where('role', '!=', UserRole::Employee->value);
             })

@@ -5,8 +5,10 @@ namespace App\Models;
 use App\Enums\CenterStaffRole;
 use App\Support\EmployeeCodeGenerator;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -102,6 +104,72 @@ class Employee extends Authenticatable
     public function center(): BelongsTo
     {
         return $this->belongsTo(Center::class);
+    }
+
+    public function assignedCenters(): BelongsToMany
+    {
+        return $this->belongsToMany(Center::class, 'employee_center_assignments')->withTimestamps();
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function assignedCenterIds(): array
+    {
+        $ids = $this->relationLoaded('assignedCenters')
+            ? $this->assignedCenters->pluck('id')
+            : $this->assignedCenters()->pluck('centers.id');
+
+        return $ids
+            ->push($this->center_id)
+            ->filter(fn ($id): bool => filled($id))
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return Collection<int, Center>
+     */
+    public function assignedCenterRecords(): Collection
+    {
+        $centers = $this->relationLoaded('assignedCenters')
+            ? $this->assignedCenters
+            : $this->assignedCenters()->get();
+
+        if ($this->center !== null) {
+            $centers = $centers->push($this->center);
+        }
+
+        return $centers->unique('id')->sortBy('name')->values();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function assignedCenterNames(): array
+    {
+        return $this->assignedCenterRecords()
+            ->pluck('name')
+            ->filter(fn ($name): bool => filled($name))
+            ->values()
+            ->all();
+    }
+
+    public function isAssignedToCenter(int $centerId): bool
+    {
+        return in_array($centerId, $this->assignedCenterIds(), true);
+    }
+
+    public function assignCenter(int $centerId): void
+    {
+        $this->assignedCenters()->syncWithoutDetaching([$centerId]);
+
+        if ($this->center_id === null) {
+            $this->center_id = $centerId;
+            $this->save();
+        }
     }
 
     public function reportingManager(): BelongsTo

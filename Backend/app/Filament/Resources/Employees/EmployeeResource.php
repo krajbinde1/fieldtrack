@@ -9,9 +9,12 @@ use App\Filament\Resources\Employees\Pages\EditEmployee;
 use App\Filament\Resources\Employees\Pages\ListEmployees;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\AdminCenterContext;
 use App\Services\CenterStaffCredentialService;
 use App\Services\OrganizationAccessService;
 use App\Support\LoginId;
+use App\Support\UserIdentity;
+use Filament\Schemas\Components\Utilities\Get;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -19,7 +22,9 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Navigation\NavigationItem;
 use Filament\Notifications\Notification;
+use Illuminate\Validation\ValidationException;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -58,6 +63,24 @@ class EmployeeResource extends Resource
         }
 
         return static::$navigationLabel ?? 'Users';
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    /**
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        return array_map(
+            fn (NavigationItem $item): NavigationItem => $item->visible(
+                fn (): bool => ! app(AdminCenterContext::class)->showsCenterModuleNavigation(),
+            ),
+            parent::getNavigationItems(),
+        );
     }
 
     public static function getPluralModelLabel(): string
@@ -118,6 +141,25 @@ class EmployeeResource extends Resource
         return $employee->deleteIfUnused();
     }
 
+    private static function identityRule(Get $get, ?Employee $record): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($get, $record): void {
+            try {
+                UserIdentity::assertAvailable(
+                    (string) $get('full_name'),
+                    (string) $get('mobile'),
+                    ignoreEmployeeId: $record?->id,
+                    ignoreUserId: $record?->user?->id,
+                    allowEmployeeReuse: $record === null,
+                    attribute: $attribute,
+                );
+            } catch (ValidationException $exception) {
+                $message = collect($exception->errors())->flatten()->first();
+                $fail(is_string($message) ? $message : UserIdentity::LOGIN_TAKEN);
+            }
+        };
+    }
+
     public static function form(Schema $schema): Schema
     {
         $access = app(OrganizationAccessService::class);
@@ -128,24 +170,26 @@ class EmployeeResource extends Resource
         return $schema->components([
             Select::make('center_id')
                 ->label('Center')
-                ->relationship(
-                    name: 'center',
-                    titleAttribute: 'name',
-                    modifyQueryUsing: fn ($query) => $user ? $access->centerQuery($user) : $query->whereRaw('1=0'),
-                )
+                ->options(fn (): array => $user
+                    ? $access->centerQuery($user)->orderBy('name')->pluck('name', 'id')->all()
+                    : [])
                 ->required()
                 ->preload()
                 ->searchable()
                 ->default($singleCenter ? $centerIds[0] : null)
                 ->disabled($singleCenter)
                 ->dehydrated(),
-            TextInput::make('full_name')->label('Name')->required()->maxLength(255),
+            TextInput::make('full_name')
+                ->label('Name')
+                ->required()
+                ->maxLength(255)
+                ->rule(fn (Get $get, ?Employee $record): \Closure => self::identityRule($get, $record)),
             TextInput::make('mobile')
                 ->label('Mobile Number')
                 ->required()
                 ->length(10)
                 ->regex('/^[6-9][0-9]{9}$/')
-                ->unique(ignoreRecord: true)
+                ->rule(fn (Get $get, ?Employee $record): \Closure => self::identityRule($get, $record))
                 ->helperText(fn (string $operation): string => $operation === 'create'
                     ? 'Login ID will be this number. Default password is the last 4 digits. You do not need to enter a Login ID or Password.'
                     : 'Changing this number does not change the password. Use Reset Password to set it to the last 4 digits.'),
@@ -177,6 +221,7 @@ class EmployeeResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['center', 'assignedCenters', 'user']))
             ->columns([
                 TextColumn::make('full_name')->label('Name')->searchable()->sortable(),
                 TextColumn::make('mobile')->label('Mobile'),
@@ -186,7 +231,10 @@ class EmployeeResource extends Resource
                     ->label('Login Role')
                     ->formatStateUsing(fn (?string $state): string => CenterStaffRole::tryFromMixed($state)->label())
                     ->badge(),
-                TextColumn::make('center.name')->label('Center'),
+                TextColumn::make('assigned_centers')
+                    ->label('Center')
+                    ->badge()
+                    ->state(fn (Employee $record): array => $record->assignedCenterNames()),
                 IconColumn::make('status')->boolean()->label('Active'),
             ])
             ->filters([

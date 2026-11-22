@@ -22,6 +22,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Navigation\NavigationItem;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Utilities\Get;
@@ -53,6 +54,24 @@ class CenterResource extends Resource
         $user = auth()->user();
 
         return (bool) ($user?->isAdmin() || $user?->isDirector() || $user?->isCenterCoordinator() || $user?->isCenterManager());
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    /**
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        return array_map(
+            fn (NavigationItem $item): NavigationItem => $item->visible(
+                fn (): bool => ! app(AdminCenterContext::class)->showsCenterModuleNavigation(),
+            ),
+            parent::getNavigationItems(),
+        );
     }
 
     public static function canCreate(): bool
@@ -239,13 +258,13 @@ class CenterResource extends Resource
                         $user = auth()->user();
 
                         return $user instanceof User
-                            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager());
+                            && app(AdminCenterContext::class)->participatesInCenterSelection($user);
                     })
                     ->action(function (Center $record) {
                         $user = auth()->user();
                         abort_unless(
                             $user instanceof User
-                            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager()),
+                            && app(AdminCenterContext::class)->participatesInCenterSelection($user),
                             403,
                         );
 

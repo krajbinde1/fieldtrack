@@ -189,6 +189,8 @@ it('hides employees outside the caller center on the live overview', function ()
 
     expect(collect($scoped)->pluck('id')->all())->toBe([$org['empA']->id]);
 
+    $this->flushSession();
+
     $this->actingAs($org['director'])
         ->getJson('/admin/employee-routes/tracking/overview')
         ->assertOk()
@@ -225,11 +227,13 @@ it('renders route playback and live tracking on the employee route page', functi
     trackingPoint($attendance, 18.5222300, 73.8567000, AttendanceCalendar::now()->subMinute(), 2);
 
     $this->actingAs($org['centerManager'])
+        ->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id])
         ->get('/admin/employee-routes')
         ->assertOk()
         ->assertSee('Live Tracking');
 
     $this->actingAs($org['centerManager'])
+        ->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id])
         ->get('/admin/employee-routes/'.$attendance->id)
         ->assertOk()
         ->assertSee('Route Playback')
@@ -239,6 +243,7 @@ it('renders route playback and live tracking on the employee route page', functi
         ->assertSee('employee-route-tracking.js');
 
     $this->actingAs($org['centerManager'])
+        ->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id])
         ->get('/admin/employee-routes/live')
         ->assertOk()
         ->assertSee('live-employee-map');

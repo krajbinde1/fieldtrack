@@ -18,35 +18,24 @@ use Filament\Facades\Filament;
     $accountSettingsUrl = AccountSettings::canAccess() ? AccountSettings::getUrl() : null;
     $changePasswordUrl = ChangePassword::getUrl();
     $logoutUrl = Filament::getLogoutUrl();
-    $selectedCenter = $user ? app(AdminCenterContext::class)->centerFor($user) : null;
-    $changeCenterUrl = $selectedCenter ? SelectCenter::getUrl() : null;
-    $isCoordinator = $user instanceof \App\Models\User && $user->isCenterCoordinator();
-    $coordinatorCenterCount = $isCoordinator
-        ? count(app(\App\Services\OrganizationAccessService::class)->visibleCenterIds($user) ?? [])
-        : 0;
+    $context = app(AdminCenterContext::class);
+    $selectedCenter = $user ? $context->centerFor($user) : null;
+    $showCenterSwitcher = $selectedCenter
+        && $user instanceof \App\Models\User
+        && $context->participatesInCenterSelection($user);
+    $changeCenterUrl = $showCenterSwitcher && SelectCenter::canAccess() ? SelectCenter::getUrl() : null;
 @endphp
 
 @if ($user)
 <div class="ft-topbar-user" data-ft-topbar-user>
-    @if ($selectedCenter && filled($changeCenterUrl) && ! $isCoordinator)
+    @if ($showCenterSwitcher)
         <div class="ft-change-center">
             <span class="ft-change-center-name">{{ $selectedCenter->name }}</span>
             <span class="ft-change-center-actions">
-                <a class="ft-change-center-action" href="{{ $changeCenterUrl }}">Change Center</a>
-                <form class="ft-clear-center" method="POST" action="{{ route('admin.clear-center') }}">
-                    @csrf
-                    <button type="submit" class="ft-change-center-action">Back to All Centers</button>
-                </form>
-            </span>
-        </div>
-    @elseif ($isCoordinator && $selectedCenter)
-        <div class="ft-change-center">
-            <span class="ft-change-center-name">{{ $selectedCenter->name }}</span>
-            <span class="ft-change-center-actions">
-                @if ($coordinatorCenterCount > 1)
+                @if (filled($changeCenterUrl))
                     <a class="ft-change-center-action" href="{{ $changeCenterUrl }}">Change Center</a>
                 @endif
-                <form @class(['ft-clear-center' => $coordinatorCenterCount > 1]) method="POST" action="{{ route('admin.clear-center') }}">
+                <form class="ft-clear-center" method="POST" action="{{ route('admin.clear-center') }}">
                     @csrf
                     <button type="submit" class="ft-change-center-action">Back to All Centers</button>
                 </form>

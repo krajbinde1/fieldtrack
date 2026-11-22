@@ -64,21 +64,14 @@ it('lets an admin open organization, people, and field-operation pages', functio
     ]);
 
     $dashboard = $this->actingAs($admin)
-        ->get('/admin')
+        ->get('/admin/center-dashboard')
         ->assertOk()
         ->assertSee('Param FieldTrack')
-        ->assertSee('Main Admin Dashboard')
-        ->assertSee('Main Dashboard')
+        ->assertSee('Demo Center Dashboard')
         ->assertSee('Center Dashboard')
         ->assertDontSee('Scheme Master')
         ->assertSee('Change Center')
-        ->assertSee('Back to All Centers');
-
-    $this->actingAs($admin)
-        ->get('/admin/center-dashboard')
-        ->assertOk()
-        ->assertSee('Demo Center Dashboard')
-        ->assertSee('Change Center')
+        ->assertSee('Back to All Centers')
         ->assertDontSee('Main Admin Dashboard');
 
     $html = $dashboard->getContent();
@@ -117,6 +110,12 @@ it('lets a director view assigned-scope pages but not admin-only management', fu
     $this->actingAs($director)->get('/admin/schemes')->assertOk();
     $this->actingAs($director)->get('/admin/users')->assertOk();
     $this->actingAs($director)->get('/admin/centers')->assertOk();
+    $this->actingAs($director)->get('/admin/admissions')->assertRedirect('/admin/centers');
+    $this->actingAs($director)->get('/admin/attendances')->assertRedirect('/admin/centers');
+
+    $this->withSession([
+        AdminCenterContext::SESSION_KEY => Center::query()->where('code', 'C1')->value('id'),
+    ]);
     $this->actingAs($director)->get('/admin/admissions')->assertOk();
     $this->actingAs($director)->get('/admin/leave-requests')->assertOk();
     $this->actingAs($director)->get('/admin/attendances')->assertOk();
@@ -236,6 +235,11 @@ it('shows a profile menu with logout for every web admin role', function (string
             ->assertSee('Main Dashboard', false)
             ->assertSee('Center Dashboard', false)
             ->assertSee('Main Admin Dashboard', false);
+    } elseif ($loginId === 'fielddirector') {
+        $response
+            ->assertSee('Main Dashboard', false)
+            ->assertSee('Center Dashboard', false)
+            ->assertDontSee('Change Center', false);
     } else {
         $response
             ->assertDontSee('Main Dashboard', false)
@@ -333,9 +337,9 @@ it('keeps punch photos and locations on the attendance view instead of the list'
         ->assertSee('Employee', false)
         ->assertSee('Scheme / Project', false)
         ->assertSee('Center', false)
-        ->assertSee('Attendance Date', false)
-        ->assertSee('Punch In Time', false)
-        ->assertSee('Punch Out Time', false)
+        ->assertSee('Daily Attendance Summary', false)
+        ->assertSee('Punch In', false)
+        ->assertSee('Punch Out', false)
         ->assertDontSee('Punch In Photo', false)
         ->assertDontSee('Punch Out Photo', false)
         ->assertDontSee('Punch in location', false)

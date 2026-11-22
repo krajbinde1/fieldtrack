@@ -129,13 +129,13 @@ final class DailyAttendanceBoard
                 'icon' => 'employees',
             ],
             self::CARD_PUNCHED_IN => [
-                'label' => 'Punched In',
+                'label' => 'Punch In',
                 'hint' => 'Has a punch in',
                 'tone' => 'mint',
                 'icon' => 'punched',
             ],
             self::CARD_PUNCHED_OUT => [
-                'label' => 'Punched Out',
+                'label' => 'Punch Out',
                 'hint' => 'Has a punch out',
                 'tone' => 'sky',
                 'icon' => 'attendance',
@@ -147,7 +147,7 @@ final class DailyAttendanceBoard
                 'icon' => 'punched',
             ],
             self::CARD_NOT_PUNCHED => [
-                'label' => 'Not Punched In',
+                'label' => 'Not Punched In Yet',
                 'hint' => 'No punch in',
                 'tone' => 'peach',
                 'icon' => 'attendance',

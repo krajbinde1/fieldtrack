@@ -5,16 +5,17 @@ namespace App\Filament\Resources\Employees\Pages;
 use App\Enums\CenterStaffRole;
 use App\Filament\Resources\Employees\EmployeeResource;
 use App\Models\Center;
-use App\Models\Employee;
 use App\Services\CenterStaffCredentialService;
 use App\Services\OrganizationAccessService;
-use App\Support\LoginId;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
 class CreateEmployee extends CreateRecord
 {
     protected static string $resource = EmployeeResource::class;
+
+    protected bool $reusedExisting = false;
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
@@ -40,7 +41,6 @@ class CreateEmployee extends CreateRecord
                 'mobile' => 'Mobile Number is required.',
             ]);
         }
-        LoginId::assertUnique($loginId, attribute: 'mobile');
 
         $role = CenterStaffRole::tryFromMixed($data['staff_role'] ?? null);
         $data['staff_role'] = $role->value;
@@ -54,10 +54,21 @@ class CreateEmployee extends CreateRecord
         return $data;
     }
 
-    protected function afterCreate(): void
+    protected function handleRecordCreation(array $data): Model
     {
-        /** @var Employee $employee */
-        $employee = $this->record;
-        app(CenterStaffCredentialService::class)->createLoginUser($employee);
+        $credentials = app(CenterStaffCredentialService::class);
+        $employee = $credentials->placeEmployee($data);
+        $this->reusedExisting = $credentials->reusedExistingAccount;
+
+        return $employee;
+    }
+
+    protected function getCreatedNotificationTitle(): ?string
+    {
+        if ($this->reusedExisting) {
+            return 'Existing user assigned to this center.';
+        }
+
+        return parent::getCreatedNotificationTitle();
     }
 }

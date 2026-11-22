@@ -6,6 +6,7 @@ use App\Filament\Resources\OrgUsers\OrgUserResource;
 use App\Models\User;
 use App\Services\OrganizationAccessService;
 use App\Support\LoginId;
+use App\Support\UserIdentity;
 use Filament\Resources\Pages\EditRecord;
 
 class EditOrgUser extends EditRecord
@@ -33,6 +34,13 @@ class EditOrgUser extends EditRecord
             $data['email'] ?? $this->record->email,
         );
         LoginId::assertUnique($data['login_id'], $this->record->id);
+        UserIdentity::assertAvailable(
+            (string) ($data['name'] ?? $this->record->name),
+            (string) $data['login_id'],
+            ignoreUserId: (int) $this->record->id,
+            ignoreEmployeeId: $this->record->employee_id ? (int) $this->record->employee_id : null,
+            attribute: 'login_id',
+        );
 
         return $data;
     }

@@ -12,36 +12,22 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureAdminCenterSelected
 {
     /**
-     * Admins without a selected center stay on the main dashboard, Centers,
-     * Team Management, and global settings. The center dashboard and
-     * center-specific modules redirect to the Centers list.
-     *
-     * Coordinators use the same center modules only after they pick one
-     * assigned center. Other roles are unchanged.
+     * Center dashboard and center modules require one selected center.
+     * Admin, Director, Center Coordinator, and Center Manager are sent to
+     * the centers list until they open a center they can access.
      *
      * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+        $context = app(AdminCenterContext::class);
 
-        if ($user instanceof User && $user->isCenterCoordinator()) {
-            if ($this->isCenterModule($request) && ! app(AdminCenterContext::class)->hasValidSelection($user)) {
-                return redirect('/admin/centers');
-            }
-
+        if (! $user instanceof User || ! $context->participatesInCenterSelection($user)) {
             return $next($request);
         }
 
-        if (! $user instanceof User || ! $user->isAdmin()) {
-            return $next($request);
-        }
-
-        if (app(AdminCenterContext::class)->hasValidSelection($user)) {
-            return $next($request);
-        }
-
-        if ($this->isCenterModule($request)) {
+        if ($this->isCenterModule($request) && ! $context->hasValidSelection($user)) {
             return redirect('/admin/centers');
         }
 

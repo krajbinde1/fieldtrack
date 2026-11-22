@@ -83,7 +83,7 @@ class ManagerEmployeeController extends Controller
         $data = $request->validate([
             'center_id' => ['nullable', 'integer', Rule::in($centerIds === [] ? [0] : $centerIds)],
             'full_name' => ['required', 'string', 'max:255'],
-            'mobile' => ['required', 'regex:/^[6-9][0-9]{9}$/', Employee::uniqueAmongActive('mobile')],
+            'mobile' => ['required', 'regex:/^[6-9][0-9]{9}$/'],
             'email' => ['nullable', 'email', 'max:255'],
             'staff_role' => ['required', Rule::in(array_keys(CenterStaffRole::assignableOptions()))],
             'status' => ['sometimes', 'boolean'],
@@ -100,12 +100,10 @@ class ManagerEmployeeController extends Controller
             'You can only create users for your own Center.',
         );
 
-        LoginId::assertUnique(trim((string) $data['mobile']), attribute: 'mobile');
-
         $role = CenterStaffRole::tryFromMixed($data['staff_role'] ?? null);
 
         $employee = DB::transaction(function () use ($actor, $center, $data, $role): Employee {
-            $employee = Employee::query()->create([
+            return $this->credentials->placeEmployee([
                 'center_id' => $center->id,
                 'full_name' => $data['full_name'],
                 'mobile' => $data['mobile'],
@@ -115,17 +113,13 @@ class ManagerEmployeeController extends Controller
                 'department' => 'Center',
                 'created_by_user_id' => $actor->id,
                 'status' => (bool) ($data['status'] ?? true),
-            ]);
-
-            $this->credentials->createLoginUser($employee);
-
-            return $employee->load(['center:id,name', 'user:id,employee_id,login_id']);
+            ])->load(['center:id,name', 'user:id,employee_id,login_id']);
         });
 
         return response()->json([
             'success' => true,
             'data' => $this->employeePayload($employee),
-        ], 201);
+        ], $this->credentials->reusedExistingAccount ? 200 : 201);
     }
 
     public function resetPassword(Request $request, Employee $employee): JsonResponse

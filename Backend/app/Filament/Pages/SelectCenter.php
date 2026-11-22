@@ -28,7 +28,8 @@ class SelectCenter extends Page
     {
         $user = auth()->user();
 
-        return $user instanceof User && ($user->isAdmin() || $user->isCenterCoordinator());
+        return $user instanceof User
+            && app(AdminCenterContext::class)->participatesInCenterSelection($user);
     }
 
     public function mount(): void

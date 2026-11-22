@@ -6,6 +6,7 @@ use App\Enums\CenterStaffRole;
 use App\Filament\Resources\Employees\EmployeeResource;
 use App\Models\Center;
 use App\Services\OrganizationAccessService;
+use App\Support\UserIdentity;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
@@ -46,6 +47,13 @@ class EditEmployee extends EditRecord
         $role = CenterStaffRole::tryFromMixed($data['staff_role'] ?? $this->record->staff_role);
         $data['staff_role'] = $role->value;
         $data['designation'] = $role->label();
+
+        UserIdentity::assertAvailable(
+            (string) ($data['full_name'] ?? $this->record->full_name),
+            (string) ($data['mobile'] ?? $this->record->mobile),
+            ignoreEmployeeId: (int) $this->record->id,
+            ignoreUserId: $this->record->user?->id,
+        );
 
         unset($data['login_id'], $data['login_password'], $data['scheme_name'], $data['project_name'], $data['center_manager_name']);
 

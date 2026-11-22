@@ -175,7 +175,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
             $this->isCenterCoordinator() => $this->coordinatedCenters,
             $this->isProjectHead() => $this->headedCenters,
             $this->isCenterManager() => $this->managedCenters,
-            $this->isEmployeeUser() => collect([$this->employee?->center])->filter(),
+            $this->isEmployeeUser() => $this->employee?->assignedCenterRecords() ?? collect(),
             default => collect(),
         };
 

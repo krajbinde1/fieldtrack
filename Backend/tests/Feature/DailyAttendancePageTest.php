@@ -26,10 +26,10 @@ it('uses one attendance page for a center manager and an admin or director', fun
     foreach ([$manager, $admin, $director] as $page) {
         $page->assertSee('Daily Attendance Summary')
             ->assertSee('Total Employees')
-            ->assertSee('Punched In')
-            ->assertSee('Punched Out')
+            ->assertSee('Punch In')
+            ->assertSee('Punch Out')
             ->assertSee('Currently Punched In')
-            ->assertSee('Not Punched In')
+            ->assertSee('Not Punched In Yet')
             ->assertSee('On Leave')
             ->assertSee('Previous Day')
             ->assertSee('Next Day')

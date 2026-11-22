@@ -177,7 +177,16 @@ it('scopes a selected center dashboard and keeps total centers on the main dashb
 
     $this->actingAs($org['director'])
         ->get('/admin/center-dashboard')
-        ->assertForbidden();
+        ->assertRedirect('/admin/centers');
 
-    expect(CenterDashboard::canAccess())->toBeFalse();
+    expect(CenterDashboard::canAccess())->toBeTrue();
+
+    selectDashboardCenter($org['centerA']->id);
+
+    $this->actingAs($org['director'])
+        ->get('/admin/center-dashboard')
+        ->assertOk()
+        ->assertSee($org['centerA']->name.' Dashboard')
+        ->assertSee('Pending Leave Requests')
+        ->assertDontSee('Total Centers');
 });

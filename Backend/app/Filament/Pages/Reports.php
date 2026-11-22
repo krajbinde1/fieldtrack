@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Support\TodayDateFilter;
 use App\Models\Attendance;
-use App\Models\User;
 use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use BackedEnum;
@@ -52,11 +51,7 @@ class Reports extends Page implements HasTable
                     return $query->whereRaw('1 = 0');
                 }
 
-                if ($user instanceof User && $user->isCenterCoordinator()) {
-                    return $context->scopeByEmployeeCenter($query, $user);
-                }
-
-                return $query;
+                return $context->scopeByEmployeeCenter($query, $user);
             })
             ->defaultSort('attendance_date', 'desc')
             ->columns([

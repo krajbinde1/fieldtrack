@@ -15,14 +15,33 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Session-backed center chosen by an Admin in the Filament panel.
- * Other roles ignore this context and keep their existing scope.
+ * Session-backed center chosen in the Filament panel.
+ * Admin, Director, Center Coordinator, and Center Manager share this context.
+ * Queries stay limited to centers that role can already view.
  */
 final class AdminCenterContext
 {
     public const SESSION_KEY = 'admin_selected_center_id';
 
     private const ORGANIZATION_WIDE_DEPTH = 'admin_center_organization_wide_depth';
+
+    public function participatesInCenterSelection(?User $user): bool
+    {
+        return $user instanceof User
+            && ($user->isAdmin() || $user->isDirector() || $user->isCenterCoordinator() || $user->isCenterManager());
+    }
+
+    /**
+     * True only after an authorized center is open. Sidebar modules use this.
+     */
+    public function showsCenterModuleNavigation(?User $user = null): bool
+    {
+        $user ??= auth()->user();
+
+        return $user instanceof User
+            && $this->participatesInCenterSelection($user)
+            && $this->hasValidSelection($user);
+    }
 
     public function forget(): void
     {
@@ -172,11 +191,24 @@ final class AdminCenterContext
         });
     }
 
+    public function scopeEmployeesByCenter(Builder $query, ?User $user = null): Builder
+    {
+        return $this->whenAdminCenter($query, $user, function (Builder $query, int $id): Builder {
+            $table = $query->getModel()->getTable();
+
+            return $query->where(function (Builder $inner) use ($id, $table): void {
+                $inner->where($table.'.center_id', $id)
+                    ->orWhereHas('assignedCenters', fn (Builder $centers) => $centers->where('centers.id', $id));
+            });
+        });
+    }
+
     public function scopeByEmployeeCenter(Builder $query, ?User $user = null): Builder
     {
         return $this->whenAdminCenter($query, $user, fn (Builder $query, int $id): Builder => $query->whereHas(
             'employee',
-            fn (Builder $employee) => $employee->where('center_id', $id),
+            fn (Builder $employee) => $employee->where('center_id', $id)
+                ->orWhereHas('assignedCenters', fn (Builder $centers) => $centers->where('centers.id', $id)),
         ));
     }
 
@@ -214,7 +246,8 @@ final class AdminCenterContext
         }
 
         return match ($model) {
-            Admission::class, Employee::class => $this->scopeByCenterId($query, $user),
+            Admission::class => $this->scopeByCenterId($query, $user),
+            Employee::class => $this->scopeEmployeesByCenter($query, $user),
             Attendance::class => $this->scopeByEmployeeCenter($query, $user),
             LeaveRequest::class, AdmissionTarget::class => $this->scopeOwnedByCenter($query, $user),
             default => $query,
@@ -238,7 +271,7 @@ final class AdminCenterContext
     {
         $user ??= auth()->user();
 
-        if (! $user instanceof User || ! $user->isAdmin()) {
+        if (! $this->usesSelectedCenter($user)) {
             return;
         }
 
@@ -248,7 +281,7 @@ final class AdminCenterContext
             return;
         }
 
-        abort_unless((int) $employee->center_id === $centerId, 404);
+        abort_unless($employee->isAssignedToCenter($centerId), 404);
     }
 
     private function rawId(): ?int
@@ -269,8 +302,7 @@ final class AdminCenterContext
 
     private function usesSelectedCenter(?User $user): bool
     {
-        return $user instanceof User
-            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager());
+        return $this->participatesInCenterSelection($user);
     }
 
     /**

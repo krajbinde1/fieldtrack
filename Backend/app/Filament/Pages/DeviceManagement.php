@@ -40,6 +40,11 @@ class DeviceManagement extends Page implements HasTable
         return auth()->user()?->isAdmin() === true;
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);

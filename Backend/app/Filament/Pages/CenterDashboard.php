@@ -2,13 +2,11 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\CoordinatorCenterModulesWidget;
 use App\Models\User;
 use App\Services\AdminCenterContext;
 use BackedEnum;
+use Filament\Navigation\NavigationItem;
 use Filament\Support\Icons\Heroicon;
-use Filament\Widgets\Widget;
-use Filament\Widgets\WidgetConfiguration;
 
 class CenterDashboard extends Dashboard
 {
@@ -28,12 +26,25 @@ class CenterDashboard extends Dashboard
         $user = auth()->user();
 
         return $user instanceof User
-            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager());
+            && app(AdminCenterContext::class)->participatesInCenterSelection($user);
     }
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return static::canAccess();
+    }
+
+    /**
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        return array_map(
+            fn (NavigationItem $item): NavigationItem => $item->visible(
+                fn (): bool => app(AdminCenterContext::class)->showsCenterModuleNavigation(),
+            ),
+            parent::getNavigationItems(),
+        );
     }
 
     public function mount(): void
@@ -41,7 +52,7 @@ class CenterDashboard extends Dashboard
         $user = auth()->user();
 
         if ($user instanceof User
-            && ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager())
+            && app(AdminCenterContext::class)->participatesInCenterSelection($user)
             && ! app(AdminCenterContext::class)->hasValidSelection($user)) {
             $this->redirect('/admin/centers');
         }
@@ -55,21 +66,6 @@ class CenterDashboard extends Dashboard
             : null;
 
         return $center ? $center->name.' Dashboard' : 'Center Dashboard';
-    }
-
-    /**
-     * @return array<class-string<Widget> | WidgetConfiguration>
-     */
-    public function getWidgets(): array
-    {
-        $widgets = parent::getWidgets();
-        $user = auth()->user();
-
-        if ($user instanceof User && $user->isCenterCoordinator()) {
-            array_unshift($widgets, CoordinatorCenterModulesWidget::class);
-        }
-
-        return $widgets;
     }
 
     protected function showsOrganizationWideDashboard(): bool

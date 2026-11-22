@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 final class LoginId
@@ -52,12 +51,8 @@ final class LoginId
 
     public static function assertUnique(string $loginId, ?int $ignoreUserId = null, string $attribute = 'login_id'): void
     {
-        $query = User::query()->where('login_id', $loginId);
-        if ($ignoreUserId !== null) {
-            $query->where('id', '!=', $ignoreUserId);
-        }
-
-        if ($query->exists()) {
+        $existing = UserIdentity::userByLogin($loginId);
+        if ($existing !== null && $existing->id !== $ignoreUserId) {
             throw ValidationException::withMessages([
                 $attribute => 'This Login ID is already taken.',
             ]);

@@ -1,6 +1,8 @@
 @php
     $user = auth()->user();
-    $showMainDashboard = $user instanceof \App\Models\User && $user->isAdmin();
+    $showMainDashboard = $user instanceof \App\Models\User
+        && $user->isAdmin()
+        && ! app(\App\Services\AdminCenterContext::class)->showsCenterModuleNavigation($user);
 
     if ($showMainDashboard) {
         $dashboardUrl = \App\Filament\Pages\Dashboard::getUrl();
