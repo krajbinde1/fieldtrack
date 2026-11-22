@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\EmployeeRouteLiveController;
 use App\Http\Controllers\LatestApkController;
 use App\Http\Controllers\PublicStorageController;
 use App\Models\User;
@@ -24,3 +25,11 @@ Route::get('/storage/{path}', PublicStorageController::class)
 
 Route::get('/apk/paramfieldtrack-latest.apk', LatestApkController::class)
     ->name('apk.latest');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/admin/employee-routes/tracking/overview', [EmployeeRouteLiveController::class, 'overview'])
+        ->name('employee-routes.tracking.overview');
+    Route::get('/admin/employee-routes/tracking/{attendance}', [EmployeeRouteLiveController::class, 'show'])
+        ->whereNumber('attendance')
+        ->name('employee-routes.tracking.show');
+});

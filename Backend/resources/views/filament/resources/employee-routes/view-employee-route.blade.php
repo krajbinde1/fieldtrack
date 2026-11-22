@@ -20,14 +20,12 @@
 @endphp
 
 @push('styles')
-    @if ($hasEnoughPoints)
-        <link
-            rel="stylesheet"
-            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-            crossorigin=""
-        />
-    @endif
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
     <style>
         /* Full-page shell: hide residual Filament chrome when sidebar/topbar are disabled. */
         body.er-fullscreen-route .fi-topbar,
@@ -644,6 +642,153 @@
             font-size: 0.8125rem;
         }
 
+        .er-tracking {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+            padding: 0.55rem 0.75rem;
+            border-bottom: 1px solid rgb(243 244 246);
+            flex-shrink: 0;
+        }
+
+        .dark .er-tracking {
+            border-bottom-color: rgb(55 65 81);
+        }
+
+        .er-mode-switch,
+        .er-playback-controls,
+        .er-speed-switch,
+        .er-playback-stats,
+        .er-live-panel {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .er-mode-btn,
+        .er-play-btn,
+        .er-speed-btn,
+        .er-follow-btn {
+            min-height: 2.15rem;
+            border-radius: 0.6rem;
+            border: 1px solid rgb(209 213 219);
+            background: white;
+            color: rgb(55 65 81);
+            padding: 0.3rem 0.7rem;
+            font-size: 0.8125rem;
+            font-weight: 650;
+        }
+
+        .er-mode-btn.is-active,
+        .er-speed-btn.is-active,
+        .er-follow-btn {
+            background: rgb(37 99 235);
+            border-color: rgb(37 99 235);
+            color: white;
+        }
+
+        .er-play-btn:disabled,
+        .er-speed-btn:disabled,
+        .er-mode-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .dark .er-mode-btn,
+        .dark .er-play-btn,
+        .dark .er-speed-btn {
+            background: rgb(31 41 55);
+            border-color: rgb(75 85 99);
+            color: rgb(229 231 235);
+        }
+
+        .er-timeline {
+            flex: 1 1 10rem;
+            min-width: 8rem;
+            accent-color: rgb(37 99 235);
+        }
+
+        .er-playback-stats {
+            font-size: 0.75rem;
+            color: rgb(55 65 81);
+        }
+
+        .dark .er-playback-stats,
+        .dark .er-live-meta {
+            color: rgb(209 213 219);
+        }
+
+        .er-live-panel {
+            align-items: center;
+        }
+
+        .er-live-photo,
+        .er-live-fallback {
+            width: 2.4rem;
+            height: 2.4rem;
+            border-radius: 9999px;
+            object-fit: cover;
+            background: rgb(219 234 254);
+            flex-shrink: 0;
+        }
+
+        .er-live-name {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: rgb(17 24 39);
+        }
+
+        .dark .er-live-name {
+            color: white;
+        }
+
+        .er-live-meta,
+        .er-live-note,
+        .er-live-connection {
+            font-size: 0.75rem;
+            color: rgb(75 85 99);
+        }
+
+        .er-status {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 9999px;
+            padding: 0.05rem 0.45rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: rgb(229 231 235);
+            color: rgb(55 65 81);
+        }
+
+        .er-status.moving { background: rgb(220 252 231); color: rgb(22 101 52); }
+        .er-status.stopped { background: rgb(254 243 199); color: rgb(146 64 14); }
+        .er-status.gps_signal_lost { background: rgb(255 237 213); color: rgb(154 52 18); }
+        .er-status.offline { background: rgb(229 231 235); color: rgb(75 85 99); }
+
+        .er-playhead,
+        .er-live-dot {
+            display: block;
+            width: 18px;
+            height: 18px;
+            border-radius: 9999px;
+            background: #2563eb;
+            border: 2px solid white;
+            box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+        }
+
+        .er-live-dot.moving { background: #16a34a; }
+        .er-live-dot.stopped { background: #d97706; }
+        .er-live-dot.gps_signal_lost { background: #ea580c; }
+        .er-live-dot.offline { background: #6b7280; }
+
+        .er-overview-link {
+            font-size: 0.75rem;
+            color: rgb(37 99 235);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
         .dark .er-warning {
             border-color: rgb(146 64 14);
             background: rgb(69 26 3 / 0.35);
@@ -690,16 +835,6 @@
         }
     </style>
 @endpush
-
-@if ($hasEnoughPoints)
-    @push('scripts')
-        <script
-            src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""
-        ></script>
-    @endpush
-@endif
 
 <x-filament-panels::page>
     <div
@@ -920,373 +1055,75 @@
                     </div>
                 </div>
 
-                @if ($hasEnoughPoints)
-                    <div class="er-map-shell">
-                        <div id="{{ $mapElementId }}" wire:ignore></div>
+                <div class="er-tracking" id="{{ $mapElementId }}-ui">
+                    <div class="er-mode-switch" role="tablist" aria-label="Route mode">
+                        <button type="button" class="er-mode-btn is-active" data-er-mode="playback" aria-pressed="true">Route Playback</button>
+                        <button type="button" class="er-mode-btn" data-er-mode="live" aria-pressed="false">Live Tracking</button>
                     </div>
-                @else
-                    <div class="er-empty">
-                        Not enough valid route points to draw a map. At least 2 valid points are required.
-                        @if (($diagnostics['total_points'] ?? 0) > 0)
-                            <div class="mt-2 text-amber-700 dark:text-amber-300">
-                                Incomplete route data – only {{ $diagnostics['total_points'] }} GPS points were received.
+
+                    <div data-er-panel="playback">
+                        @unless ($hasEnoughPoints)
+                            <div class="er-live-note">Not enough valid route points to play this day. At least 2 valid points are required.</div>
+                        @endunless
+                        <div class="er-playback-controls">
+                            <button type="button" class="er-play-btn" data-er-play>Play</button>
+                            <button type="button" class="er-play-btn" data-er-pause>Pause</button>
+                            <button type="button" class="er-play-btn" data-er-resume>Resume</button>
+                            <button type="button" class="er-play-btn" data-er-restart>Restart</button>
+                            <button type="button" class="er-play-btn" data-er-stop>Stop</button>
+                            <div class="er-speed-switch" role="group" aria-label="Playback speed">
+                                <button type="button" class="er-speed-btn is-active" data-er-speed="1">1x</button>
+                                <button type="button" class="er-speed-btn" data-er-speed="2">2x</button>
+                                <button type="button" class="er-speed-btn" data-er-speed="5">5x</button>
+                                <button type="button" class="er-speed-btn" data-er-speed="10">10x</button>
                             </div>
-                        @endif
+                        </div>
+                        <input class="er-timeline" data-er-timeline type="range" min="0" max="1000" value="0" aria-label="Route timeline" />
+                        <div class="er-playback-stats">
+                            <span data-er-stat="time">—</span>
+                            <span data-er-stat="distance">0 km</span>
+                            <span data-er-stat="speed">0 km/h</span>
+                            <span data-er-stat="stops">0 stoppages</span>
+                        </div>
                     </div>
-                @endif
+
+                    <div data-er-panel="live" hidden>
+                        <img class="er-live-photo" data-er-live="photo" alt="" hidden />
+                        <div>
+                            <div class="er-live-name" data-er-live="name">{{ $employeeName }}</div>
+                            <div class="er-live-meta">
+                                <span class="er-status offline" data-er-live="status">Offline</span>
+                                <span data-er-live="speed">Current speed: —</span>
+                            </div>
+                            <div class="er-live-meta" data-er-live="updated">Last GPS update: —</div>
+                            <div class="er-live-note" data-er-live="note"></div>
+                            <div class="er-live-connection" data-er-live="connection"></div>
+                        </div>
+                        <button type="button" class="er-follow-btn" data-er-follow>Following</button>
+                        <a class="er-overview-link" href="{{ $routeData['live']['overview_url'] ?? '#' }}">All live employees</a>
+                    </div>
+                </div>
+
+                <div class="er-map-shell">
+                    <div id="{{ $mapElementId }}" wire:ignore></div>
+                </div>
             </section>
         </div>
     </div>
 
-    @if ($hasEnoughPoints)
-        @script
-            <script>
-                (() => {
-                    const mapElementId = @js($mapElementId);
-                    const routeData = @json($routeData, JSON_THROW_ON_ERROR);
-
-                    window.__employeeRouteMapInstances = window.__employeeRouteMapInstances || {};
-                    window.__employeeRouteMarkerIndex = window.__employeeRouteMarkerIndex || {};
-
-                    const toNumber = (value) => {
-                        const parsed = Number.parseFloat(value);
-                        return Number.isFinite(parsed) ? parsed : null;
-                    };
-
-                    const toLatLng = (latitude, longitude) => {
-                        const lat = toNumber(latitude);
-                        const lng = toNumber(longitude);
-
-                        if (lat === null || lng === null) {
-                            return null;
-                        }
-
-                        return [lat, lng];
-                    };
-
-                    const destroyMap = () => {
-                        const existing = window.__employeeRouteMapInstances[mapElementId];
-
-                        if (existing) {
-                            existing.remove();
-                            delete window.__employeeRouteMapInstances[mapElementId];
-                        }
-
-                        window.__employeeRouteMarkerIndex[mapElementId] = {};
-                    };
-
-                    const fitRouteBounds = (map, bounds) => {
-                        if (!map || !bounds || bounds.length === 0) {
-                            return;
-                        }
-
-                        const latLngBounds = window.L.latLngBounds(bounds);
-
-                        if (!latLngBounds.isValid()) {
-                            return;
-                        }
-
-                        map.fitBounds(latLngBounds, {
-                            padding: [48, 48],
-                            maxZoom: 16,
-                            animate: false,
-                        });
-                    };
-
-                    const invalidateAndRefit = (map, bounds) => {
-                        if (!map) {
-                            return;
-                        }
-
-                        map.invalidateSize({ animate: false, pan: false });
-                        fitRouteBounds(map, bounds);
-                    };
-
-                    const waitForLeaflet = (attempt = 0) => {
-                        if (typeof window.L !== 'undefined') {
-                            return Promise.resolve(window.L);
-                        }
-
-                        if (attempt >= 40) {
-                            return Promise.reject(new Error('Leaflet failed to load.'));
-                        }
-
-                        return new Promise((resolve) => {
-                            window.setTimeout(() => {
-                                resolve(waitForLeaflet(attempt + 1));
-                            }, 100);
-                        });
-                    };
-
-                    const numberIcon = (sequence, active = false) => window.L.divIcon({
-                        className: '',
-                        html: `<span class="er-number-marker${active ? ' is-active' : ''}">${sequence}</span>`,
-                        iconSize: [28, 28],
-                        iconAnchor: [14, 14],
-                        popupAnchor: [0, -14],
-                    });
-
-                    const endpointIcon = (kind) => window.L.divIcon({
-                        className: '',
-                        html: `<span class="er-endpoint-marker ${kind}">${kind === 'start' ? 'START' : 'END'}</span>`,
-                        iconSize: [56, 24],
-                        iconAnchor: [28, 12],
-                        popupAnchor: [0, -12],
-                    });
-
-                    const setActiveMarker = (eventId) => {
-                        const index = window.__employeeRouteMarkerIndex[mapElementId] || {};
-
-                        Object.entries(index).forEach(([id, entry]) => {
-                            if (!entry?.marker || !entry?.kind) {
-                                return;
-                            }
-
-                            const isActive = id === eventId;
-
-                            if (entry.kind === 'stoppage') {
-                                entry.marker.setIcon(numberIcon(entry.sequence, isActive));
-                                entry.marker.setZIndexOffset(isActive ? 1000 : 500);
-                            } else {
-                                entry.marker.setZIndexOffset(isActive ? 1100 : 700);
-                            }
-
-                            if (isActive) {
-                                entry.marker.openPopup();
-                            }
-                        });
-                    };
-
-                    const focusEvent = (eventId) => {
-                        const map = window.__employeeRouteMapInstances[mapElementId];
-                        const entry = (window.__employeeRouteMarkerIndex[mapElementId] || {})[eventId];
-
-                        if (!map || !entry?.marker) {
-                            return;
-                        }
-
-                        setActiveMarker(eventId);
-                        map.panTo(entry.marker.getLatLng(), { animate: true });
-
-                        if (map.getZoom() < 14) {
-                            map.setZoom(15, { animate: true });
-                        }
-                    };
-
-                    const renderMap = () => {
-                        const mapElement = document.getElementById(mapElementId);
-
-                        if (!mapElement) {
-                            return false;
-                        }
-
-                        if (mapElement.offsetWidth < 40 || mapElement.offsetHeight < 40) {
-                            return false;
-                        }
-
-                        destroyMap();
-
-                        const map = window.L.map(mapElement, {
-                            preferCanvas: true,
-                            zoomControl: true,
-                        });
-
-                        window.__employeeRouteMapInstances[mapElementId] = map;
-                        window.__employeeRouteMarkerIndex[mapElementId] = {};
-
-                        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            maxZoom: 19,
-                            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-                        }).addTo(map);
-
-                        const bounds = [];
-                        const pushBound = (latLng) => {
-                            if (latLng) {
-                                bounds.push(latLng);
-                            }
-                        };
-
-                        const pathSource = (routeData.valid_points && routeData.valid_points.length >= 2)
-                            ? routeData.valid_points
-                            : (routeData.timeline || []);
-
-                        const polylinePoints = pathSource
-                            .map((point) => toLatLng(point.latitude, point.longitude))
-                            .filter((latLng) => latLng !== null);
-
-                        polylinePoints.forEach(pushBound);
-
-                        if (polylinePoints.length >= 2) {
-                            window.L.polyline(polylinePoints, {
-                                color: '#2563eb',
-                                weight: 5,
-                                opacity: 0.9,
-                                lineJoin: 'round',
-                                lineCap: 'round',
-                            }).addTo(map);
-                        }
-
-                        const registerMarker = (id, kind, sequence, marker) => {
-                            window.__employeeRouteMarkerIndex[mapElementId][id] = {
-                                kind,
-                                sequence,
-                                marker,
-                            };
-
-                            marker.on('click', () => {
-                                window.dispatchEvent(new CustomEvent('er-marker-selected', {
-                                    detail: { id },
-                                }));
-                                setActiveMarker(id);
-                            });
-                        };
-
-                        const journeyEvents = routeData.journey_events || [];
-
-                        journeyEvents.forEach((event) => {
-                            if (event.type === 'travel') {
-                                return;
-                            }
-
-                            const latLng = toLatLng(event.latitude, event.longitude);
-
-                            if (!latLng) {
-                                return;
-                            }
-
-                            pushBound(latLng);
-
-                            if (event.type === 'start' || event.type === 'end') {
-                                const marker = window.L.marker(latLng, {
-                                    icon: endpointIcon(event.type),
-                                    zIndexOffset: 700,
-                                }).addTo(map);
-
-                                marker.bindPopup(
-                                    `<strong>${event.label}</strong><br>${event.time_label ?? '-'}<br>${event.location ?? ''}`,
-                                );
-                                registerMarker(event.id, event.type, null, marker);
-
-                                return;
-                            }
-
-                            if (event.type === 'stoppage') {
-                                const marker = window.L.marker(latLng, {
-                                    icon: numberIcon(event.sequence, false),
-                                    zIndexOffset: 500,
-                                }).addTo(map);
-
-                                marker.bindPopup(
-                                    `<strong>Stop ${event.sequence}</strong><br>${event.time_label ?? '-'}<br>${event.duration_label ?? ''}`,
-                                );
-                                registerMarker(event.id, 'stoppage', event.sequence, marker);
-                            }
-                        });
-
-                        // Fallback punch markers if journey events lack coordinates.
-                        const punchIn = routeData.punch_in || {};
-                        const punchOut = routeData.punch_out || {};
-
-                        if (!window.__employeeRouteMarkerIndex[mapElementId].start) {
-                            const pin = toLatLng(punchIn.latitude, punchIn.longitude);
-                            if (pin) {
-                                pushBound(pin);
-                                const marker = window.L.marker(pin, {
-                                    icon: endpointIcon('start'),
-                                    zIndexOffset: 700,
-                                }).addTo(map);
-                                marker.bindPopup(`<strong>START</strong><br>${punchIn.time ?? '-'}`);
-                                registerMarker('start', 'start', null, marker);
-                            }
-                        }
-
-                        if (!window.__employeeRouteMarkerIndex[mapElementId].end) {
-                            const pout = toLatLng(punchOut.latitude, punchOut.longitude);
-                            if (pout) {
-                                pushBound(pout);
-                                const marker = window.L.marker(pout, {
-                                    icon: endpointIcon('end'),
-                                    zIndexOffset: 700,
-                                }).addTo(map);
-                                marker.bindPopup(`<strong>END</strong><br>${punchOut.time ?? '-'}`);
-                                registerMarker('end', 'end', null, marker);
-                            }
-                        }
-
-                        if (bounds.length > 0) {
-                            fitRouteBounds(map, bounds);
-                        } else {
-                            map.setView([20.5937, 78.9629], 5);
-                        }
-
-                        window.requestAnimationFrame(() => {
-                            invalidateAndRefit(map, bounds);
-                            window.setTimeout(() => invalidateAndRefit(map, bounds), 120);
-                            window.setTimeout(() => invalidateAndRefit(map, bounds), 400);
-                            window.setTimeout(() => invalidateAndRefit(map, bounds), 900);
-                        });
-
-                        return true;
-                    };
-
-                    const initializeMap = () => {
-                        waitForLeaflet()
-                            .then(() => {
-                                if (!renderMap()) {
-                                    window.setTimeout(initializeMap, 150);
-                                }
-                            })
-                            .catch((error) => {
-                                console.error('[EmployeeRouteMap]', error);
-                            });
-                    };
-
-                    const scheduleInitialize = () => {
-                        window.requestAnimationFrame(() => {
-                            window.setTimeout(initializeMap, 30);
-                        });
-                    };
-
-                    scheduleInitialize();
-
-                    window.addEventListener('er-select-event', (event) => {
-                        focusEvent(event.detail?.id);
-                    });
-
-                    document.addEventListener('livewire:navigated', scheduleInitialize);
-                    document.addEventListener('DOMContentLoaded', scheduleInitialize);
-
-                    document.addEventListener('visibilitychange', () => {
-                        if (document.visibilityState !== 'visible') {
-                            return;
-                        }
-
-                        const map = window.__employeeRouteMapInstances[mapElementId];
-                        if (map) {
-                            map.invalidateSize({ animate: false, pan: false });
-                        }
-                    });
-
-                    window.addEventListener('resize', () => {
-                        const map = window.__employeeRouteMapInstances[mapElementId];
-                        if (map) {
-                            map.invalidateSize({ animate: false, pan: false });
-                        }
-                    });
-
-                    const mapElement = document.getElementById(mapElementId);
-
-                    if (mapElement && typeof ResizeObserver !== 'undefined') {
-                        const observer = new ResizeObserver(() => {
-                            const map = window.__employeeRouteMapInstances[mapElementId];
-                            if (map) {
-                                map.invalidateSize({ animate: false, pan: false });
-                            }
-                        });
-                        observer.observe(mapElement);
-                    }
-                })();
-            </script>
-        @endscript
-    @endif
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""
+    ></script>
+    <script src="{{ asset('js/employee-route-tracking.js') }}?v=20261122"></script>
+    @script
+        <script>
+            window.EmployeeRouteTracking.mountRoute({
+                mapElementId: @js($mapElementId),
+                routeData: @json($routeData, JSON_THROW_ON_ERROR),
+            });
+        </script>
+    @endscript
 </x-filament-panels::page>
+

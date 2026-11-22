@@ -6,6 +6,7 @@ use App\Filament\Resources\EmployeeRoutes\EmployeeRouteResource;
 use App\Models\Attendance;
 use App\Services\EmployeeRouteAnalysisService;
 use App\Support\AttendanceCalendar;
+use App\Support\PublicStorage;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Support\Htmlable;
@@ -73,6 +74,7 @@ class ViewEmployeeRoute extends ViewRecord
 
         $previous = $this->findAdjacentAttendance('previous');
         $next = $this->findAdjacentAttendance('next');
+        $liveAttendance = $this->liveAttendance($record);
 
         return [
             'summary' => $analysis['summary'],
@@ -100,6 +102,13 @@ class ViewEmployeeRoute extends ViewRecord
                 'id' => $record->employee_id,
                 'full_name' => $record->employee?->full_name,
                 'employee_code' => $record->employee?->employee_code,
+                'photo_url' => PublicStorage::url($record->employee?->profile_photo_path),
+            ],
+            'live' => [
+                'feed_url' => route('employee-routes.tracking.show', ['attendance' => $liveAttendance->id]),
+                'overview_url' => EmployeeRouteResource::getUrl('live'),
+                'same_attendance' => $liveAttendance->id === $record->id,
+                'tracking_active' => $liveAttendance->isRouteTrackingActive(),
             ],
             'attendance_date' => $record->attendance_date->timezone(AttendanceCalendar::TIMEZONE)->format('d M Y'),
             'attendance_date_iso' => $record->attendance_date->timezone(AttendanceCalendar::TIMEZONE)->toDateString(),
@@ -134,6 +143,20 @@ class ViewEmployeeRoute extends ViewRecord
         }
 
         $this->redirect(EmployeeRouteResource::getUrl('view', ['record' => $target]));
+    }
+
+    private function liveAttendance(Attendance $record): Attendance
+    {
+        $active = Attendance::query()
+            ->where('employee_id', $record->employee_id)
+            ->whereNotNull('punch_in_time')
+            ->whereNull('punch_out_time')
+            ->whereDate('attendance_date', '>=', AttendanceCalendar::now()->subDay()->toDateString())
+            ->orderByDesc('attendance_date')
+            ->orderByDesc('id')
+            ->first();
+
+        return $active ?? $record;
     }
 
     private function findAdjacentAttendance(string $direction): ?Attendance

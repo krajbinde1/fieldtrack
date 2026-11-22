@@ -6,6 +6,7 @@ use App\Filament\Concerns\DeniesOrdersOnlyFilamentUsers;
 use App\Filament\Concerns\RequiresSelectedAdminCenter;
 use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\EmployeeRoutes\Pages\ListEmployeeRoutes;
+use App\Filament\Resources\EmployeeRoutes\Pages\LiveEmployeeTracking;
 use App\Filament\Resources\EmployeeRoutes\Pages\ViewEmployeeRoute;
 use App\Filament\Resources\EmployeeRoutes\Tables\EmployeeRoutesTable;
 use App\Models\Attendance;
@@ -53,6 +54,7 @@ class EmployeeRouteResource extends Resource
     {
         return [
             'index' => ListEmployeeRoutes::route('/'),
+            'live' => LiveEmployeeTracking::route('/live'),
             'view' => ViewEmployeeRoute::route('/{record}'),
         ];
     }

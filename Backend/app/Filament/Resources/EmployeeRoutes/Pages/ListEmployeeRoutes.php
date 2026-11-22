@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\EmployeeRoutes\Pages;
 
 use App\Filament\Resources\EmployeeRoutes\EmployeeRouteResource;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,6 +15,16 @@ class ListEmployeeRoutes extends ListRecords
     public function getSubheading(): string|Htmlable|null
     {
         return 'Track live and historical field routes for employees who have punched in.';
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('liveTracking')
+                ->label('Live Tracking')
+                ->icon('heroicon-o-map')
+                ->url(fn (): string => EmployeeRouteResource::getUrl('live')),
+        ];
     }
 
     protected function getTableQuery(): Builder
