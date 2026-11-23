@@ -63,15 +63,38 @@ final class ExpenseApprovalTimeline
             $decisions[2] ?? null,
             $pendingLevel,
         );
-        $stages[] = $this->approvalStage(
-            $claim,
-            3,
-            'final',
-            'Admin/Director Final Approval',
-            'Admin / Director',
-            $decisions[3] ?? null,
-            $pendingLevel,
-        );
+        $legacy = $this->legacyCombinedFinal($claim, $decisions);
+        if ($legacy instanceof ExpenseApproval) {
+            $role = filled($legacy->role) ? $legacy->role : 'Approver';
+            $stages[] = $this->approvalStage(
+                $claim,
+                3,
+                'final',
+                $role.' Final Approval',
+                $role,
+                $legacy,
+                null,
+            );
+        } else {
+            $stages[] = $this->approvalStage(
+                $claim,
+                3,
+                'director',
+                'Director Approval',
+                'Director',
+                $decisions[3] ?? null,
+                $pendingLevel,
+            );
+            $stages[] = $this->approvalStage(
+                $claim,
+                4,
+                'admin',
+                'Admin Final Approval',
+                'Admin',
+                $decisions[4] ?? null,
+                $pendingLevel,
+            );
+        }
         $stages[] = $this->paymentStage($claim);
 
         return [
@@ -264,17 +287,34 @@ final class ExpenseApprovalTimeline
         );
     }
 
+    /**
+     * A finished claim whose only final row is the old combined Admin/Director
+     * decision. New claims record the director at level 3 and the admin at level 4.
+     *
+     * @param  array<int, ExpenseApproval>  $decisions
+     */
+    private function legacyCombinedFinal(ExpenseClaim $claim, array $decisions): ?ExpenseApproval
+    {
+        $level3 = $decisions[3] ?? null;
+        if (! $level3 instanceof ExpenseApproval || isset($decisions[4])) {
+            return null;
+        }
+
+        if ($claim->status === ExpenseClaimStatus::Approved || $claim->payment_status === ExpensePaymentStatus::Paid) {
+            return $level3;
+        }
+
+        $role = strtolower((string) $level3->role);
+        if ($claim->status === ExpenseClaimStatus::Rejected && str_contains($role, 'admin') && ! str_contains($role, 'director')) {
+            return $level3;
+        }
+
+        return null;
+    }
+
     private function pendingLevel(ExpenseClaim $claim): ?int
     {
-        return match ($claim->status) {
-            ExpenseClaimStatus::PendingCenterManager => 1,
-            ExpenseClaimStatus::PendingCenterCoordinator => 2,
-            ExpenseClaimStatus::PendingFinal => 3,
-            ExpenseClaimStatus::NeedsResolution => $claim->blocked_level !== null
-                ? (int) $claim->blocked_level
-                : ((int) $claim->current_level > 0 ? (int) $claim->current_level : null),
-            default => null,
-        };
+        return $claim->pendingApprovalLevel();
     }
 
     /**
@@ -288,7 +328,8 @@ final class ExpenseApprovalTimeline
         $pool = match ($level) {
             1 => $center === null ? collect() : $this->approvers->managers($center, $claimantId),
             2 => $center === null ? collect() : $this->approvers->coordinators($center, $claimantId),
-            3 => $this->approvers->finalApprovers($claimantId),
+            3 => $this->approvers->directors($claimantId),
+            4 => $this->approvers->admins($claimantId),
             default => collect(),
         };
 

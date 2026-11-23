@@ -90,14 +90,59 @@ class ExpenseClaim extends Model
 
     public function displayStatus(): string
     {
-        if ($this->status === ExpenseClaimStatus::Approved && $this->payment_status === ExpensePaymentStatus::Unpaid) {
-            return 'Approved / Pending Payment';
-        }
-
         if ($this->payment_status === ExpensePaymentStatus::Paid) {
             return 'Paid';
         }
 
+        if ($this->status === ExpenseClaimStatus::Approved && $this->payment_status === ExpensePaymentStatus::Unpaid) {
+            return 'Approved / Pending Payment';
+        }
+
+        $level = $this->pendingApprovalLevel();
+        if ($level !== null && $this->status !== ExpenseClaimStatus::NeedsResolution) {
+            return match ($level) {
+                1 => 'Pending Center Manager',
+                2 => 'Pending Center Coordinator',
+                3 => 'Pending Director',
+                4 => 'Pending Admin',
+                default => $this->status->label(),
+            };
+        }
+
         return $this->status->label();
+    }
+
+    /**
+     * The stage that can still be acted on. A stored approval closes that stage
+     * even when the status column has not caught up.
+     */
+    public function pendingApprovalLevel(): ?int
+    {
+        if ($this->status === ExpenseClaimStatus::NeedsResolution) {
+            return $this->blocked_level !== null
+                ? (int) $this->blocked_level
+                : ((int) $this->current_level > 0 ? (int) $this->current_level : null);
+        }
+
+        if (! $this->status instanceof ExpenseClaimStatus || ! $this->status->isPendingApproval()) {
+            return null;
+        }
+
+        $this->loadMissing(['approvals', 'createdBy']);
+        $start = $this->createdBy?->isCenterManager() === true ? 2 : 1;
+        $approved = [];
+        foreach ($this->approvals as $approval) {
+            if ($approval->action === 'approved') {
+                $approved[(int) $approval->level] = true;
+            }
+        }
+
+        for ($level = $start; $level <= 4; $level++) {
+            if (! isset($approved[$level])) {
+                return $level;
+            }
+        }
+
+        return null;
     }
 }

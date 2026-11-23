@@ -70,11 +70,27 @@ final class ExpenseApproverResolver
     /**
      * @return Collection<int, User>
      */
-    public function finalApprovers(int $claimantUserId): Collection
+    public function directors(int $claimantUserId): Collection
+    {
+        return $this->activeRole(UserRole::Director, $claimantUserId);
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function admins(int $claimantUserId): Collection
+    {
+        return $this->activeRole(UserRole::Admin, $claimantUserId);
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    private function activeRole(UserRole $role, int $claimantUserId): Collection
     {
         return User::query()
             ->where('is_active', true)
-            ->whereIn('role', [UserRole::Admin->value, UserRole::Director->value])
+            ->where('role', $role->value)
             ->where('id', '!=', $claimantUserId)
             ->orderBy('id')
             ->get();

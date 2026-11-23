@@ -167,22 +167,46 @@ it('keeps each approver tab aligned from submission through payment', function (
     $this->actingAs($coordinator, 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Center ok'])
         ->assertOk()
-        ->assertJsonPath('data.status', 'pending_final');
+        ->assertJsonPath('data.status', 'pending_director');
 
-    $finalNames = $resolver->finalApprovers($org['userA']->id)->pluck('name')->all();
     expect(expenseStatusIds($this, $coordinator, 'pending'))->not->toContain($id)
         ->and(expenseStatusIds($this, $coordinator, 'approved'))->toContain($id)
         ->and(expenseStatusIds($this, $manager, 'approved'))->toContain($id)
         ->and(expenseStatusIds($this, $manager, 'pending'))->not->toContain($id)
-        ->and(expenseStatusIds($this, $admin, 'pending'))->toContain($id)
+        ->and(expenseStatusIds($this, $admin, 'pending'))->not->toContain($id)
         ->and(expenseStatusIds($this, $director, 'pending'))->toContain($id)
         ->and(expenseStatusIds($this, $admin, 'approved'))->not->toContain($id)
         ->and(expenseStatusIds($this, $director, 'approved'))->not->toContain($id);
 
-    $withFinal = expenseStatusRow($this, $admin, 'pending', $id);
-    expect($withFinal['pending_with'])->toBe('Admin / Director — waiting on '.implode(', ', $finalNames))
-        ->and($withFinal['pending_with'])->toContain('Admin')
-        ->and($withFinal['pending_with'])->toContain('Director');
+    $withDirector = expenseStatusRow($this, $director, 'pending', $id);
+    expect($withDirector['pending_with'])->toBe('Director — waiting on '.$director->name)
+        ->and($withDirector['pending_with'])->not->toContain('Admin')
+        ->and($withDirector['timeline']['pending_text'])->toBe('Director Approval — waiting on '.$director->name);
+
+    $this->actingAs($admin, 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertForbidden();
+    $this->actingAs($director, 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Director ok'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_final');
+
+    expect(expenseStatusIds($this, $director, 'pending'))->not->toContain($id)
+        ->and(expenseStatusIds($this, $director, 'approved'))->toContain($id)
+        ->and(expenseStatusIds($this, $admin, 'pending'))->toContain($id)
+        ->and(expenseStatusIds($this, $admin, 'approved'))->not->toContain($id);
+
+    $withAdmin = expenseStatusRow($this, $admin, 'pending', $id);
+    expect($withAdmin['pending_with'])->toBe('Admin — waiting on '.$admin->name)
+        ->and($withAdmin['timeline']['pending_text'])->toBe('Admin Final Approval — waiting on '.$admin->name);
+
+    $this->actingAs($director, 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 250,
+            'payment_mode' => 'upi',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertForbidden();
 
     $this->actingAs($admin, 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Final ok'])
@@ -194,7 +218,7 @@ it('keeps each approver tab aligned from submission through payment', function (
     expect(expenseStatusIds($this, $admin, 'pending'))->not->toContain($id)
         ->and(expenseStatusIds($this, $director, 'pending'))->not->toContain($id)
         ->and(expenseStatusIds($this, $admin, 'approved'))->toContain($id)
-        ->and(expenseStatusIds($this, $director, 'approved'))->not->toContain($id)
+        ->and(expenseStatusIds($this, $director, 'approved'))->toContain($id)
         ->and(expenseStatusIds($this, $manager, 'approved'))->toContain($id)
         ->and(expenseStatusIds($this, $coordinator, 'approved'))->toContain($id)
         ->and(expenseStatusIds($this, $admin, 'paid'))->not->toContain($id);
@@ -243,11 +267,12 @@ it('keeps each approver tab aligned from submission through payment', function (
             ->and($stages->pluck('key')->all())->toContain('created')
             ->and($stages->firstWhere('key', 'center_manager')['person_name'])->toBe('CM')
             ->and($stages->firstWhere('key', 'center_coordinator')['person_name'])->toBe('Ravi Coordinator')
-            ->and($stages->firstWhere('key', 'final')['person_name'])->toBe('Admin')
+            ->and($stages->firstWhere('key', 'director')['person_name'])->toBe('Director')
+            ->and($stages->firstWhere('key', 'admin')['person_name'])->toBe('Admin')
             ->and($stages->firstWhere('key', 'payment')['status_label'])->toBe('Paid');
     }
 
-    expect(expenseStatusIds($this, $director, 'history'))->not->toContain($id);
+    expect(expenseStatusIds($this, $director, 'history'))->toContain($id);
 
     $this->app['auth']->forgetGuards();
     Livewire::actingAs($admin)
@@ -271,6 +296,9 @@ it('keeps each approver tab aligned from submission through payment', function (
         ->postJson('/api/director/expenses/'.$otherId.'/approve')
         ->assertOk();
     $this->actingAs($director, 'sanctum')
+        ->postJson('/api/director/expenses/'.$otherId.'/approve')
+        ->assertOk();
+    $this->actingAs($admin, 'sanctum')
         ->postJson('/api/director/expenses/'.$otherId.'/approve')
         ->assertOk();
     $this->actingAs($admin, 'sanctum')

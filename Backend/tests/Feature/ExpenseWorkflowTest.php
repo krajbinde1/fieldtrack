@@ -102,14 +102,37 @@ it('walks an expense from the mobilizer through payment without skipping a level
     $this->actingAs($first, 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Center ok'])
         ->assertOk()
-        ->assertJsonPath('data.status', 'pending_final');
+        ->assertJsonPath('data.status', 'pending_director')
+        ->assertJsonPath('data.pending_approval', 'Director — waiting on Director');
 
     $this->actingAs($second, 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve')
         ->assertForbidden();
 
+    $this->actingAs($org['admin'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertForbidden();
+
     $this->actingAs($org['director'], 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_final')
+        ->assertJsonPath('data.pending_approval', 'Admin — waiting on Admin');
+
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertForbidden();
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 250,
+            'payment_mode' => 'upi',
+            'reference_number' => 'UPI1',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($org['admin'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Final ok'])
         ->assertOk()
         ->assertJsonPath('data.status', 'approved')
         ->assertJsonPath('data.payment_status', 'unpaid')
@@ -154,7 +177,10 @@ it('walks an expense from the mobilizer through payment without skipping a level
         ->assertJsonPath('data.summary.total_submitted', '250.00');
 
     expect(AppNotification::query()->where('user_id', $org['userA']->id)->where('type', 'expense_paid')->count())->toBe(1)
-        ->and(ExpenseApproval::query()->where('expense_claim_id', $id)->count())->toBe(3);
+        ->and(ExpenseApproval::query()->where('expense_claim_id', $id)->count())->toBe(4)
+        ->and(AppNotification::query()->where('user_id', $org['admin']->id)->where('type', 'expense_pending_level_3')->count())->toBe(0)
+        ->and(AppNotification::query()->where('user_id', $org['director']->id)->where('type', 'expense_pending_level_3')->count())->toBe(1)
+        ->and(AppNotification::query()->where('user_id', $org['admin']->id)->where('type', 'expense_pending_final')->count())->toBe(1);
 });
 
 it('stops the workflow when a claim is rejected', function () {
@@ -302,27 +328,28 @@ it('lists a mobilizer claim for the assigned center manager before any center is
     $this->actingAs($coordinator, 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Coordinator checked'])
         ->assertOk()
-        ->assertJsonPath('data.status', 'pending_final')
-        ->assertJsonPath('data.pending_approval', 'Admin / Director — waiting on Admin, Director');
+        ->assertJsonPath('data.status', 'pending_director')
+        ->assertJsonPath('data.pending_approval', 'Director — waiting on Director');
 
-    expect($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeTrue()
+    expect($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse()
         ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeTrue()
         ->and($service->approvalHistoryLines($claim->fresh()))->toHaveCount(2);
 
     $this->app['auth']->forgetGuards();
     Livewire::actingAs($org['admin'])
         ->test(ListExpenseClaims::class)
-        ->assertCanSeeTableRecords([$claim->fresh()]);
+        ->assertCanNotSeeTableRecords([$claim->fresh()]);
 
-    Livewire::actingAs($org['admin'])
+    Livewire::actingAs($org['director'])
         ->test(ViewExpenseClaim::class, ['record' => $id])
         ->assertSee('Center Manager Approval')
         ->assertSee('CM')
         ->assertSee('Manager checked')
         ->assertSee('List Coordinator')
         ->assertSee('Coordinator checked')
-        ->assertSee('Admin/Director Final Approval')
-        ->assertSee('waiting on Admin, Director');
+        ->assertSee('Director Approval')
+        ->assertSee('waiting on Director')
+        ->assertDontSee('waiting on Admin');
 });
 
 it('does not let another center approve or view the claim', function () {
@@ -410,12 +437,22 @@ it('routes a center manager expense to the coordinator and never lets them appro
     $this->actingAs($coordinator, 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Manager claim ok'])
         ->assertOk()
-        ->assertJsonPath('data.status', 'pending_final');
+        ->assertJsonPath('data.status', 'pending_director');
 
-    expect(AppNotification::query()->where('user_id', $org['director']->id)->where('type', 'expense_pending_final')->count())->toBe(1)
+    expect(AppNotification::query()->where('user_id', $org['director']->id)->where('type', 'expense_pending_level_3')->count())->toBe(1)
+        ->and(AppNotification::query()->where('user_id', $org['admin']->id)->where('type', 'expense_pending_final')->count())->toBe(0)
         ->and(AppNotification::query()->where('user_id', $org['centerManager']->id)->where('type', 'expense_level_approved')->count())->toBe(1);
 
+    $this->actingAs($org['admin'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertForbidden();
+
     $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_final');
+
+    $this->actingAs($org['admin'], 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve')
         ->assertOk()
         ->assertJsonPath('data.status', 'approved');
@@ -532,19 +569,37 @@ it('moves a 500 rupee travelling expense through every approver and then payment
     $this->actingAs($second, 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Coordinator checked'])
         ->assertOk()
-        ->assertJsonPath('data.status', 'pending_final');
+        ->assertJsonPath('data.status', 'pending_director');
     $this->actingAs($first, 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve')
         ->assertForbidden();
 
     $this->actingAs($org['admin'], 'sanctum')
         ->getJson('/api/dashboard')
-        ->assertJsonPath('data.pending_expenses', 1);
+        ->assertJsonPath('data.pending_expenses', 0);
+    $this->actingAs($org['admin'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertForbidden();
     $this->actingAs($org['director'], 'sanctum')
         ->getJson('/api/director/expenses?status=pending')
         ->assertOk()
         ->assertJsonFragment(['id' => $id, 'total_amount' => '500.00']);
 
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Director ok'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_final');
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 500,
+            'payment_mode' => 'upi',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($org['admin'], 'sanctum')
+        ->getJson('/api/dashboard')
+        ->assertJsonPath('data.pending_expenses', 1);
     $this->actingAs($org['admin'], 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Final ok'])
         ->assertOk()
@@ -586,7 +641,7 @@ it('moves a 500 rupee travelling expense through every approver and then payment
         ->assertJsonPath('data.summary.paid', '500.00');
 
     expect(AppNotification::query()->where('user_id', $org['userA']->id)->where('type', 'expense_paid')->count())->toBe(1)
-        ->and(ExpenseApproval::query()->where('expense_claim_id', $id)->count())->toBe(3);
+        ->and(ExpenseApproval::query()->where('expense_claim_id', $id)->count())->toBe(4);
 
     $this->app['auth']->forgetGuards();
     Livewire::actingAs($org['admin'])
@@ -632,7 +687,7 @@ it('rejects an expense at the coordinator and final stages', function () {
         ->toContain('Amount is too high');
 });
 
-it('lets a director record payment after final approval', function () {
+it('lets only an admin record payment after the director and admin have approved', function () {
     $org = seedOrg();
     $coordinator = expenseCoordinator($org, 'coord-director-pay');
     $id = $this->actingAs($org['userA'], 'sanctum')
@@ -648,8 +703,26 @@ it('lets a director record payment after final approval', function () {
     $this->actingAs($org['director'], 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve')
         ->assertOk()
+        ->assertJsonPath('data.status', 'pending_final');
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 250,
+            'payment_mode' => 'cash',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertForbidden();
+    $this->actingAs($org['admin'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertOk()
         ->assertJsonPath('data.status_label', 'Approved / Pending Payment');
     $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 250,
+            'payment_mode' => 'cash',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertForbidden();
+    $this->actingAs($org['admin'], 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/pay', [
             'amount' => 250,
             'payment_mode' => 'cash',
@@ -740,4 +813,220 @@ it('shows a mobilizer claim to the primary center manager without a pivot row', 
     Livewire::actingAs($org['centerManager']->fresh())
         ->test(ListExpenseClaims::class)
         ->assertCanSeeTableRecords([$claim]);
+});
+
+it('closes each stage after one approval and keeps pending-with on that stage', function () {
+    $org = seedOrg();
+    $peer = User::query()->create([
+        'name' => 'Peer Manager',
+        'email' => 'peer-manager@test.local',
+        'login_id' => 'peermanager',
+        'password' => Hash::make('CenterMgr@123'),
+        'role' => UserRole::CenterManager->value,
+        'is_active' => true,
+    ]);
+    $org['centerA']->update(['primary_center_manager_id' => $peer->id]);
+    $first = expenseCoordinator($org, 'stage-coord-a', 'First Coordinator');
+    $second = expenseCoordinator($org, 'stage-coord-b', 'Second Coordinator');
+    $service = app(ExpenseClaimService::class);
+
+    $id = (int) $this->actingAs($org['userA'], 'sanctum')
+        ->post('/api/expenses', expensePayload())
+        ->assertCreated()
+        ->json('data.id');
+
+    expect($service->queueQuery($org['centerManager'])->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($peer)->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($first)->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse();
+
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->postJson('/api/manager/expenses/'.$id.'/approve', ['remarks' => 'One manager is enough'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_center_coordinator')
+        ->assertJsonPath('data.pending_with', 'Center Coordinator — waiting on First Coordinator, Second Coordinator');
+
+    $managerApprovalId = ExpenseApproval::query()->where('expense_claim_id', $id)->where('level', 1)->value('id');
+
+    expect($service->queueQuery($org['centerManager'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($peer)->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($first)->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($second)->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse()
+        ->and(AppNotification::query()->where('user_id', $peer->id)->where('type', 'expense_pending_level_2')->count())->toBe(0);
+
+    $this->actingAs($peer, 'sanctum')
+        ->postJson('/api/manager/expenses/'.$id.'/approve')
+        ->assertForbidden();
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->postJson('/api/manager/expenses/'.$id.'/approve')
+        ->assertForbidden();
+    expect(ExpenseApproval::query()->where('expense_claim_id', $id)->count())->toBe(1)
+        ->and(ExpenseApproval::query()->where('expense_claim_id', $id)->value('id'))->toBe($managerApprovalId);
+
+    $this->actingAs($first, 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'One coordinator is enough'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_director')
+        ->assertJsonPath('data.pending_with', 'Director — waiting on Director')
+        ->assertJsonPath('data.timeline.pending_text', 'Director Approval — waiting on Director');
+
+    expect($service->queueQuery($second)->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($first)->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse()
+        ->and(AppNotification::query()->where('user_id', $org['admin']->id)->where('type', 'expense_pending_final')->count())->toBe(0)
+        ->and(AppNotification::query()->where('user_id', $org['director']->id)->where('type', 'expense_pending_level_3')->count())->toBe(1);
+
+    $this->actingAs($second, 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertForbidden();
+
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Director checked'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_final')
+        ->assertJsonPath('data.pending_with', 'Admin — waiting on Admin');
+
+    expect($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeTrue();
+
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 250,
+            'payment_mode' => 'cash',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertForbidden();
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertForbidden();
+
+    $this->actingAs($org['admin'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Admin final'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'approved')
+        ->assertJsonPath('data.payment_status', 'unpaid')
+        ->assertJsonPath('data.status_label', 'Approved / Pending Payment')
+        ->assertJsonPath('data.pending_with', 'Payment');
+
+    expect($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeFalse();
+
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 250,
+            'payment_mode' => 'upi',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertForbidden();
+    $this->actingAs($first, 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 250,
+            'payment_mode' => 'upi',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertForbidden();
+    $this->actingAs($org['admin'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 250,
+            'payment_mode' => 'upi',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.payment_status', 'paid')
+        ->assertJsonPath('data.pending_with', null);
+
+    expect(ExpenseApproval::query()->where('expense_claim_id', $id)->orderBy('level')->pluck('level')->all())->toBe([1, 2, 3, 4])
+        ->and(ExpenseApproval::query()->find($managerApprovalId)?->approver_name)->toBe('CM');
+});
+
+it('advances a stuck manager stage from the stored approval without rewriting it', function () {
+    $org = seedOrg();
+    $peer = User::query()->create([
+        'name' => 'Stuck Peer',
+        'email' => 'stuck-peer@test.local',
+        'login_id' => 'stuckpeer',
+        'password' => Hash::make('CenterMgr@123'),
+        'role' => UserRole::CenterManager->value,
+        'is_active' => true,
+    ]);
+    $org['centerA']->update(['primary_center_manager_id' => $peer->id]);
+    $coordinator = expenseCoordinator($org, 'stuck-coord', 'Stuck Coordinator');
+    $service = app(ExpenseClaimService::class);
+
+    $id = (int) $this->actingAs($org['userA'], 'sanctum')
+        ->post('/api/expenses', expensePayload())
+        ->assertCreated()
+        ->json('data.id');
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->postJson('/api/manager/expenses/'.$id.'/approve', ['remarks' => 'Already approved'])
+        ->assertOk();
+
+    $approval = ExpenseApproval::query()->where('expense_claim_id', $id)->firstOrFail();
+    $original = $approval->only(['id', 'level', 'action', 'user_id', 'approver_name', 'role', 'remarks']);
+    ExpenseClaim::query()->whereKey($id)->update([
+        'status' => ExpenseClaimStatus::PendingCenterManager->value,
+        'current_level' => 1,
+    ]);
+
+    $stuck = ExpenseClaim::query()->findOrFail($id);
+    expect($service->queueQuery($peer)->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['centerManager'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($coordinator)->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->pendingWithText($stuck))->toBe('Center Coordinator — waiting on Stuck Coordinator')
+        ->and($service->pendingWithText($stuck))->not->toContain('Stuck Peer');
+
+    $synced = $service->syncOpenStage($stuck);
+    $approval->refresh();
+
+    expect($synced->status)->toBe(ExpenseClaimStatus::PendingCenterCoordinator)
+        ->and($synced->current_level)->toBe(2)
+        ->and(ExpenseApproval::query()->where('expense_claim_id', $id)->count())->toBe(1)
+        ->and($approval->only(['id', 'level', 'action', 'user_id', 'approver_name', 'role', 'remarks']))->toBe($original);
+});
+
+it('leaves a completed level-3 final approval on the stored approver role', function () {
+    $org = seedOrg();
+    $service = app(ExpenseClaimService::class);
+    $claim = ExpenseClaim::query()->create([
+        'employee_id' => $org['empA']->id,
+        'center_id' => $org['centerA']->id,
+        'scheme_id' => $org['centerA']->scheme_id,
+        'created_by_user_id' => $org['userA']->id,
+        'claim_number' => 'EXP-LEGACY-ADMIN',
+        'status' => ExpenseClaimStatus::Approved,
+        'payment_status' => 'unpaid',
+        'current_level' => 3,
+        'total_amount' => 250,
+        'submitted_at' => now(),
+        'final_approved_at' => now(),
+    ]);
+    $row = ExpenseApproval::query()->create([
+        'expense_claim_id' => $claim->id,
+        'level' => 3,
+        'action' => 'approved',
+        'user_id' => $org['admin']->id,
+        'approver_name' => 'Admin',
+        'role' => 'Admin',
+        'remarks' => 'Old final',
+    ]);
+
+    $presented = $service->present($claim->fresh($service->relations()));
+    $final = collect($presented['timeline']['stages'])->firstWhere('key', 'final');
+
+    expect($service->queueQuery($org['admin'])->whereKey($claim->id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['director'])->whereKey($claim->id)->exists())->toBeFalse()
+        ->and($service->canDecide($org['admin'], $claim->fresh()))->toBeFalse()
+        ->and($service->canDecide($org['director'], $claim->fresh()))->toBeFalse()
+        ->and($presented['pending_with'])->toBe('Payment')
+        ->and(collect($presented['timeline']['stages'])->pluck('key'))->not->toContain('director')
+        ->and($final['person_name'])->toBe('Admin')
+        ->and($final['role'])->toBe('Admin')
+        ->and($final['status_label'])->toBe('Approved')
+        ->and($row->fresh()->remarks)->toBe('Old final');
 });

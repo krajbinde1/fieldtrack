@@ -76,7 +76,7 @@ class ViewExpenseClaim extends ViewRecord
                 });
         }
 
-        if ($user->isAdminOrDirector() && $record->status?->value === 'approved' && $record->payment_status?->value === 'unpaid') {
+        if ($user->isAdmin() && $record->status?->value === 'approved' && $record->payment_status?->value === 'unpaid') {
             $actions[] = Action::make('pay')
                 ->label('Mark Paid')
                 ->color('info')

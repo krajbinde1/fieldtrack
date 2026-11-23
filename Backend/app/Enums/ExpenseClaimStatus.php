@@ -7,6 +7,7 @@ enum ExpenseClaimStatus: string
     case Draft = 'draft';
     case PendingCenterManager = 'pending_center_manager';
     case PendingCenterCoordinator = 'pending_center_coordinator';
+    case PendingDirector = 'pending_director';
     case PendingFinal = 'pending_final';
     case Approved = 'approved';
     case Rejected = 'rejected';
@@ -18,7 +19,8 @@ enum ExpenseClaimStatus: string
             self::Draft => 'Draft',
             self::PendingCenterManager => 'Pending Center Manager',
             self::PendingCenterCoordinator => 'Pending Center Coordinator',
-            self::PendingFinal => 'Pending Final Approval',
+            self::PendingDirector => 'Pending Director',
+            self::PendingFinal => 'Pending Admin',
             self::Approved => 'Approved',
             self::Rejected => 'Rejected',
             self::NeedsResolution => 'Needs Admin Resolution',
@@ -30,7 +32,8 @@ enum ExpenseClaimStatus: string
         return match ($this) {
             self::PendingCenterManager => 1,
             self::PendingCenterCoordinator => 2,
-            self::PendingFinal => 3,
+            self::PendingDirector => 3,
+            self::PendingFinal => 4,
             default => 0,
         };
     }
@@ -40,6 +43,7 @@ enum ExpenseClaimStatus: string
         return in_array($this, [
             self::PendingCenterManager,
             self::PendingCenterCoordinator,
+            self::PendingDirector,
             self::PendingFinal,
             self::NeedsResolution,
         ], true);

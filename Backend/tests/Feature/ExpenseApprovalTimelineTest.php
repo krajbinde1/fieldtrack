@@ -142,7 +142,7 @@ it('shows the same approval timeline to every role and follows each stage', func
     expect(app(\App\Services\Expenses\ExpenseApprovalTimeline::class)->forClaim($claim->fresh()))->toEqual($submitted)
         ->and(ExpenseApproval::query()->where('expense_claim_id', $id)->count())->toBe($rowCount)
         ->and(collect($submitted['stages'])->pluck('key')->all())->toBe([
-            'created', 'center_manager', 'center_coordinator', 'final', 'payment',
+            'created', 'center_manager', 'center_coordinator', 'director', 'admin', 'payment',
         ])
         ->and($submitted['pending_text'])->toBe('Center Manager Approval — waiting on CM');
 
@@ -165,7 +165,8 @@ it('shows the same approval timeline to every role and follows each stage', func
     expect(expenseTimelineStage($submitted, 'center_coordinator')['color'])->toBe('grey')
         ->and(expenseTimelineStage($submitted, 'center_coordinator')['status_label'])->toBe('Not Started')
         ->and(expenseTimelineStage($submitted, 'center_coordinator')['person_name'])->toBeNull()
-        ->and(expenseTimelineStage($submitted, 'final')['color'])->toBe('grey')
+        ->and(expenseTimelineStage($submitted, 'director')['color'])->toBe('grey')
+        ->and(expenseTimelineStage($submitted, 'admin')['color'])->toBe('grey')
         ->and(expenseTimelineStage($submitted, 'payment')['color'])->toBe('grey')
         ->and(expenseTimelineStage($submitted, 'payment')['status'])->toBe('not_started');
 
@@ -223,7 +224,8 @@ it('shows the same approval timeline to every role and follows each stage', func
         ->and($coordinatorStage['pending_names'])->toBe(['Ravi Coordinator'])
         ->and($coordinatorStage['person_name'])->toBe('Ravi Coordinator')
         ->and($afterManager['pending_text'])->toBe('Center Coordinator Approval — waiting on Ravi Coordinator')
-        ->and(expenseTimelineStage($afterManager, 'final')['color'])->toBe('grey')
+        ->and(expenseTimelineStage($afterManager, 'director')['color'])->toBe('grey')
+        ->and(expenseTimelineStage($afterManager, 'admin')['color'])->toBe('grey')
         ->and(expenseTimelineStage($afterManager, 'payment')['color'])->toBe('grey')
         ->and($service->canDecide($coordinator, $claim->fresh()))->toBeTrue()
         ->and($service->canDecide($org['centerManager'], $claim->fresh()))->toBeFalse();
@@ -234,28 +236,44 @@ it('shows the same approval timeline to every role and follows each stage', func
     $afterCoordinator = expenseTimelineFrom($this, $org['director'], '/api/director/expenses/'.$id);
     $coordinatorRow = ExpenseApproval::query()->where('expense_claim_id', $id)->where('level', 2)->firstOrFail();
     $approvedCoordinator = expenseTimelineStage($afterCoordinator, 'center_coordinator');
-    $finalNames = app(ExpenseApproverResolver::class)->finalApprovers($org['userA']->id)->pluck('name')->all();
+    $directorNames = app(ExpenseApproverResolver::class)->directors($org['userA']->id)->pluck('name')->all();
     expect($approvedCoordinator['person_name'])->toBe($coordinatorRow->approver_name)
         ->and($approvedCoordinator['role'])->toBe($coordinatorRow->role)
         ->and($approvedCoordinator['color'])->toBe('green')
         ->and($approvedCoordinator['remarks'])->toBe('Center ok')
-        ->and(expenseTimelineStage($afterCoordinator, 'final')['color'])->toBe('orange')
-        ->and(expenseTimelineStage($afterCoordinator, 'final')['pending_names'])->toBe($finalNames)
-        ->and(expenseTimelineStage($afterCoordinator, 'final')['person_name'])->toBe(implode(', ', $finalNames))
+        ->and(expenseTimelineStage($afterCoordinator, 'director')['color'])->toBe('orange')
+        ->and(expenseTimelineStage($afterCoordinator, 'director')['pending_names'])->toBe($directorNames)
+        ->and(expenseTimelineStage($afterCoordinator, 'director')['person_name'])->toBe(implode(', ', $directorNames))
+        ->and(expenseTimelineStage($afterCoordinator, 'admin')['color'])->toBe('grey')
         ->and(expenseTimelineStage($afterCoordinator, 'payment')['color'])->toBe('grey')
-        ->and($service->canDecide($org['admin'], $claim->fresh()))->toBeTrue()
+        ->and($service->canDecide($org['admin'], $claim->fresh()))->toBeFalse()
         ->and($service->canDecide($org['director'], $claim->fresh()))->toBeTrue()
         ->and($service->canDecide($coordinator, $claim->fresh()))->toBeFalse();
 
     $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Director ok'])
+        ->assertOk();
+    $afterDirector = expenseTimelineFrom($this, $org['admin'], '/api/director/expenses/'.$id);
+    $directorRow = ExpenseApproval::query()->where('expense_claim_id', $id)->where('level', 3)->firstOrFail();
+    $adminNames = app(ExpenseApproverResolver::class)->admins($org['userA']->id)->pluck('name')->all();
+    expect(expenseTimelineStage($afterDirector, 'director')['person_name'])->toBe($directorRow->approver_name)
+        ->and(expenseTimelineStage($afterDirector, 'director')['role'])->toBe('Director')
+        ->and(expenseTimelineStage($afterDirector, 'director')['color'])->toBe('green')
+        ->and(expenseTimelineStage($afterDirector, 'admin')['color'])->toBe('orange')
+        ->and(expenseTimelineStage($afterDirector, 'admin')['pending_names'])->toBe($adminNames)
+        ->and(expenseTimelineStage($afterDirector, 'payment')['color'])->toBe('grey')
+        ->and($service->canDecide($org['admin'], $claim->fresh()))->toBeTrue()
+        ->and($service->canDecide($org['director'], $claim->fresh()))->toBeFalse();
+
+    $this->actingAs($org['admin'], 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Final ok'])
         ->assertOk();
     $approved = expenseTimelineFrom($this, $org['admin'], '/api/director/expenses/'.$id);
-    $finalRow = ExpenseApproval::query()->where('expense_claim_id', $id)->where('level', 3)->firstOrFail();
-    expect(expenseTimelineStage($approved, 'final')['person_name'])->toBe($finalRow->approver_name)
-        ->and(expenseTimelineStage($approved, 'final')['role'])->toBe($finalRow->role)
-        ->and(expenseTimelineStage($approved, 'final')['role'])->toBe('Director')
-        ->and(expenseTimelineStage($approved, 'final')['color'])->toBe('green')
+    $adminRow = ExpenseApproval::query()->where('expense_claim_id', $id)->where('level', 4)->firstOrFail();
+    expect(expenseTimelineStage($approved, 'admin')['person_name'])->toBe($adminRow->approver_name)
+        ->and(expenseTimelineStage($approved, 'admin')['role'])->toBe($adminRow->role)
+        ->and(expenseTimelineStage($approved, 'admin')['role'])->toBe('Admin')
+        ->and(expenseTimelineStage($approved, 'admin')['color'])->toBe('green')
         ->and(expenseTimelineStage($approved, 'payment')['color'])->toBe('orange')
         ->and(expenseTimelineStage($approved, 'payment')['status_label'])->toBe('Pending')
         ->and(expenseTimelineStage($approved, 'payment')['person_name'])->toBeNull()
@@ -292,7 +310,7 @@ it('shows the same approval timeline to every role and follows each stage', func
         ->and($payment['role'])->toBe('Admin')
         ->and($payment['date'])->toBe('23 Nov 2026')
         ->and($payment['remarks'])->toBe('Transferred')
-        ->and(ExpenseApproval::query()->where('expense_claim_id', $id)->count())->toBe(3);
+        ->and(ExpenseApproval::query()->where('expense_claim_id', $id)->count())->toBe(4);
 });
 
 it('keeps later timeline stages grey after a rejection', function () {
@@ -322,7 +340,8 @@ it('keeps later timeline stages grey after a rejection', function () {
         ->and($manager['remarks'])->toBe('Bill is unclear')
         ->and(expenseTimelineStage($timeline, 'center_coordinator')['color'])->toBe('grey')
         ->and(expenseTimelineStage($timeline, 'center_coordinator')['status'])->toBe('not_started')
-        ->and(expenseTimelineStage($timeline, 'final')['color'])->toBe('grey')
+        ->and(expenseTimelineStage($timeline, 'director')['color'])->toBe('grey')
+        ->and(expenseTimelineStage($timeline, 'admin')['color'])->toBe('grey')
         ->and(expenseTimelineStage($timeline, 'payment')['color'])->toBe('grey')
         ->and(expenseTimelineStage($timeline, 'payment')['status_label'])->toBe('Not Started')
         ->and($timeline['pending_text'])->toBeNull();
@@ -352,7 +371,7 @@ it('skips manager approval for a center manager claim and names a missing approv
     expect($blocked->json('data.status'))->toBe('needs_resolution')
         ->and($blocked->json('data.pending_approval'))->toBe('Center Coordinator — no approver is assigned')
         ->and(collect($blockedTimeline['stages'])->pluck('key')->all())->toBe([
-            'created', 'center_coordinator', 'final', 'payment',
+            'created', 'center_coordinator', 'director', 'admin', 'payment',
         ])
         ->and(expenseTimelineStage($blockedTimeline, 'created')['person_name'])->toBe('CM')
         ->and(expenseTimelineStage($blockedTimeline, 'created')['role'])->toBe('Center Manager')
@@ -362,7 +381,8 @@ it('skips manager approval for a center manager claim and names a missing approv
         ->and(expenseTimelineStage($blockedTimeline, 'center_coordinator')['detail'])->toBe('No approver is assigned')
         ->and(expenseTimelineStage($blockedTimeline, 'center_coordinator')['person_name'])->toBeNull()
         ->and($blockedTimeline['pending_text'])->toBe('Center Coordinator Approval — no approver is assigned')
-        ->and(expenseTimelineStage($blockedTimeline, 'final')['color'])->toBe('grey')
+        ->and(expenseTimelineStage($blockedTimeline, 'director')['color'])->toBe('grey')
+        ->and(expenseTimelineStage($blockedTimeline, 'admin')['color'])->toBe('grey')
         ->and(expenseTimelineStage($blockedTimeline, 'payment')['color'])->toBe('grey')
         ->and($service->canDecide($org['admin'], ExpenseClaim::query()->findOrFail($blockedId)))->toBeFalse();
 
