@@ -52,7 +52,7 @@ final class PendingCenterAccount
         }
 
         $payload = self::payload($stored, $errorKey);
-        self::assertAvailable($livewire, $payload, $role, $reuseManager, $errorKey);
+        self::assertAvailable($livewire, $payload, $role, $reuseManager, $errorKey, $key);
 
         $existing = User::query()->whereRaw('lower(login_id) = ?', [mb_strtolower($payload['mobile'])])->lockForUpdate()->first();
         if ($existing instanceof User) {
@@ -220,19 +220,23 @@ final class PendingCenterAccount
     /**
      * @param  array{name: string, mobile: string, email: string}  $payload
      */
-    private static function assertAvailable(object $livewire, array $payload, UserRole $role, bool $reuseManager, string $attribute = 'mobile'): void
+    private static function assertAvailable(object $livewire, array $payload, UserRole $role, bool $reuseManager, string $attribute = 'mobile', ?string $ignorePendingKey = null): void
     {
         $mobile = $payload['mobile'];
         $email = $payload['email'];
         foreach ([self::COORDINATORS, self::MANAGERS] as $bucket) {
-            foreach ($livewire->{$bucket} ?? [] as $pending) {
+            foreach ($livewire->{$bucket} ?? [] as $pendingKey => $pending) {
                 if (! is_array($pending)) {
+                    continue;
+                }
+
+                if ($ignorePendingKey !== null && (string) $pendingKey === $ignorePendingKey) {
                     continue;
                 }
 
                 if (($pending['mobile'] ?? null) === $mobile) {
                     throw ValidationException::withMessages([
-                        'mobile' => 'This Login ID is already taken.',
+                        $attribute => 'This Login ID is already taken.',
                     ]);
                 }
 
