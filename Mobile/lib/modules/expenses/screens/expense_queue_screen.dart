@@ -39,6 +39,14 @@ class _ExpenseQueueScreenState extends State<ExpenseQueueScreen> {
     return (await ExpenseApi.create()).queue(widget.apiPrefix, status: _status);
   }
 
+  String _summary(ExpenseRecord claim) {
+    final center = claim.centerName.isEmpty ? claim.number : claim.centerName;
+    final item = claim.items.isEmpty ? null : claim.items.first;
+    final type = item == null ? '' : ' · ${item['type_label']}';
+    final date = item == null ? '' : ' · ${item['expense_date']}';
+    return '$center · ₹${claim.amount}$type$date';
+  }
+
   @override
   Widget build(BuildContext context) {
     return PgPageScaffold(
@@ -112,7 +120,7 @@ class _ExpenseQueueScreenState extends State<ExpenseQueueScreen> {
                         child: ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(claim.employeeName.isEmpty ? claim.number : claim.employeeName),
-                          subtitle: Text('${claim.number} · ${claim.statusLabel} · ${claim.paymentStatus}'),
+                          subtitle: Text(_summary(claim)),
                           trailing: Text('₹${claim.amount}'),
                         ),
                       ),

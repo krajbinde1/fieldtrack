@@ -16,7 +16,10 @@ class ExpenseClaimInfolist
         return $schema->components([
             Section::make('Claim')->columns(3)->schema([
                 TextEntry::make('claim_number')->label('Claim'),
-                TextEntry::make('employee.full_name')->label('Employee'),
+                TextEntry::make('employee.full_name')
+                    ->label('Employee')
+                    ->placeholder('—')
+                    ->state(fn (ExpenseClaim $record): string => $record->employee?->full_name ?: ($record->createdBy?->name ?? '—')),
                 TextEntry::make('center.name')->label('Center'),
                 TextEntry::make('status')
                     ->badge()

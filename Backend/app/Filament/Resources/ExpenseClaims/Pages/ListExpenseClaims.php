@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ExpenseClaims\Pages;
 use App\Enums\ExpenseClaimStatus;
 use App\Enums\ExpensePaymentStatus;
 use App\Filament\Resources\ExpenseClaims\ExpenseClaimResource;
+use App\Services\Expenses\ExpenseClaimService;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -34,12 +35,16 @@ class ListExpenseClaims extends ListRecords
         }
 
         $tabs['pending'] = Tab::make('Pending Approval')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->whereIn('status', [
-                ExpenseClaimStatus::PendingCenterManager->value,
-                ExpenseClaimStatus::PendingCenterCoordinator->value,
-                ExpenseClaimStatus::PendingFinal->value,
-                ExpenseClaimStatus::NeedsResolution->value,
-            ]));
+            ->modifyQueryUsing(function (Builder $query) use ($user): Builder {
+                if ($user === null) {
+                    return $query->whereRaw('1 = 0');
+                }
+
+                return $query->whereIn(
+                    'expense_claims.id',
+                    app(ExpenseClaimService::class)->queueQuery($user)->select('expense_claims.id'),
+                );
+            });
         $tabs['approved'] = Tab::make('Approved')
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', ExpenseClaimStatus::Approved->value)
                 ->where('payment_status', ExpensePaymentStatus::Unpaid->value));
@@ -51,5 +56,10 @@ class ListExpenseClaims extends ListRecords
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', '!=', ExpenseClaimStatus::Draft->value));
 
         return $tabs;
+    }
+
+    public function getDefaultActiveTab(): string|int|null
+    {
+        return 'pending';
     }
 }

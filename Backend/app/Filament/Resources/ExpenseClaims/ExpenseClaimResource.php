@@ -128,7 +128,7 @@ class ExpenseClaimResource extends Resource
                     TextInput::make('travel_to')->label('Travel to'),
                     TextInput::make('travel_km')->label('Travel km')->numeric(),
                     FileUpload::make('receipt')
-                        ->label('Receipt / Bill')
+                        ->label('Bill photo (optional)')
                         ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
                         ->maxSize(5120)
                         ->storeFiles(false)

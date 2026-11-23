@@ -429,7 +429,7 @@ GoRouter createRouter(
             claimId: int.parse(state.pathParameters['id']!),
             apiPrefix: '/director/expenses',
             canDecide: true,
-            canPay: auth.userRole.isAdmin,
+            canPay: auth.userRole.isAdmin || auth.userRole.isDirector,
           ),
         ),
         GoRoute(

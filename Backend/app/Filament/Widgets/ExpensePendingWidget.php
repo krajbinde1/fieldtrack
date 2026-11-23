@@ -30,7 +30,7 @@ class ExpensePendingWidget extends Widget
     {
         return [
             'count' => app(ExpenseClaimService::class)->pendingCountFor(auth()->user()),
-            'url' => ExpenseClaimResource::getUrl(),
+            'url' => ExpenseClaimResource::getUrl().'?tab=pending',
         ];
     }
 }

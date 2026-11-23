@@ -47,6 +47,7 @@ class ExpenseRecord {
   String get paymentStatus => '${json['payment_status'] ?? ''}';
   String get amount => '${json['total_amount'] ?? '0.00'}';
   String get employeeName => '${json['employee_name'] ?? ''}';
+  String get centerName => '${json['center_name'] ?? ''}';
   String get rejection => '${json['rejection_remarks'] ?? ''}';
   List<Map<String, dynamic>> get items => (json['items'] as List? ?? const [])
       .whereType<Map>()

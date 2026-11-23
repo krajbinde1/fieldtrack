@@ -89,7 +89,7 @@ final class ExpenseClaimService
                 ]);
             }
 
-            $this->replaceItems($claim, $items, $receipts, $submit);
+            $this->replaceItems($claim, $items, $receipts);
             $claim->update([
                 'total_amount' => $claim->items()->sum('amount'),
             ]);
@@ -181,8 +181,8 @@ final class ExpenseClaimService
      */
     public function markPaid(User $user, ExpenseClaim $claim, array $payload): ExpenseClaim
     {
-        if (! $user->isAdmin()) {
-            abort(403, 'Only an admin can record payment.');
+        if (! $user->isAdminOrDirector()) {
+            abort(403, 'Only an admin or director can record payment.');
         }
 
         return DB::transaction(function () use ($user, $claim, $payload): ExpenseClaim {
@@ -279,13 +279,13 @@ final class ExpenseClaimService
         if ($user->isCenterCoordinator()) {
             return $query
                 ->where('status', ExpenseClaimStatus::PendingCenterCoordinator->value)
-                ->where('designated_approver_id', $user->id);
+                ->where('created_by_user_id', '!=', $user->id);
         }
 
         if ($user->isCenterManager()) {
             return $query
                 ->where('status', ExpenseClaimStatus::PendingCenterManager->value)
-                ->where('designated_approver_id', $user->id);
+                ->where('created_by_user_id', '!=', $user->id);
         }
 
         return $query->whereRaw('1 = 0');
@@ -381,14 +381,6 @@ final class ExpenseClaimService
             throw ValidationException::withMessages([
                 'items' => 'Add at least one expense before submitting.',
             ]);
-        }
-
-        foreach ($claim->items as $item) {
-            if (! $item->hasReceipt()) {
-                throw ValidationException::withMessages([
-                    'receipts' => 'Each expense needs a receipt before it can be submitted.',
-                ]);
-            }
         }
 
         $claim->update([
@@ -489,11 +481,11 @@ final class ExpenseClaimService
             return;
         }
 
-        $approver = $center === null ? null : ($level === 1
-            ? $this->approvers->manager($center, $claimantId)
-            : $this->approvers->coordinator($center, $claimantId));
+        $approvers = $center === null ? collect() : ($level === 1
+            ? $this->approvers->managers($center, $claimantId)
+            : $this->approvers->coordinators($center, $claimantId));
 
-        if (! $approver instanceof User) {
+        if ($approvers->isEmpty()) {
             $this->block($claim, $level);
 
             return;
@@ -505,14 +497,14 @@ final class ExpenseClaimService
                 : ExpenseClaimStatus::PendingCenterCoordinator,
             'current_level' => $level,
             'blocked_level' => null,
-            'designated_approver_id' => $approver->id,
+            'designated_approver_id' => $approvers->first()->id,
         ]);
         $fresh = $claim->fresh();
         $route = $level === 1
             ? '/manager/expenses/'.$fresh->id
             : '/director/expenses/'.$fresh->id;
-        $this->notifier->notifyUser(
-            $approver,
+        $this->notifier->notifyUsers(
+            $approvers,
             $fresh,
             'expense_pending_level_'.$level,
             'Expense awaiting your approval',
@@ -593,8 +585,8 @@ final class ExpenseClaimService
         }
 
         $level = (int) $expected[1];
-        if ($level < 3 && (int) $claim->designated_approver_id !== (int) $user->id) {
-            abort(403, 'This expense is assigned to another approver.');
+        if ($level < 3 && ! $this->userCanActAtLevel($user, $claim, $level)) {
+            abort(403, 'This expense is outside your center assignment.');
         }
 
         if ($claim->approvals()->where('level', $level)->exists()) {
@@ -604,6 +596,22 @@ final class ExpenseClaimService
         }
 
         return $level;
+    }
+
+    private function userCanActAtLevel(User $user, ExpenseClaim $claim, int $level): bool
+    {
+        $claim->loadMissing('center');
+        $center = $claim->center;
+        if ($center === null) {
+            return false;
+        }
+
+        $claimantId = (int) $claim->created_by_user_id;
+        $pool = $level === 1
+            ? $this->approvers->managers($center, $claimantId)
+            : $this->approvers->coordinators($center, $claimantId);
+
+        return $pool->contains(fn (User $approver): bool => (int) $approver->id === (int) $user->id);
     }
 
     private function recordDecision(ExpenseClaim $claim, User $user, int $level, string $action, ?string $remarks): void
@@ -623,7 +631,7 @@ final class ExpenseClaimService
      * @param  list<array<string, mixed>>  $items
      * @param  array<int, UploadedFile|null>  $receipts
      */
-    private function replaceItems(ExpenseClaim $claim, array $items, array $receipts, bool $submit): void
+    private function replaceItems(ExpenseClaim $claim, array $items, array $receipts): void
     {
         if ($items === []) {
             throw ValidationException::withMessages([
@@ -677,10 +685,6 @@ final class ExpenseClaimService
                 $stored['receipt_original_name'] = $old->receipt_original_name;
                 $stored['receipt_mime'] = $old->receipt_mime;
                 $old->receipt_path = null;
-            } elseif ($submit) {
-                throw ValidationException::withMessages([
-                    'receipts' => 'Each expense needs a receipt before it can be submitted.',
-                ]);
             }
 
             $claim->items()->create($stored);

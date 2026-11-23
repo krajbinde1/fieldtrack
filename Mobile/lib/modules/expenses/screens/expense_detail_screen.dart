@@ -97,6 +97,8 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
             children: [
               Text(claim.number, style: Theme.of(context).textTheme.titleLarge),
               Text(claim.statusLabel),
+              if (claim.employeeName.isNotEmpty) Text(claim.employeeName),
+              if (claim.centerName.isNotEmpty) Text(claim.centerName),
               Text('Amount ₹${claim.amount}'),
               Text('Payment: ${claim.paymentStatus}'),
               if (claim.rejection.isNotEmpty) Text('Remarks: ${claim.rejection}'),

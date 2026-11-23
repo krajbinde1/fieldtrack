@@ -107,7 +107,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                   if (file != null) setState(() => _lines[index].receipt = file.path);
                 },
                 icon: const Icon(Icons.receipt_long_outlined),
-                label: Text(_lines[index].receipt == null ? 'Add receipt' : 'Receipt added'),
+                label: Text(_lines[index].receipt == null ? 'Add bill photo (optional)' : 'Bill photo added'),
               ),
             ),
             const Divider(),
