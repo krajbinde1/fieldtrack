@@ -19,10 +19,21 @@ it('lets a director list every active center and open a selected center dashboar
 
     Sanctum::actingAs($org['director']);
 
+    $outside = \App\Models\Center::create([
+        'scheme_id' => $org['projectA']->id,
+        'name' => 'Unassigned Center',
+        'code' => 'CU',
+        'is_active' => true,
+    ]);
+
     $centers = $this->getJson('/api/director/centers')->assertOk()->json('data');
     $ids = collect($centers)->pluck('id')->all();
     expect($ids)->toContain($org['centerA']->id)
-        ->and($ids)->toContain($org['centerB']->id);
+        ->and($ids)->toContain($org['centerB']->id)
+        ->and($ids)->not->toContain($outside->id);
+
+    $this->getJson('/api/director/centers/'.$outside->id)->assertForbidden();
+    $this->getJson('/api/dashboard?center_id='.$outside->id)->assertForbidden();
 
     $centerA = collect($centers)->firstWhere('id', $org['centerA']->id);
     expect($centerA['name'])->toBe('Center A')

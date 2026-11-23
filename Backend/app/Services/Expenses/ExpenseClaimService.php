@@ -457,8 +457,8 @@ final class ExpenseClaimService
     }
 
     /**
-     * Rejected claims in this user's centers. Admin and Director keep organization-wide visibility.
-     * Another center is not included for a center manager or coordinator.
+     * Rejected claims in this user's centers. Admin keeps organization-wide visibility.
+     * Director, center manager, and coordinator stay inside their assigned centers.
      */
     private function rejectedCenterQuery(User $user): Builder
     {
@@ -684,7 +684,7 @@ final class ExpenseClaimService
         $pool = match ($level) {
             1 => $center === null ? collect() : $this->approvers->managers($center, $claimantId),
             2 => $center === null ? collect() : $this->approvers->coordinators($center, $claimantId),
-            3 => $this->approvers->directors($claimantId),
+            3 => $center === null ? collect() : $this->approvers->directors($center, $claimantId),
             4 => $this->approvers->admins($claimantId),
             default => collect(),
         };
@@ -807,7 +807,7 @@ final class ExpenseClaimService
         }
 
         if ($level === 3) {
-            $pool = $this->approvers->directors($claimantId);
+            $pool = $center === null ? collect() : $this->approvers->directors($center, $claimantId);
             if ($pool->isEmpty()) {
                 $this->block($claim, 3);
 
@@ -967,7 +967,7 @@ final class ExpenseClaimService
             abort(403, 'This expense is not waiting for your approval.');
         }
 
-        if ($level <= 2 && ! $this->userCanActAtLevel($user, $claim, $level)) {
+        if (in_array($level, [1, 2, 3], true) && ! $this->userCanActAtLevel($user, $claim, $level)) {
             abort(403, 'This expense is outside your center assignment.');
         }
 
@@ -1033,9 +1033,12 @@ final class ExpenseClaimService
         }
 
         $claimantId = (int) $claim->created_by_user_id;
-        $pool = $level === 1
-            ? $this->approvers->managers($center, $claimantId)
-            : $this->approvers->coordinators($center, $claimantId);
+        $pool = match ($level) {
+            1 => $this->approvers->managers($center, $claimantId),
+            2 => $this->approvers->coordinators($center, $claimantId),
+            3 => $this->approvers->directors($center, $claimantId),
+            default => collect(),
+        };
 
         if ($pool->contains(fn (User $approver): bool => (int) $approver->id === (int) $user->id)) {
             return true;

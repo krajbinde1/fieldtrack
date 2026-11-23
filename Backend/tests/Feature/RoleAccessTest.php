@@ -54,8 +54,9 @@ it('allows admin to view every employee route', function () {
         ->assertOk();
 });
 
-it('lets a director view routes from every project', function () {
+it('lets a director view routes only for assigned centers', function () {
     $org = seedOrg();
+    $org['director']->directedCenters()->sync([$org['centerA']->id]);
     $own = Attendance::create([
         'employee_id' => $org['empA']->id,
         'attendance_date' => AttendanceCalendar::today()->toDateString(),
@@ -73,6 +74,22 @@ it('lets a director view routes from every project', function () {
 
     Sanctum::actingAs($org['director']);
 
+    $this->getJson('/api/director/route-tracking/'.$own->id)->assertOk();
+    $this->getJson('/api/director/route-tracking/'.$other->id)->assertForbidden();
+
+    $unassigned = User::create([
+        'name' => 'Unassigned Director',
+        'email' => 'unassigned-director@test.local',
+        'login_id' => 'unassigneddir',
+        'password' => Hash::make('Director@123'),
+        'role' => UserRole::Director->value,
+        'is_active' => true,
+    ]);
+    Sanctum::actingAs($unassigned);
+    $this->getJson('/api/director/route-tracking/'.$own->id)->assertForbidden();
+    $this->getJson('/api/director/route-tracking/'.$other->id)->assertForbidden();
+
+    Sanctum::actingAs($org['admin']);
     $this->getJson('/api/director/route-tracking/'.$own->id)->assertOk();
     $this->getJson('/api/director/route-tracking/'.$other->id)->assertOk();
 });
@@ -380,18 +397,35 @@ it('lets a project head access centers from different projects when those center
         ->and($access->canViewEmployee($org['projectHead'], $org['empB']))->toBeFalse();
 });
 
-it('gives a director organization-wide access without project or center assignment', function () {
+it('limits a director to assigned centers and keeps admin organization-wide', function () {
     $org = seedOrg();
     $access = app(OrganizationAccessService::class);
+    $org['director']->directedCenters()->sync([$org['centerA']->id]);
+
+    $unassigned = User::create([
+        'name' => 'Unassigned Director',
+        'email' => 'unassigned-director-access@test.local',
+        'login_id' => 'unassigneddir2',
+        'password' => Hash::make('Director@123'),
+        'role' => UserRole::Director->value,
+        'is_active' => true,
+    ]);
 
     expect($org['director']->directedProjects()->count())->toBe(0)
-        ->and($access->visibleProjectIds($org['director']))->toBeNull()
-        ->and($access->visibleCenterIds($org['director']))->toBeNull()
-        ->and($access->visibleEmployeeIds($org['director']))->toBeNull()
+        ->and($access->hasOrganizationWideAccess($org['director']))->toBeFalse()
+        ->and($access->hasOrganizationWideAccess($org['admin']))->toBeTrue()
+        ->and($access->visibleProjectIds($org['admin']))->toBeNull()
+        ->and($access->visibleCenterIds($org['admin']))->toBeNull()
+        ->and($access->visibleCenterIds($org['director']))->toBe([$org['centerA']->id])
+        ->and($access->visibleProjectIds($org['director']))->toBe([$org['projectA']->id])
+        ->and($access->visibleCenterIds($unassigned))->toBe([])
+        ->and($access->visibleEmployeeIds($unassigned))->toBe([])
         ->and($access->canViewEmployee($org['director'], $org['empA']))->toBeTrue()
-        ->and($access->canViewEmployee($org['director'], $org['empB']))->toBeTrue()
+        ->and($access->canViewEmployee($org['director'], $org['empB']))->toBeFalse()
+        ->and($access->canViewEmployee($unassigned, $org['empA']))->toBeFalse()
         ->and($access->canManageOrgUser($org['director'], $org['projectHead']))->toBeTrue()
-        ->and($access->canManageOrgUser($org['director'], $org['centerManager']))->toBeTrue();
+        ->and($access->canManageOrgUser($org['director'], $org['centerManager']))->toBeTrue()
+        ->and($access->canManageOrgUser($unassigned, $org['centerManager']))->toBeFalse();
 });
 
 it('registers the Center Manager mobile module API routes', function () {
@@ -576,7 +610,7 @@ it('lets a center manager punch using the employee attendance API without joinin
         ->and($employeeIds)->not->toContain($org['centerManager']->fresh()->employee_id);
 });
 
-it('lets a director use organization-wide operations without admin system controls', function () {
+it('lets a director use assigned-center operations without admin system controls', function () {
     $org = seedOrg();
     $unchanged = [
         'director' => $org['director']->only(['id', 'role', 'is_active', 'login_id']),
@@ -593,13 +627,13 @@ it('lets a director use organization-wide operations without admin system contro
         ->assertJsonPath('user.role', UserRole::Director->value)
         ->assertJsonPath('permissions', [
             'director_dashboard',
-            'attendance_view_all',
-            'route_tracking_view_all',
-            'leave_view_all',
-            'expense_approve_all',
+            'attendance_view_assigned',
+            'route_tracking_view_assigned',
+            'leave_view_assigned',
+            'expense_approve_assigned',
             'expense_payment',
-            'admissions_view_all',
-            'admission_target_view_all',
+            'admissions_view_assigned',
+            'admission_target_view_assigned',
         ]);
 
     $this->actingAs($org['director'], 'sanctum')
@@ -613,6 +647,24 @@ it('lets a director use organization-wide operations without admin system contro
         ->assertOk()
         ->assertJsonFragment(['name' => 'Center A'])
         ->assertJsonFragment(['name' => 'Center B']);
+
+    $unassigned = User::create([
+        'name' => 'No Centers',
+        'email' => 'no-centers@test.local',
+        'login_id' => 'nocenters',
+        'password' => Hash::make('Director@123'),
+        'role' => UserRole::Director->value,
+        'is_active' => true,
+    ]);
+    $this->actingAs($unassigned, 'sanctum')
+        ->getJson('/api/dashboard')
+        ->assertOk()
+        ->assertJsonPath('data.centers', 0);
+    expect($this->actingAs($unassigned, 'sanctum')->getJson('/api/director/centers')->assertOk()->json('data'))->toBe([])
+        ->and(collect($this->actingAs($unassigned, 'sanctum')->getJson('/api/director/employees')->assertOk()->json('data'))->pluck('id')->all())->toBe([]);
+
+    $adminCenters = collect($this->actingAs($org['admin'], 'sanctum')->getJson('/api/director/centers')->assertOk()->json('data'))->pluck('name');
+    expect($adminCenters)->toContain('Center A', 'Center B');
 
     $this->actingAs($org['director'], 'sanctum')
         ->getJson('/api/director/employees')

@@ -103,7 +103,7 @@ class OrgUserResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
-            ->with(['headedCenters', 'managedCenters', 'coordinatedCenters', 'employee.center'])
+            ->with(['headedCenters', 'managedCenters', 'coordinatedCenters', 'directedCenters', 'employee.center'])
             ->where('is_center_login', false);
         $user = auth()->user();
         $access = app(OrganizationAccessService::class);
@@ -115,16 +115,22 @@ class OrgUserResource extends Resource
         $roles = $access->visibleOrgUserRoles($user);
         $query->whereIn('role', $roles);
 
-        if ($user->isAdmin() || $user->isDirector()) {
-            if ($user->isAdmin()) {
-                $centerId = app(AdminCenterContext::class)->idFor($user);
+        if ($user->isAdmin()) {
+            $centerId = app(AdminCenterContext::class)->idFor($user);
 
-                return $centerId === null
-                    ? $query
-                    : self::constrainUsersByCenterId($query, $centerId);
-            }
+            return $centerId === null
+                ? $query
+                : self::constrainUsersByCenterId($query, $centerId);
+        }
 
-            return $query;
+        if ($user->isDirector()) {
+            $centerIds = $access->visibleCenterIds($user) ?? [];
+
+            return $query->where(function (Builder $inner) use ($centerIds): void {
+                $inner->whereHas('managedCenters', fn ($q) => $q->whereIn('centers.id', $centerIds))
+                    ->orWhereHas('coordinatedCenters', fn ($q) => $q->whereIn('centers.id', $centerIds))
+                    ->orWhereHas('headedCenters', fn ($q) => $q->whereIn('centers.id', $centerIds));
+            });
         }
 
         $centerIds = $access->visibleCenterIds($user) ?? [];
@@ -166,6 +172,23 @@ class OrgUserResource extends Resource
                 ->dehydrated(fn ($state) => filled($state))
                 ->required(fn (string $operation): bool => $operation === 'create')
                 ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make($state) : null),
+            CenterAssignmentSelect::make('directedCenters')
+                ->label('Assign Centers')
+                ->helperText('This Director can view and manage only these centers. Choose one center, several centers, or every center.')
+                ->required(false)
+                ->visible(fn ($get): bool => $get('role') === UserRole::Director->value && auth()->user()?->isAdmin() === true)
+                ->saveRelationshipsUsing(function (User $record, $state): void {
+                    abort_unless(auth()->user()?->isAdmin() === true, 403);
+                    if (! $record->isDirector()) {
+                        return;
+                    }
+
+                    $ids = array_values(array_unique(array_map(
+                        fn ($id): int => (int) $id,
+                        is_array($state) ? $state : [],
+                    )));
+                    $record->directedCenters()->sync($ids);
+                }),
             CenterAssignmentSelect::make('coordinatedCenters')
                 ->label('Assigned Centers')
                 ->helperText('This Center Coordinator can view only these centers. A center can have more than one coordinator.')
@@ -282,6 +305,7 @@ class OrgUserResource extends Resource
     {
         return $query->where(function (Builder $inner) use ($centerId): void {
             $inner->whereHas('headedCenters', fn (Builder $centers) => $centers->where('centers.id', $centerId))
+                ->orWhereHas('directedCenters', fn (Builder $centers) => $centers->where('centers.id', $centerId))
                 ->orWhereHas('coordinatedCenters', fn (Builder $centers) => $centers->where('centers.id', $centerId))
                 ->orWhereHas('managedCenters', fn (Builder $centers) => $centers->where('centers.id', $centerId))
                 ->orWhereHas('employee', fn (Builder $employee) => $employee->where('center_id', $centerId));
@@ -294,6 +318,7 @@ class OrgUserResource extends Resource
 
         return $query->where(function (Builder $inner) use ($term): void {
             $inner->whereHas('headedCenters', fn (Builder $centers) => $centers->where('centers.name', 'like', $term))
+                ->orWhereHas('directedCenters', fn (Builder $centers) => $centers->where('centers.name', 'like', $term))
                 ->orWhereHas('coordinatedCenters', fn (Builder $centers) => $centers->where('centers.name', 'like', $term))
                 ->orWhereHas('managedCenters', fn (Builder $centers) => $centers->where('centers.name', 'like', $term))
                 ->orWhereHas('employee.center', fn (Builder $centers) => $centers->where('name', 'like', $term));

@@ -328,7 +328,7 @@ final class ExpenseApprovalTimeline
         $pool = match ($level) {
             1 => $center === null ? collect() : $this->approvers->managers($center, $claimantId),
             2 => $center === null ? collect() : $this->approvers->coordinators($center, $claimantId),
-            3 => $this->approvers->directors($claimantId),
+            3 => $center === null ? collect() : $this->approvers->directors($center, $claimantId),
             4 => $this->approvers->admins($claimantId),
             default => collect(),
         };

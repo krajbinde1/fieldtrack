@@ -74,6 +74,7 @@ function seedOrg(): array
         'role' => UserRole::Director->value,
         'is_active' => true,
     ]);
+    $director->directedCenters()->attach([$centerA->id, $centerB->id]);
 
     $projectHead = User::create([
         'name' => 'PH',

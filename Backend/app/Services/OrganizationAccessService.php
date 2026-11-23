@@ -23,30 +23,16 @@ final class OrganizationAccessService
      */
     public function visibleProjectIds(User $user): ?array
     {
+        if ($user->isDirector()) {
+            return $this->schemeIdsForCenters($this->visibleCenterIds($user) ?? []);
+        }
+
         if ($this->hasOrganizationWideAccess($user)) {
             return null;
         }
 
-        if ($user->isCenterCoordinator()) {
-            return Center::query()
-                ->whereIn('id', $this->visibleCenterIds($user) ?? [])
-                ->pluck('scheme_id')
-                ->filter()
-                ->unique()
-                ->map(fn ($id) => (int) $id)
-                ->values()
-                ->all();
-        }
-
-        if ($user->isCenterManager()) {
-            return Center::query()
-                ->whereIn('id', $this->visibleCenterIds($user) ?? [])
-                ->pluck('scheme_id')
-                ->filter()
-                ->unique()
-                ->map(fn ($id) => (int) $id)
-                ->values()
-                ->all();
+        if ($user->isCenterCoordinator() || $user->isCenterManager()) {
+            return $this->schemeIdsForCenters($this->visibleCenterIds($user) ?? []);
         }
 
         if ($user->isEmployeeUser() && $user->employee) {
@@ -67,6 +53,10 @@ final class OrganizationAccessService
      */
     public function visibleCenterIds(User $user): ?array
     {
+        if ($user->isDirector()) {
+            return $user->directedCenters()->pluck('centers.id')->map(fn ($id) => (int) $id)->all();
+        }
+
         if ($this->hasOrganizationWideAccess($user)) {
             return null;
         }
@@ -97,7 +87,7 @@ final class OrganizationAccessService
      */
     public function visibleEmployeeIds(User $user): ?array
     {
-        if ($this->hasOrganizationWideAccess($user)) {
+        if (! $user->isDirector() && $this->hasOrganizationWideAccess($user)) {
             return null;
         }
 
@@ -365,8 +355,15 @@ final class OrganizationAccessService
                 && $this->canViewLeave($user, $leave);
         }
 
-        if ($user->isAdminOrDirector()) {
+        if ($user->isAdmin()) {
             return $this->isProjectHeadLeave($leave);
+        }
+
+        if ($user->isDirector()) {
+            $centerIds = $this->visibleCenterIds($user) ?? [];
+
+            return $this->isProjectHeadLeave($leave)
+                && in_array((int) $leave->center_id, $centerIds, true);
         }
 
         return false;
@@ -404,8 +401,14 @@ final class OrganizationAccessService
             return false;
         }
 
-        if ($this->hasOrganizationWideAccess($user)) {
+        if ($user->isAdmin()) {
             return true;
+        }
+
+        if ($user->isDirector()) {
+            $centerIds = $this->visibleCenterIds($user) ?? [];
+
+            return in_array((int) $admission->center_id, $centerIds, true);
         }
 
         if (! $user->isCenterManager()) {
@@ -531,16 +534,32 @@ final class OrganizationAccessService
 
     public function canManageCenters(User $user, Scheme|Center|null $scope = null): bool
     {
-        return $this->hasOrganizationWideAccess($user);
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if (! $user->isDirector()) {
+            return false;
+        }
+
+        if ($scope instanceof Center) {
+            return in_array((int) $scope->id, $this->visibleCenterIds($user) ?? [], true);
+        }
+
+        if ($scope instanceof Scheme) {
+            return in_array((int) $scope->id, $this->visibleProjectIds($user) ?? [], true);
+        }
+
+        return true;
     }
 
     public function canManageCenterManagers(User $user, ?Center $center = null): bool
     {
-        if ($this->hasOrganizationWideAccess($user)) {
+        if ($user->isAdmin()) {
             return true;
         }
 
-        if (! $user->isCenterCoordinator()) {
+        if (! $user->isDirector() && ! $user->isCenterCoordinator()) {
             return false;
         }
 
@@ -714,7 +733,18 @@ final class OrganizationAccessService
         }
 
         if ($actor->isDirector()) {
-            return $record->isCenterCoordinator() || $record->isProjectHead() || $record->isCenterManager();
+            if (! ($record->isCenterCoordinator() || $record->isProjectHead() || $record->isCenterManager())) {
+                return false;
+            }
+
+            $centerIds = $this->visibleCenterIds($actor) ?? [];
+
+            return $centerIds !== []
+                && (
+                    $record->coordinatedCenters()->whereIn('centers.id', $centerIds)->exists()
+                    || $record->headedCenters()->whereIn('centers.id', $centerIds)->exists()
+                    || $record->managedCenters()->whereIn('centers.id', $centerIds)->exists()
+                );
         }
 
         if ($actor->isCenterCoordinator() && $record->isCenterManager()) {
@@ -768,6 +798,22 @@ final class OrganizationAccessService
 
     public function hasOrganizationWideAccess(User $user): bool
     {
-        return $user->isAdmin() || $user->isDirector();
+        return $user->isAdmin();
+    }
+
+    /**
+     * @param  list<int>  $centerIds
+     * @return list<int>
+     */
+    private function schemeIdsForCenters(array $centerIds): array
+    {
+        return Center::query()
+            ->whereIn('id', $centerIds === [] ? [-1] : $centerIds)
+            ->pluck('scheme_id')
+            ->filter()
+            ->unique()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
     }
 }

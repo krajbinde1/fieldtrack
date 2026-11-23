@@ -278,5 +278,5 @@ it('keeps trainer mobilizer and the combined food and hostel supervisor assignab
         ->and($access->canManageEmployees($org['centerManager'], $org['centerB']))->toBeFalse()
         ->and($access->visibleCenterIds($org['centerManager']))->toBe([$org['centerA']->id])
         ->and($access->hasOrganizationWideAccess($org['admin']))->toBeTrue()
-        ->and($access->hasOrganizationWideAccess($org['director']))->toBeTrue();
+        ->and($access->hasOrganizationWideAccess($org['director']))->toBeFalse();
 });

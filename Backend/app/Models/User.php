@@ -95,6 +95,12 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
             ->withTimestamps();
     }
 
+    public function directedCenters(): BelongsToMany
+    {
+        return $this->belongsToMany(Center::class, 'center_director_assignments')
+            ->withTimestamps();
+    }
+
     public function centerLogin(): HasOne
     {
         return $this->hasOne(Center::class, 'login_user_id');
@@ -164,7 +170,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
     }
 
     /**
-     * Center names already assigned to this user. Empty for Admin/Director.
+     * Center names already assigned to this user. Empty for Admin.
      *
      * @return list<string>
      */
@@ -172,6 +178,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar, HasName
     {
         $centers = match (true) {
             $this->isCenterLogin() => collect([$this->centerLogin])->filter(),
+            $this->isDirector() => $this->directedCenters,
             $this->isCenterCoordinator() => $this->coordinatedCenters,
             $this->isProjectHead() => $this->headedCenters,
             $this->isCenterManager() => $this->managedCenters,

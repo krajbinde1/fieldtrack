@@ -236,7 +236,7 @@ it('shows the same approval timeline to every role and follows each stage', func
     $afterCoordinator = expenseTimelineFrom($this, $org['director'], '/api/director/expenses/'.$id);
     $coordinatorRow = ExpenseApproval::query()->where('expense_claim_id', $id)->where('level', 2)->firstOrFail();
     $approvedCoordinator = expenseTimelineStage($afterCoordinator, 'center_coordinator');
-    $directorNames = app(ExpenseApproverResolver::class)->directors($org['userA']->id)->pluck('name')->all();
+    $directorNames = app(ExpenseApproverResolver::class)->directors($org['centerA'], $org['userA']->id)->pluck('name')->all();
     expect($approvedCoordinator['person_name'])->toBe($coordinatorRow->approver_name)
         ->and($approvedCoordinator['role'])->toBe($coordinatorRow->role)
         ->and($approvedCoordinator['color'])->toBe('green')

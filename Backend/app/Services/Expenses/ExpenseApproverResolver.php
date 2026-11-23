@@ -68,11 +68,15 @@ final class ExpenseApproverResolver
     }
 
     /**
+     * Directors assigned to this center. Directors of other centers are not approvers.
+     *
      * @return Collection<int, User>
      */
-    public function directors(int $claimantUserId): Collection
+    public function directors(Center $center, int $claimantUserId): Collection
     {
-        return $this->activeRole(UserRole::Director, $claimantUserId);
+        return $this->activeAssigned($center->directors(), UserRole::Director)
+            ->reject(fn (User $user): bool => (int) $user->id === $claimantUserId)
+            ->values();
     }
 
     /**

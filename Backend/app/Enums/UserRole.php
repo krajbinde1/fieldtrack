@@ -94,7 +94,7 @@ enum UserRole: string
 
     public function canViewAllOrganization(): bool
     {
-        return $this === self::Admin || $this === self::Director;
+        return $this === self::Admin;
     }
 
     /**
@@ -132,13 +132,13 @@ enum UserRole: string
             self::ProjectHead => [],
             self::Director => [
                 'director_dashboard',
-                'attendance_view_all',
-                'route_tracking_view_all',
-                'leave_view_all',
-                'expense_approve_all',
+                'attendance_view_assigned',
+                'route_tracking_view_assigned',
+                'leave_view_assigned',
+                'expense_approve_assigned',
                 'expense_payment',
-                'admissions_view_all',
-                'admission_target_view_all',
+                'admissions_view_assigned',
+                'admission_target_view_assigned',
             ],
             self::Admin => [
                 'admin_dashboard',

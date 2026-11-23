@@ -114,8 +114,17 @@ it('lets a director view assigned-scope pages but not admin-only management', fu
     $this->actingAs($director)->get('/admin/admissions')->assertRedirect('/admin/centers');
     $this->actingAs($director)->get('/admin/attendances')->assertRedirect('/admin/centers');
 
+    $demoCenterId = Center::query()->where('code', 'C1')->value('id');
+    $otherCenterId = Center::query()->where('code', 'C9')->value('id');
+    $director->directedCenters()->sync([$demoCenterId]);
+
     $this->withSession([
-        AdminCenterContext::SESSION_KEY => Center::query()->where('code', 'C1')->value('id'),
+        AdminCenterContext::SESSION_KEY => $otherCenterId,
+    ]);
+    $this->actingAs($director->fresh())->get('/admin/admissions')->assertRedirect('/admin/centers');
+
+    $this->withSession([
+        AdminCenterContext::SESSION_KEY => $demoCenterId,
     ]);
     $this->actingAs($director)->get('/admin/admissions')->assertOk();
     $this->actingAs($director)->get('/admin/leave-requests')->assertOk();

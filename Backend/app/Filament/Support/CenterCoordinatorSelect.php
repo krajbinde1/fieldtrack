@@ -74,19 +74,34 @@ final class CenterCoordinatorSelect
                 $operation = $component->getContainer()?->getOperation();
 
                 if ($operation !== 'create') {
-                    abort_unless(self::canAssign(), 403);
+                    abort_unless(self::canAssign($record), 403);
                 }
 
                 self::sync($component, $record, $state);
             });
     }
 
-    public static function canAssign(): bool
+    public static function canAssign(?Center $center = null): bool
     {
         $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return false;
+        }
 
-        return $actor instanceof User
-            && app(OrganizationAccessService::class)->hasOrganizationWideAccess($actor);
+        if ($actor->isAdmin()) {
+            return true;
+        }
+
+        if (! $actor->isDirector()) {
+            return false;
+        }
+
+        $ids = app(OrganizationAccessService::class)->visibleCenterIds($actor) ?? [];
+        if (! $center instanceof Center || ! $center->exists) {
+            return $ids !== [];
+        }
+
+        return in_array((int) $center->id, $ids, true);
     }
 
     public static function assignAction(): Action
@@ -95,22 +110,21 @@ final class CenterCoordinatorSelect
             ->label('Assign Coordinators')
             ->modalHeading('Assign Coordinators')
             ->modalSubmitActionLabel('Save')
-            ->authorize(fn (): bool => self::canAssign())
+            ->authorize(fn (Center $record): bool => self::canAssign($record))
             ->schema([
                 self::make(),
             ])
             ->mountUsing(function (Action $action, ?Schema $schema): void {
-                abort_unless(self::canAssign(), 403);
-
                 $record = $action->getRecord();
+                abort_unless(self::canAssign($record instanceof Center ? $record : null), 403);
                 $ids = $record instanceof Center
                     ? $record->coordinators()->pluck('users.id')->map(fn ($id): string => (string) $id)->all()
                     : [];
 
                 $schema?->fill(['coordinators' => $ids]);
             })
-            ->before(function (): void {
-                abort_unless(self::canAssign(), 403);
+            ->before(function (Center $record): void {
+                abort_unless(self::canAssign($record), 403);
             })
             ->action(function (): void {
                 Notification::make()

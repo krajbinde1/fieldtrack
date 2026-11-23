@@ -84,6 +84,12 @@ class Center extends Model
             ->withTimestamps();
     }
 
+    public function directors(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'center_director_assignments')
+            ->withTimestamps();
+    }
+
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);

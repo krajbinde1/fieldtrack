@@ -357,14 +357,29 @@ it('rejects a duplicate login id on the people users module', function () {
         ->assertHasFormErrors(['login_id']);
 });
 
-it('lets a director see center managers from every center without a project assignment', function () {
+it('lets a director see center managers only for assigned centers', function () {
     $director = User::query()->where('login_id', 'fielddirector')->firstOrFail();
     $own = User::query()->where('login_id', 'centermgr')->firstOrFail();
     $other = User::query()->where('login_id', 'othermgr')->firstOrFail();
+    $demo = Center::query()->where('name', 'Demo Center')->firstOrFail();
+    $otherCenter = Center::query()->where('name', 'Other Center')->firstOrFail();
 
     expect($director->directedProjects()->count())->toBe(0);
 
     Livewire::actingAs($director)
+        ->test(ListOrgUsers::class)
+        ->assertCanNotSeeTableRecords([$own, $other]);
+
+    $director->directedCenters()->sync([$demo->id]);
+
+    Livewire::actingAs($director->fresh())
+        ->test(ListOrgUsers::class)
+        ->assertCanSeeTableRecords([$own])
+        ->assertCanNotSeeTableRecords([$other]);
+
+    $director->directedCenters()->sync([$demo->id, $otherCenter->id]);
+
+    Livewire::actingAs($director->fresh())
         ->test(ListOrgUsers::class)
         ->assertCanSeeTableRecords([$own, $other]);
 });
