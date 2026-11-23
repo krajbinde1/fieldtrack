@@ -25,9 +25,9 @@ class DashboardController extends Controller
         }
         $employeeIds = (clone $employeeQuery)->pluck('id');
         $directorOrgDashboard = $user->isAdminOrDirector() && $centerId === null;
-        $projectHeadOrgDashboard = $user->isCenterCoordinator() && $centerId === null;
-        $workforceSummary = ($directorOrgDashboard || $projectHeadOrgDashboard)
-            ? $workforce->summarize($user)
+        $coordinatorDashboard = $user->isCenterCoordinator();
+        $workforceSummary = ($directorOrgDashboard || $coordinatorDashboard)
+            ? $workforce->summarize($user, $coordinatorDashboard ? $centerId : null)
             : null;
 
         $punchedIn = $workforceSummary['punched_in_today'] ?? Attendance::query()

@@ -259,6 +259,7 @@ it('persists the selected center and scopes lists, filters, and direct urls', fu
         'Admission Targets',
         'Leave Requests',
         'Reports',
+        'Expenses',
         'App Update Settings',
         'Device Management',
     ]);

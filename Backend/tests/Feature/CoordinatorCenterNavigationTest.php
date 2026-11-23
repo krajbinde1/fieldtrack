@@ -18,6 +18,7 @@ use App\Filament\Resources\Centers\Pages\ListCenters;
 use App\Filament\Resources\EmployeeRoutes\EmployeeRouteResource;
 use App\Filament\Resources\EmployeeRoutes\Pages\ListEmployeeRoutes;
 use App\Filament\Resources\Employees\EmployeeResource;
+use App\Filament\Resources\ExpenseClaims\ExpenseClaimResource;
 use App\Filament\Resources\Employees\Pages\ListEmployees;
 use App\Filament\Resources\LeaveRequests\LeaveRequestResource;
 use App\Filament\Resources\OrgUsers\OrgUserResource;
@@ -71,6 +72,7 @@ function centerSidebarLabels(): array
         'Admission Targets',
         'Leave Requests',
         'Reports',
+        'Expenses',
     ];
 }
 
@@ -100,6 +102,49 @@ function adminCenterSidebarLabels(): array
         'App Update Settings',
         'Device Management',
     ];
+}
+
+/**
+ * @return array{group: ?string, collapsible: bool, url: string}|null
+ */
+function expenseSidebarLink(): ?array
+{
+    app()->forgetInstance(NavigationManager::class);
+
+    foreach (filament()->getNavigation() as $group) {
+        foreach ($group->getItems() as $item) {
+            if ($item->getLabel() !== 'Expenses') {
+                continue;
+            }
+
+            return [
+                'group' => $group->getLabel(),
+                'collapsible' => $group->isCollapsible(),
+                'url' => $item->getUrl(),
+            ];
+        }
+    }
+
+    return null;
+}
+
+function assertExpensesSidebar(\Illuminate\Testing\TestResponse $response): void
+{
+    $link = expenseSidebarLink();
+
+    expect($link)->not->toBeNull()
+        ->and($link['group'])->toBe('Expenses')
+        ->and($link['collapsible'])->toBeFalse()
+        ->and($link['url'])->toContain('/admin/expense-claims');
+
+    $html = $response->getContent();
+
+    expect($html)->toMatch('/<nav class="fi-sidebar-nav">[\s\S]*data-group-label="Expenses"[\s\S]*href="[^"]*\/admin\/expense-claims"[\s\S]*<\/nav>/');
+
+    preg_match('/<li\b[^>]*data-group-label="Expenses"[^>]*>/', $html, $group);
+
+    expect($group[0] ?? '')->not->toContain('fi-collapsible')
+        ->and($group[0] ?? '')->toContain('fi-sidebar-group');
 }
 
 function navigationCoordinator(array $org): User
@@ -165,7 +210,7 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
     expect($centerPage->getContent())->toMatch('/<li[^>]*fi-active[^>]*>[\s\S]*?href="[^"]*\/admin\/attendances"/');
     expect(session(AdminCenterContext::SESSION_KEY))->toBe($org['centerA']->id);
     expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels())
-        ->and(array_values(array_intersect(mainSidebarLabels(), coordinatorSidebarLabels())))->toBe(['Main Dashboard', 'Center Dashboard']);
+        ->and(array_values(array_intersect(mainSidebarLabels(), coordinatorSidebarLabels())))->toBe(['Main Dashboard', 'Center Dashboard', 'Expenses']);
 
     $this->actingAs($coordinator)
         ->post(route('admin.clear-center'))
@@ -279,10 +324,7 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
         ->assertSee('Back to All Centers', false)
         ->assertSee($org['centerA']->name, false);
 
-    expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
-        ...centerSidebarLabels(),
-        'Expenses',
-    ])
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels())
         ->and(coordinatorSidebarLabels())->not->toContain('Users', 'Team Management');
 
     $this->actingAs($org['centerManager'])
@@ -460,4 +502,81 @@ it('scopes coordinator modules to the selected center and can switch assigned ce
     Livewire::actingAs($coordinator)
         ->test(ListEmployees::class)
         ->assertCanSeeTableRecords([$org['empA'], $org['empB']]);
+});
+
+it('keeps Expenses under the Expenses group on home and open-center sidebars', function () {
+    $org = seedOrg();
+    $coordinator = navigationCoordinator($org);
+
+    // Center Manager Dashboard is the main Filament dashboard for that role.
+    $managerHome = $this->actingAs($org['centerManager'])
+        ->get('/admin')
+        ->assertOk()
+        ->assertSee('Center Manager Dashboard');
+    assertExpensesSidebar($managerHome);
+
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
+    resetFilamentNavigationRequest();
+
+    $managerCenter = $this->actingAs($org['centerManager'])
+        ->get('/admin/center-dashboard')
+        ->assertOk();
+    assertExpensesSidebar($managerCenter);
+
+    $this->flushSession();
+
+    $adminHome = $this->actingAs($org['admin'])
+        ->get('/admin')
+        ->assertOk()
+        ->assertSee('Main Admin Dashboard');
+    assertExpensesSidebar($adminHome);
+
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
+    resetFilamentNavigationRequest();
+
+    // Individual Center Dashboard opened by an admin.
+    $adminCenter = $this->actingAs($org['admin'])
+        ->get('/admin/center-dashboard')
+        ->assertOk()
+        ->assertSee($org['centerA']->name.' Dashboard');
+    assertExpensesSidebar($adminCenter);
+
+    // The centers list stays on the center sidebar while a center is selected.
+    $adminCenters = $this->actingAs($org['admin'])
+        ->get('/admin/centers')
+        ->assertOk();
+    assertExpensesSidebar($adminCenters);
+
+    $this->flushSession();
+
+    $coordinatorHome = $this->actingAs($coordinator)->get('/admin')->assertOk();
+    assertExpensesSidebar($coordinatorHome);
+
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
+    resetFilamentNavigationRequest();
+    $coordinatorCenter = $this->actingAs($coordinator)->get('/admin/center-dashboard')->assertOk();
+    assertExpensesSidebar($coordinatorCenter);
+
+    $this->flushSession();
+
+    $directorHome = $this->actingAs($org['director'])->get('/admin')->assertOk();
+    assertExpensesSidebar($directorHome);
+
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
+    resetFilamentNavigationRequest();
+    $directorCenter = $this->actingAs($org['director'])->get('/admin/center-dashboard')->assertOk();
+    assertExpensesSidebar($directorCenter);
+
+    $this->flushSession();
+    $this->actingAs($org['userA']);
+    expect(ExpenseClaimResource::canAccess())->toBeFalse()
+        ->and(ExpenseClaimResource::shouldRegisterNavigation())->toBeFalse()
+        ->and(expenseSidebarLink())->toBeNull();
+    $this->actingAs($org['userA'])->get('/admin/expense-claims')->assertForbidden();
+
+    $this->actingAs($org['projectHead']);
+    expect(ExpenseClaimResource::canAccess())->toBeFalse()
+        ->and(ExpenseClaimResource::shouldRegisterNavigation())->toBeFalse()
+        ->and(expenseSidebarLink())->toBeNull();
+    $this->actingAs($org['projectHead'])->get('/admin/expense-claims')->assertForbidden();
 });

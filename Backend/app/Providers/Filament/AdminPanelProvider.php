@@ -16,6 +16,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -49,14 +50,16 @@ class AdminPanelProvider extends PanelProvider
                 'orange' => Color::Orange,
             ])
             ->navigationGroups([
-                'Organization',
-                'People',
-                'Field Operations',
-                'Admissions',
-                'Leave',
-                'Expenses',
-                'Reports',
-                'System',
+                NavigationGroup::make('Organization'),
+                NavigationGroup::make('People'),
+                NavigationGroup::make('Field Operations'),
+                NavigationGroup::make('Admissions'),
+                NavigationGroup::make('Leave'),
+                // One child shares this label. A collapsible group can be stored
+                // as collapsed and then hide the only Expenses link.
+                NavigationGroup::make('Expenses')->collapsible(false),
+                NavigationGroup::make('Reports'),
+                NavigationGroup::make('System'),
             ])
             ->navigation(fn (): bool => ! request()->routeIs('filament.admin.resources.employee-routes.view'))
             ->topbar(fn (): bool => ! request()->routeIs('filament.admin.resources.employee-routes.view'))

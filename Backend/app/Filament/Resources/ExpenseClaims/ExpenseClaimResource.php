@@ -13,7 +13,6 @@ use App\Filament\Resources\ExpenseClaims\Schemas\ExpenseClaimInfolist;
 use App\Filament\Resources\ExpenseClaims\Tables\ExpenseClaimsTable;
 use App\Models\ExpenseClaim;
 use App\Models\User;
-use App\Services\AdminCenterContext;
 use App\Services\Expenses\ExpenseClaimService;
 use App\Support\AttendanceCalendar;
 use BackedEnum;
@@ -23,7 +22,6 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Navigation\NavigationItem;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -59,43 +57,6 @@ class ExpenseClaimResource extends Resource
     public static function shouldRegisterNavigation(): bool
     {
         return static::canAccess();
-    }
-
-    public static function getNavigationGroup(): string|\UnitEnum|null
-    {
-        $user = auth()->user();
-
-        // A collapsible group labelled Expenses hides the link of the same name.
-        // Center Managers get a direct sidebar link instead of that group.
-        if ($user instanceof User && $user->isCenterManager()) {
-            return null;
-        }
-
-        return parent::getNavigationGroup();
-    }
-
-    /**
-     * @return array<NavigationItem>
-     */
-    public static function getNavigationItems(): array
-    {
-        return array_map(
-            fn (NavigationItem $item): NavigationItem => $item->visible(function (): bool {
-                $user = auth()->user();
-                if (! $user instanceof User || ! static::canAccess()) {
-                    return false;
-                }
-
-                if ($user->isCenterManager()) {
-                    // Home clears the selected center, so this link cannot wait
-                    // for a center to be open or it disappears from the sidebar.
-                    return true;
-                }
-
-                return ! app(AdminCenterContext::class)->showsCenterModuleNavigation($user);
-            }),
-            parent::getNavigationItems(),
-        );
     }
 
     public static function canCreate(): bool

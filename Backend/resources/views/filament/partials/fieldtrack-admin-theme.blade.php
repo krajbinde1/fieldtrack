@@ -19,6 +19,14 @@
                 }
             });
         }
+        try {
+            var collapsedGroups = JSON.parse(localStorage.getItem('collapsedGroups') || 'null');
+            if (Array.isArray(collapsedGroups) && collapsedGroups.indexOf('Expenses') !== -1) {
+                localStorage.setItem('collapsedGroups', JSON.stringify(collapsedGroups.filter(function (group) {
+                    return group !== 'Expenses';
+                })));
+            }
+        } catch (e) {}
     })();
 </script>
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
@@ -265,6 +273,17 @@
         display: flex;
         flex-direction: column;
         gap: 0.1rem;
+    }
+
+    /*
+     * Expenses is a single link under a group of the same name. Filament still
+     * hides a group's children when that label was collapsed earlier, even if
+     * the group is no longer collapsible. Keep the EXPENSES label and the link.
+     */
+    html.fieldtrack-admin .fi-sidebar-group[data-group-label="Expenses"] > .fi-sidebar-group-items {
+        display: flex !important;
+        height: auto !important;
+        overflow: visible !important;
     }
 
     html.fieldtrack-admin .fi-sidebar-close-overlay,

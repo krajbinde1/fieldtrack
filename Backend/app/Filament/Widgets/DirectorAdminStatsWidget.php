@@ -127,28 +127,30 @@ class DirectorAdminStatsWidget extends Widget
         ];
 
         if ($centerId !== null && $user instanceof User) {
-            $centerEmployeeIds = $access->fieldEmployeeQuery($user)
-                ->where('center_id', $centerId)
-                ->pluck('id');
-            $employeeTotal = $centerEmployeeIds->count();
-            $punchedIn = $centerEmployeeIds->isEmpty()
-                ? 0
-                : Attendance::query()
-                    ->whereIn('employee_id', $centerEmployeeIds)
-                    ->whereDate('attendance_date', $today)
-                    ->whereNotNull('punch_in_time')
-                    ->pluck('employee_id')
-                    ->unique()
-                    ->count();
-            $activeRoutes = $centerEmployeeIds->isEmpty()
-                ? 0
-                : Attendance::query()
-                    ->whereIn('employee_id', $centerEmployeeIds)
-                    ->whereDate('attendance_date', $today)
-                    ->whereNotNull('punch_in_time')
-                    ->whereNull('punch_out_time')
-                    ->count();
-            $employeesCard['value'] = (string) $employeeTotal;
+            if (! $user->isCenterCoordinator()) {
+                $centerEmployeeIds = $access->fieldEmployeeQuery($user)
+                    ->where('center_id', $centerId)
+                    ->pluck('id');
+                $employeeTotal = $centerEmployeeIds->count();
+                $punchedIn = $centerEmployeeIds->isEmpty()
+                    ? 0
+                    : Attendance::query()
+                        ->whereIn('employee_id', $centerEmployeeIds)
+                        ->whereDate('attendance_date', $today)
+                        ->whereNotNull('punch_in_time')
+                        ->pluck('employee_id')
+                        ->unique()
+                        ->count();
+                $activeRoutes = $centerEmployeeIds->isEmpty()
+                    ? 0
+                    : Attendance::query()
+                        ->whereIn('employee_id', $centerEmployeeIds)
+                        ->whereDate('attendance_date', $today)
+                        ->whereNotNull('punch_in_time')
+                        ->whereNull('punch_out_time')
+                        ->count();
+                $employeesCard['value'] = (string) $employeeTotal;
+            }
             $employeesCard['url'] = $user->isCenterCoordinator()
                 ? EmployeeResource::getUrl('index', ['center' => $centerId])
                 : OrgUserResource::getUrl('index', [

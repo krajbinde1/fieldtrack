@@ -138,6 +138,10 @@ final class DirectorWorkforceService
      */
     public function collect(User $viewer, ?int $centerId = null, ?int $schemeId = null): Collection
     {
+        if ($viewer->isCenterCoordinator()) {
+            return $this->coordinatorRoster($viewer, $centerId, $schemeId);
+        }
+
         $today = AttendanceCalendar::today()->toDateString();
         $orgUsers = $this->orgUsers($viewer, $centerId, $schemeId);
         $linkedEmployeeIds = $orgUsers
@@ -174,6 +178,47 @@ final class DirectorWorkforceService
         }
 
         return $rows->values();
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function coordinatorRoster(User $viewer, ?int $centerId, ?int $schemeId): Collection
+    {
+        $today = AttendanceCalendar::today()->toDateString();
+        $employees = $this->access->fieldEmployeeQuery($viewer)
+            ->with(['center:id,name,scheme_id', 'center.scheme:id,name', 'user:id,employee_id,login_id,role,name'])
+            ->when($centerId !== null, function ($query) use ($centerId): void {
+                $query->where(function ($inner) use ($centerId): void {
+                    $inner->where('center_id', $centerId)
+                        ->orWhereHas('assignedCenters', fn ($centers) => $centers->where('centers.id', $centerId));
+                });
+            })
+            ->when($schemeId !== null, function ($query) use ($schemeId): void {
+                $query->where(function ($inner) use ($schemeId): void {
+                    $inner->whereHas('center', fn ($center) => $center->where('scheme_id', $schemeId))
+                        ->orWhereHas('assignedCenters', fn ($centers) => $centers->where('centers.scheme_id', $schemeId));
+                });
+            })
+            ->orderBy('full_name')
+            ->get()
+            ->unique('id')
+            ->values();
+
+        $employeeIds = $employees->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $attendances = $employeeIds === []
+            ? collect()
+            : Attendance::query()
+                ->whereIn('employee_id', $employeeIds)
+                ->whereDate('attendance_date', $today)
+                ->whereNotNull('punch_in_time')
+                ->orderBy('id')
+                ->get(['employee_id', 'punch_in_time', 'punch_out_time'])
+                ->keyBy(fn (Attendance $attendance): int => (int) $attendance->employee_id);
+
+        return $employees->map(
+            fn (Employee $employee): array => $this->employeeRow($employee, $attendances->get((int) $employee->id)),
+        )->values();
     }
 
     /**
