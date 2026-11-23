@@ -125,11 +125,15 @@ class ExpenseApi {
     required List<Map<String, dynamic>> items,
     required List<String?> receipts,
     int? id,
+    int? centerId,
   }) {
     return _call(() async {
       final form = FormData();
       form.fields.add(MapEntry('action', action));
       form.fields.add(MapEntry('items', jsonEncode(items)));
+      if (centerId != null) {
+        form.fields.add(MapEntry('center_id', '$centerId'));
+      }
       for (var index = 0; index < receipts.length; index++) {
         final path = receipts[index];
         if (path == null || path.isEmpty) continue;

@@ -1,13 +1,17 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Filament\Resources\ExpenseClaims\Pages\CreateExpenseClaim;
+use App\Filament\Resources\ExpenseClaims\Pages\ListExpenseClaims;
 use App\Models\AppNotification;
 use App\Models\ExpenseApproval;
 use App\Models\ExpenseClaim;
 use App\Models\User;
+use App\Services\AdminCenterContext;
 use App\Services\Notifications\ExpensePushNotifier;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Livewire;
 
 function expenseCoordinator(array $org, string $login, string $name = 'Coordinator'): User
 {
@@ -236,4 +240,73 @@ it('keeps a draft until a receipt is attached', function () {
             ]]),
         ])
         ->assertStatus(422);
+});
+
+it('routes a center manager expense to the coordinator and never lets them approve it', function () {
+    $org = seedOrg();
+    $coordinator = expenseCoordinator($org, 'coord-manager');
+    $other = expenseCoordinator($org, 'coord-other-center');
+    $other->coordinatedCenters()->detach();
+    $other->coordinatedCenters()->attach($org['centerB']->id);
+
+    $created = $this->actingAs($org['centerManager'], 'sanctum')
+        ->post('/api/expenses', expensePayload())
+        ->assertCreated()
+        ->assertJsonPath('data.status', 'pending_center_coordinator')
+        ->assertJsonPath('data.employee_name', $org['centerManager']->name);
+
+    $id = $created->json('data.id');
+
+    expect(ExpenseClaim::query()->findOrFail($id)->employee_id)->toBeNull()
+        ->and(AppNotification::query()->where('user_id', $coordinator->id)->where('type', 'expense_pending_level_2')->count())->toBe(1)
+        ->and(AppNotification::query()->where('user_id', $org['centerManager']->id)->where('type', 'expense_submitted')->count())->toBe(1);
+
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->postJson('/api/manager/expenses/'.$id.'/approve')
+        ->assertForbidden();
+
+    $this->actingAs($other, 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertForbidden();
+
+    $this->actingAs($coordinator, 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Manager claim ok'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_final');
+
+    expect(AppNotification::query()->where('user_id', $org['director']->id)->where('type', 'expense_pending_final')->count())->toBe(1)
+        ->and(AppNotification::query()->where('user_id', $org['centerManager']->id)->where('type', 'expense_level_approved')->count())->toBe(1);
+
+    $this->actingAs($org['director'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve')
+        ->assertOk()
+        ->assertJsonPath('data.status', 'approved');
+
+    $this->actingAs($org['admin'], 'sanctum')
+        ->getJson('/api/director/expenses?status=paid')
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+
+    $this->actingAs($org['admin'], 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/pay', [
+            'amount' => 250,
+            'payment_mode' => 'cash',
+            'paid_on' => '2026-11-23',
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.payment_status', 'paid');
+
+    expect(AppNotification::query()->where('user_id', $org['centerManager']->id)->where('type', 'expense_paid')->count())->toBe(1);
+
+    $this->app['auth']->forgetGuards();
+
+    Livewire::actingAs($org['admin'])
+        ->test(ListExpenseClaims::class)
+        ->assertSee('Pending Approval');
+
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
+    Livewire::actingAs($org['centerManager'])
+        ->test(CreateExpenseClaim::class)
+        ->assertSee('Save Draft')
+        ->assertSee('Submit');
 });

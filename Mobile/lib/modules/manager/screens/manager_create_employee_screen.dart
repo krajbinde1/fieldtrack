@@ -216,7 +216,7 @@ class _ManagerCreateEmployeeScreenState
                 const SizedBox(height: AppSpacing.md),
                 FilledButton(
                   onPressed: _saving ? null : _save,
-                  child: Text(_saving ? 'Saving…' : 'Create User'),
+                  child: Text(_saving ? 'Savingâ€¦' : 'Create User'),
                 ),
               ],
             ),

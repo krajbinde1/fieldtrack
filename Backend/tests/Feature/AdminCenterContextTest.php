@@ -83,6 +83,7 @@ it('opens the main admin dashboard across all authorized centers', function () {
             'Main Dashboard',
             'Center Dashboard',
             'Team Management',
+            'Expenses',
             'App Update Settings',
             'Device Management',
         ])
@@ -258,7 +259,6 @@ it('persists the selected center and scopes lists, filters, and direct urls', fu
         'Admission Targets',
         'Leave Requests',
         'Reports',
-        'Expenses',
         'App Update Settings',
         'Device Management',
     ]);
@@ -596,7 +596,7 @@ it('does not force center selection on a director', function () {
 
     $this->actingAs($org['director'])->get('/admin/center-dashboard')->assertRedirect('/admin/centers');
     expect(CenterDashboard::canAccess())->toBeTrue()
-        ->and(centerContextNavLabels())->toEqualCanonicalizing(['Main Dashboard', 'Center Dashboard', 'Team Management'])
+        ->and(centerContextNavLabels())->toEqualCanonicalizing(['Main Dashboard', 'Center Dashboard', 'Team Management', 'Expenses'])
         ->and(Dashboard::getNavigationLabel())->toBe('Main Dashboard');
 
     expect(OrgUserResource::shouldRegisterNavigation())->toBeTrue();

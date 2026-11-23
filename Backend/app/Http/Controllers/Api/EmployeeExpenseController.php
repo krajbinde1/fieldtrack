@@ -50,6 +50,8 @@ class EmployeeExpenseController extends Controller
             $this->items($request),
             $this->receipts($request),
             $submit,
+            null,
+            $request->filled('center_id') ? $request->integer('center_id') : null,
         );
 
         return $this->ok($submit ? 'Expense submitted.' : 'Draft saved.', $this->expenses->present($claim), 201);
@@ -64,6 +66,7 @@ class EmployeeExpenseController extends Controller
             $this->receipts($request),
             $submit,
             $expenseClaim,
+            $request->filled('center_id') ? $request->integer('center_id') : null,
         );
 
         return $this->ok($submit ? 'Expense submitted.' : 'Draft saved.', $this->expenses->present($claim));

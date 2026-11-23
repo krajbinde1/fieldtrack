@@ -469,6 +469,7 @@
     }
 
     .ft-topbar-bell {
+        position: relative;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -478,7 +479,23 @@
         border: 1px solid var(--ft-border);
         background: #fff;
         color: #475569;
-        cursor: default;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .ft-topbar-bell-count {
+        position: absolute;
+        top: -0.25rem;
+        right: -0.25rem;
+        min-width: 1rem;
+        height: 1rem;
+        padding: 0 0.2rem;
+        border-radius: 999px;
+        background: #b45309;
+        color: white;
+        font-size: 0.65rem;
+        line-height: 1rem;
+        text-align: center;
     }
 
     .ft-topbar-bell svg {

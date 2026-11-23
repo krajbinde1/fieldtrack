@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\ExpenseClaims\Pages;
 
 use App\Enums\ExpenseClaimStatus;
+use App\Enums\ExpensePaymentStatus;
 use App\Filament\Resources\ExpenseClaims\ExpenseClaimResource;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,22 +14,42 @@ class ListExpenseClaims extends ListRecords
 {
     protected static string $resource = ExpenseClaimResource::class;
 
-    public function getTabs(): array
+    protected function getHeaderActions(): array
     {
         return [
-            'pending' => Tab::make('Pending')
-                ->modifyQueryUsing(fn (Builder $query): Builder => $query->whereIn('status', [
-                    ExpenseClaimStatus::PendingCenterManager->value,
-                    ExpenseClaimStatus::PendingCenterCoordinator->value,
-                    ExpenseClaimStatus::PendingFinal->value,
-                    ExpenseClaimStatus::NeedsResolution->value,
-                ])),
-            'approved' => Tab::make('Approved')
-                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', ExpenseClaimStatus::Approved->value)),
-            'rejected' => Tab::make('Rejected')
-                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', ExpenseClaimStatus::Rejected->value)),
-            'history' => Tab::make('History')
-                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', '!=', ExpenseClaimStatus::Draft->value)),
+            CreateAction::make()
+                ->label('Add Expense')
+                ->visible(fn (): bool => ExpenseClaimResource::canCreate()),
         ];
+    }
+
+    public function getTabs(): array
+    {
+        $user = auth()->user();
+        $tabs = [];
+
+        if ($user?->isCenterManager() === true) {
+            $tabs['mine'] = Tab::make('My Expenses')
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('created_by_user_id', $user->id));
+        }
+
+        $tabs['pending'] = Tab::make('Pending Approval')
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->whereIn('status', [
+                ExpenseClaimStatus::PendingCenterManager->value,
+                ExpenseClaimStatus::PendingCenterCoordinator->value,
+                ExpenseClaimStatus::PendingFinal->value,
+                ExpenseClaimStatus::NeedsResolution->value,
+            ]));
+        $tabs['approved'] = Tab::make('Approved')
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', ExpenseClaimStatus::Approved->value)
+                ->where('payment_status', ExpensePaymentStatus::Unpaid->value));
+        $tabs['rejected'] = Tab::make('Rejected')
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', ExpenseClaimStatus::Rejected->value));
+        $tabs['paid'] = Tab::make('Paid')
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('payment_status', ExpensePaymentStatus::Paid->value));
+        $tabs['history'] = Tab::make('History')
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', '!=', ExpenseClaimStatus::Draft->value));
+
+        return $tabs;
     }
 }

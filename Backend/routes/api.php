@@ -170,7 +170,7 @@ Route::middleware(['auth:sanctum', 'role:employee'])->prefix('field-activities')
         ->whereNumber('fieldActivity');
 });
 
-Route::middleware(['auth:sanctum', 'role:employee'])->prefix('expenses')->group(function () {
+Route::middleware(['auth:sanctum', 'role:employee,center_manager'])->prefix('expenses')->group(function () {
     Route::get('/', [EmployeeExpenseController::class, 'index']);
     Route::post('/', [EmployeeExpenseController::class, 'store']);
     Route::patch('{expenseClaim}', [EmployeeExpenseController::class, 'update'])->whereNumber('expenseClaim');

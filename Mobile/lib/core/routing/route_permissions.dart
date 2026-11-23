@@ -20,7 +20,7 @@ class RoutePermissions {
     }
 
     if (path.startsWith('/expenses')) {
-      return role.isEmployee;
+      return role.isEmployee || role.isCenterManager;
     }
 
     if (path.startsWith('/notifications')) {

@@ -241,7 +241,7 @@ final class AdminCenterContext
 
         if (
             $this->coordinatorMustPickCenter($user)
-            && in_array($model, [Admission::class, Attendance::class, LeaveRequest::class, AdmissionTarget::class, ExpenseClaim::class], true)
+            && in_array($model, [Admission::class, Attendance::class, LeaveRequest::class, AdmissionTarget::class], true)
         ) {
             return $query->whereRaw('1 = 0');
         }

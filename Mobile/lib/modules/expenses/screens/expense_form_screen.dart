@@ -7,7 +7,9 @@ import '../../../core/widgets/design/pg_scaffold.dart';
 import '../api/expense_api.dart';
 
 class ExpenseFormScreen extends StatefulWidget {
-  const ExpenseFormScreen({super.key});
+  const ExpenseFormScreen({super.key, this.centerId});
+
+  final int? centerId;
 
   @override
   State<ExpenseFormScreen> createState() => _ExpenseFormScreenState();
@@ -57,6 +59,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         action: action,
         items: items,
         receipts: _lines.map((line) => line.receipt).toList(),
+        centerId: widget.centerId,
       );
       if (mounted) context.pop();
     } catch (error) {

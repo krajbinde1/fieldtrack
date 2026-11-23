@@ -24,6 +24,12 @@ use Filament\Facades\Filament;
         && $user instanceof \App\Models\User
         && $context->participatesInCenterSelection($user);
     $changeCenterUrl = $showCenterSwitcher && SelectCenter::canAccess() ? SelectCenter::getUrl() : null;
+    $unreadNotifications = $user instanceof \App\Models\User
+        ? \App\Models\AppNotification::query()->where('user_id', $user->id)->whereNull('read_at')->count()
+        : 0;
+    $notificationUrl = \App\Filament\Pages\NotificationInbox::canAccess()
+        ? \App\Filament\Pages\NotificationInbox::getUrl()
+        : null;
 @endphp
 
 @if ($user)
@@ -43,12 +49,17 @@ use Filament\Facades\Filament;
         </div>
     @endif
 
-    <button type="button" class="ft-topbar-bell" aria-label="Notifications" title="No new notifications">
-        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path d="M10 2.4a5 5 0 0 0-5 5v1.7c0 .7-.2 1.3-.6 1.9L3.5 12.7A1.2 1.2 0 0 0 4.5 14.6h11a1.2 1.2 0 0 0 1-1.9l-.9-1.7a3.4 3.4 0 0 1-.6-1.9V7.4a5 5 0 0 0-5-5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-            <path d="M8 14.6a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-    </button>
+    @if (filled($notificationUrl))
+        <a class="ft-topbar-bell" href="{{ $notificationUrl }}" aria-label="Notifications" title="{{ $unreadNotifications > 0 ? $unreadNotifications.' unread notifications' : 'No new notifications' }}">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M10 2.4a5 5 0 0 0-5 5v1.7c0 .7-.2 1.3-.6 1.9L3.5 12.7A1.2 1.2 0 0 0 4.5 14.6h11a1.2 1.2 0 0 0 1-1.9l-.9-1.7a3.4 3.4 0 0 1-.6-1.9V7.4a5 5 0 0 0-5-5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M8 14.6a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            @if ($unreadNotifications > 0)
+                <span class="ft-topbar-bell-count">{{ $unreadNotifications > 9 ? '9+' : $unreadNotifications }}</span>
+            @endif
+        </a>
+    @endif
 
     <details class="ft-topbar-profile">
         <summary class="ft-topbar-profile-trigger" aria-label="Open account menu">

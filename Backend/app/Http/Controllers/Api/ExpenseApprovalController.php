@@ -25,7 +25,7 @@ class ExpenseApprovalController extends Controller
             'pending' => $this->expenses->queueQuery($request->user()),
             'approved' => $this->expenses->visibleQuery($request->user())->where('status', ExpenseClaimStatus::Approved->value),
             'rejected' => $this->expenses->visibleQuery($request->user())->where('status', ExpenseClaimStatus::Rejected->value),
-            'payment' => $this->expenses->visibleQuery($request->user())->where('status', ExpenseClaimStatus::Approved->value),
+            'paid', 'payment' => $this->expenses->visibleQuery($request->user())->where('payment_status', 'paid'),
             default => $this->expenses->visibleQuery($request->user())->where('status', '!=', ExpenseClaimStatus::Draft->value),
         };
 

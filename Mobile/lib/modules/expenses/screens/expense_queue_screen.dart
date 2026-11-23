@@ -12,10 +12,14 @@ class ExpenseQueueScreen extends StatefulWidget {
     super.key,
     required this.apiPrefix,
     required this.detailPrefix,
+    this.showMine = false,
+    this.centerId,
   });
 
   final String apiPrefix;
   final String detailPrefix;
+  final bool showMine;
+  final int? centerId;
 
   @override
   State<ExpenseQueueScreen> createState() => _ExpenseQueueScreenState();
@@ -44,18 +48,41 @@ class _ExpenseQueueScreenState extends State<ExpenseQueueScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Wrap(
-              spacing: 8,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final status in ['pending', 'approved', 'rejected', 'payment', 'history'])
-                  ChoiceChip(
-                    label: Text(status[0].toUpperCase() + status.substring(1)),
-                    selected: _status == status,
-                    onSelected: (_) => setState(() {
-                      _status = status;
-                      _future = _load();
-                    }),
+                if (widget.showMine)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        final center = widget.centerId;
+                        context.push(center == null ? '/expenses' : '/expenses?center_id=$center');
+                      },
+                      icon: const Icon(Icons.receipt_long_outlined),
+                      label: const Text('My Expenses'),
+                    ),
                   ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final filter in const [
+                      ('pending', 'Pending'),
+                      ('approved', 'Approved'),
+                      ('rejected', 'Rejected'),
+                      ('paid', 'Paid'),
+                      ('history', 'History'),
+                    ])
+                      ChoiceChip(
+                        label: Text(filter.$2),
+                        selected: _status == filter.$1,
+                        onSelected: (_) => setState(() {
+                          _status = filter.$1;
+                          _future = _load();
+                        }),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),

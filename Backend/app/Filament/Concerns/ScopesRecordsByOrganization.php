@@ -41,7 +41,7 @@ trait ScopesRecordsByOrganization
             $scoped = $ids === null
                 ? $query
                 : $query->whereIn('expense_claims.center_id', $ids === [] ? [-1] : $ids);
-            $scoped = $scoped->with(['employee', 'center', 'items', 'payment']);
+            $scoped = $scoped->with(['employee', 'center', 'createdBy', 'items', 'payment']);
         } elseif ($ids === null) {
             $scoped = $query;
         } elseif ($model === Attendance::class) {

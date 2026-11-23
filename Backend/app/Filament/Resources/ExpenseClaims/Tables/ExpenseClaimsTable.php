@@ -6,8 +6,10 @@ use App\Enums\ExpenseClaimStatus;
 use App\Enums\ExpensePaymentStatus;
 use App\Enums\ExpenseType;
 use App\Filament\Support\EmployeeSelect;
+use App\Models\ExpenseClaim;
 use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
@@ -29,6 +31,7 @@ class ExpenseClaimsTable
                 TextColumn::make('claim_number')->label('Claim')->searchable(),
                 TextColumn::make('employee.full_name')
                     ->label('Employee')
+                    ->formatStateUsing(fn ($state, ExpenseClaim $record): string => filled($state) ? (string) $state : (string) ($record->createdBy?->name ?? '—'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('center.name')->label('Center')->searchable(),
@@ -85,6 +88,7 @@ class ExpenseClaimsTable
                     }),
             ])
             ->recordActions([
+                EditAction::make()->label('Edit Draft'),
                 ViewAction::make(),
             ]);
     }

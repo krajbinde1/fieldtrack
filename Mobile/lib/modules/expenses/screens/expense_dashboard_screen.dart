@@ -10,7 +10,9 @@ import '../../../core/widgets/design/pg_scaffold.dart';
 import '../api/expense_api.dart';
 
 class ExpenseDashboardScreen extends StatefulWidget {
-  const ExpenseDashboardScreen({super.key});
+  const ExpenseDashboardScreen({super.key, this.centerId});
+
+  final int? centerId;
 
   @override
   State<ExpenseDashboardScreen> createState() => _ExpenseDashboardScreenState();
@@ -18,6 +20,7 @@ class ExpenseDashboardScreen extends StatefulWidget {
 
 class _ExpenseDashboardScreenState extends State<ExpenseDashboardScreen> {
   late Future<({ExpenseSummary summary, List<ExpenseRecord> claims})> _future;
+  String _filter = 'all';
 
   @override
   void initState() {
@@ -32,6 +35,16 @@ class _ExpenseDashboardScreenState extends State<ExpenseDashboardScreen> {
   Future<void> _refresh() async {
     setState(() => _future = _load());
     await _future;
+  }
+
+  bool _matches(ExpenseRecord claim) {
+    return switch (_filter) {
+      'pending' => claim.status.startsWith('pending') || claim.status == 'needs_resolution',
+      'approved' => claim.status == 'approved' && claim.paymentStatus != 'paid',
+      'rejected' => claim.status == 'rejected',
+      'paid' => claim.paymentStatus == 'paid',
+      _ => true,
+    };
   }
 
   @override
@@ -70,19 +83,38 @@ class _ExpenseDashboardScreenState extends State<ExpenseDashboardScreen> {
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: () async {
-                    await context.push('/expenses/new');
+                    final center = widget.centerId;
+                    await context.push(center == null ? '/expenses/new' : '/expenses/new?center_id=$center');
                     if (mounted) await _refresh();
                   },
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Add Expense'),
                 ),
                 const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final filter in const [
+                      ('all', 'My Expenses'),
+                      ('pending', 'Pending'),
+                      ('approved', 'Approved'),
+                      ('rejected', 'Rejected'),
+                      ('paid', 'Paid'),
+                    ])
+                      ChoiceChip(
+                        label: Text(filter.$2),
+                        selected: _filter == filter.$1,
+                        onSelected: (_) => setState(() => _filter = filter.$1),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 Text('History', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
-                if (data.claims.isEmpty)
+                if (data.claims.where(_matches).isEmpty)
                   const PgEmptyState(message: 'No expenses yet.')
                 else
-                  ...data.claims.map(
+                  ...data.claims.where(_matches).map(
                     (claim) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: PgCard(

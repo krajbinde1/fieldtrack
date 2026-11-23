@@ -6,6 +6,7 @@ use App\Enums\ExpenseClaimStatus;
 use App\Enums\ExpensePaymentStatus;
 use App\Enums\ExpenseType;
 use App\Enums\UserRole;
+use App\Models\Center;
 use App\Models\ExpenseApproval;
 use App\Models\ExpenseClaim;
 use App\Models\ExpenseItem;
@@ -51,16 +52,18 @@ final class ExpenseClaimService
      * @param  list<array<string, mixed>>  $items
      * @param  array<int, UploadedFile|null>  $receipts
      */
-    public function save(User $user, array $items, array $receipts, bool $submit, ?ExpenseClaim $claim = null): ExpenseClaim
+    public function save(User $user, array $items, array $receipts, bool $submit, ?ExpenseClaim $claim = null, ?int $centerId = null): ExpenseClaim
     {
-        $employee = $user->employee;
-        if ($employee === null || $employee->center_id === null) {
-            throw ValidationException::withMessages([
-                'center' => 'This account is not assigned to a center.',
-            ]);
-        }
+        abort_unless(
+            $user->isEmployeeUser() || $user->isCenterManager(),
+            403,
+            'This account cannot submit expenses.',
+        );
 
-        return DB::transaction(function () use ($user, $employee, $items, $receipts, $submit, $claim): ExpenseClaim {
+        $center = $this->submissionCenter($user, $centerId);
+        $employeeId = $this->submissionEmployeeId($user, $center);
+
+        return DB::transaction(function () use ($user, $employeeId, $center, $items, $receipts, $submit, $claim): ExpenseClaim {
             if ($claim instanceof ExpenseClaim) {
                 $claim = ExpenseClaim::query()->whereKey($claim->id)->lockForUpdate()->firstOrFail();
                 $this->assertOwner($user, $claim);
@@ -71,9 +74,9 @@ final class ExpenseClaimService
                 }
             } else {
                 $claim = ExpenseClaim::query()->create([
-                    'employee_id' => $employee->id,
-                    'center_id' => $employee->center_id,
-                    'scheme_id' => $employee->center?->scheme_id,
+                    'employee_id' => $employeeId,
+                    'center_id' => $center->id,
+                    'scheme_id' => $center->scheme_id,
                     'created_by_user_id' => $user->id,
                     'claim_number' => 'EXP-TMP-'.(string) str()->uuid(),
                     'status' => ExpenseClaimStatus::Draft,
@@ -327,7 +330,7 @@ final class ExpenseClaimService
             'payment_status_label' => $claim->payment_status->label(),
             'current_level' => $claim->current_level,
             'total_amount' => number_format((float) $claim->total_amount, 2, '.', ''),
-            'employee_name' => $claim->employee?->full_name,
+            'employee_name' => $claim->employee?->full_name ?: $claim->createdBy?->name,
             'center_name' => $claim->center?->name,
             'center_id' => $claim->center_id,
             'submitted_at' => $claim->submitted_at?->toDateTimeString(),
@@ -392,7 +395,7 @@ final class ExpenseClaimService
             'submitted_at' => now(),
             'total_amount' => $claim->items->sum(fn (ExpenseItem $item) => (float) $item->amount),
         ]);
-        $this->routeToLevel($claim, 1);
+        $this->routeToLevel($claim, $this->openingLevel($claim), false);
         $this->tellMobilizer(
             $claim->fresh(),
             'expense_submitted',
@@ -401,7 +404,56 @@ final class ExpenseClaimService
         );
     }
 
-    private function routeToLevel(ExpenseClaim $claim, int $level): void
+    private function submissionCenter(User $user, ?int $requestedCenterId): Center
+    {
+        if ($user->isEmployeeUser()) {
+            $employee = $user->employee;
+            $center = $employee?->center;
+            if ($employee === null || $center === null) {
+                throw ValidationException::withMessages([
+                    'center' => 'This account is not assigned to a center.',
+                ]);
+            }
+
+            return $center;
+        }
+
+        $managed = $user->managedCenters()->orderBy('centers.id')->get();
+        $selected = $requestedCenterId ?? app(AdminCenterContext::class)->idFor($user);
+        $center = $selected !== null
+            ? $managed->firstWhere('id', $selected)
+            : ($managed->count() === 1 ? $managed->first() : null);
+
+        if (! $center instanceof Center) {
+            throw ValidationException::withMessages([
+                'center' => 'Choose the center this expense belongs to.',
+            ]);
+        }
+
+        return $center;
+    }
+
+    private function submissionEmployeeId(User $user, Center $center): ?int
+    {
+        if ($user->isEmployeeUser()) {
+            return $user->employee_id !== null ? (int) $user->employee_id : null;
+        }
+
+        $employee = $user->employee;
+
+        return $employee !== null && (int) $employee->center_id === (int) $center->id
+            ? (int) $employee->id
+            : null;
+    }
+
+    private function openingLevel(ExpenseClaim $claim): int
+    {
+        $claim->loadMissing('createdBy');
+
+        return $claim->createdBy?->isCenterManager() === true ? 2 : 1;
+    }
+
+    private function routeToLevel(ExpenseClaim $claim, int $level, bool $notifySubmitter = true): void
     {
         $claim->loadMissing('center');
         $center = $claim->center;
@@ -430,7 +482,9 @@ final class ExpenseClaimService
                 $fresh->claimNumber().' is ready for final approval.',
                 '/director/expenses/'.$fresh->id,
             );
-            $this->tellMobilizer($fresh, 'expense_level_approved', 'Expense moved forward', $fresh->claimNumber().' was approved and is awaiting final approval.');
+            if ($notifySubmitter) {
+                $this->tellMobilizer($fresh, 'expense_level_approved', 'Expense moved forward', $fresh->claimNumber().' was approved and is awaiting final approval.');
+            }
 
             return;
         }
@@ -466,7 +520,7 @@ final class ExpenseClaimService
             $route,
         );
 
-        if ($level > 1) {
+        if ($notifySubmitter && $level > 1) {
             $this->tellMobilizer($fresh, 'expense_level_approved', 'Expense approved', $fresh->claimNumber().' moved to the next approver.');
         }
     }
@@ -577,10 +631,7 @@ final class ExpenseClaimService
             ]);
         }
 
-        $claim->items->each(function (ExpenseItem $item): void {
-            $item->deleteStoredReceipt();
-            $item->delete();
-        });
+        $previous = $claim->items()->orderBy('sort_order')->orderBy('id')->get()->values();
 
         foreach (array_values($items) as $index => $item) {
             $type = ExpenseType::tryFrom((string) ($item['type'] ?? ''));
@@ -612,6 +663,7 @@ final class ExpenseClaimService
             ];
 
             $file = $receipts[$index] ?? null;
+            $old = $previous->get($index);
             if ($file instanceof UploadedFile) {
                 $this->assertReceipt($file);
                 $path = $file->store('expenses/'.$claim->id, 'local');
@@ -619,6 +671,12 @@ final class ExpenseClaimService
                 $stored['receipt_path'] = $path;
                 $stored['receipt_original_name'] = $file->getClientOriginalName();
                 $stored['receipt_mime'] = $file->getMimeType();
+            } elseif ($old instanceof ExpenseItem && $old->hasReceipt()) {
+                $stored['receipt_disk'] = $old->receipt_disk;
+                $stored['receipt_path'] = $old->receipt_path;
+                $stored['receipt_original_name'] = $old->receipt_original_name;
+                $stored['receipt_mime'] = $old->receipt_mime;
+                $old->receipt_path = null;
             } elseif ($submit) {
                 throw ValidationException::withMessages([
                     'receipts' => 'Each expense needs a receipt before it can be submitted.',
@@ -627,6 +685,11 @@ final class ExpenseClaimService
 
             $claim->items()->create($stored);
         }
+
+        $previous->each(function (ExpenseItem $item): void {
+            $item->deleteStoredReceipt();
+            $item->delete();
+        });
     }
 
     private function assertReceipt(UploadedFile $file): void

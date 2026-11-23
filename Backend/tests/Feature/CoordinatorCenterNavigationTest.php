@@ -71,7 +71,6 @@ function centerSidebarLabels(): array
         'Admission Targets',
         'Leave Requests',
         'Reports',
-        'Expenses',
     ];
 }
 
@@ -81,6 +80,7 @@ function mainSidebarLabels(): array
         'Main Dashboard',
         'Center Dashboard',
         'Team Management',
+        'Expenses',
     ];
 }
 
@@ -129,7 +129,6 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
         'Admission Targets',
         'Leave Requests',
         'Reports',
-        'Expenses',
     ];
 
     $this->actingAs($coordinator)
@@ -277,7 +276,10 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
         ->assertSee('Back to All Centers', false)
         ->assertSee($org['centerA']->name, false);
 
-    expect(coordinatorSidebarLabels())->toEqualCanonicalizing(centerSidebarLabels())
+    expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
+        ...centerSidebarLabels(),
+        'Expenses',
+    ])
         ->and(coordinatorSidebarLabels())->not->toContain('Users', 'Team Management');
 
     $this->actingAs($org['centerManager'])

@@ -118,11 +118,15 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/expenses',
-          builder: (_, _) => const ExpenseDashboardScreen(),
+          builder: (_, state) => ExpenseDashboardScreen(
+            centerId: int.tryParse(state.uri.queryParameters['center_id'] ?? ''),
+          ),
         ),
         GoRoute(
           path: '/expenses/new',
-          builder: (_, _) => const ExpenseFormScreen(),
+          builder: (_, state) => ExpenseFormScreen(
+            centerId: int.tryParse(state.uri.queryParameters['center_id'] ?? ''),
+          ),
         ),
         GoRoute(
           path: '/expenses/:id',
@@ -308,9 +312,11 @@ GoRouter createRouter(
         ),
         GoRoute(
           path: '/manager/expenses',
-          builder: (_, _) => const ExpenseQueueScreen(
+          builder: (_, state) => ExpenseQueueScreen(
             apiPrefix: '/manager/expenses',
             detailPrefix: '/manager/expenses',
+            showMine: true,
+            centerId: int.tryParse(state.uri.queryParameters['center_id'] ?? ''),
           ),
         ),
         GoRoute(
