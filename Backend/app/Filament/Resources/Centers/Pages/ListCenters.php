@@ -26,7 +26,7 @@ class ListCenters extends ListRecords
         $table = parent::makeTable();
 
         $user = auth()->user();
-        if (! $user instanceof User || ! ($user->isAdmin() || $user->isCenterCoordinator() || $user->isCenterManager())) {
+        if (! $user instanceof User || ! ($user->isAdmin() || $user->isDirector() || $user->isCenterCoordinator() || $user->isCenterManager())) {
             return $table;
         }
 

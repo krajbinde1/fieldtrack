@@ -60,6 +60,10 @@ class Dashboard extends BaseDashboard
             return 'Main Admin Dashboard';
         }
 
+        if ($user instanceof User && $user->isDirector()) {
+            return 'Director Dashboard';
+        }
+
         if ($user instanceof User && $user->isCenterCoordinator()) {
             return 'Coordinator Dashboard';
         }

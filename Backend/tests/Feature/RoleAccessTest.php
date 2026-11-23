@@ -575,3 +575,79 @@ it('lets a center manager punch using the employee attendance API without joinin
     expect($employeeIds)->toContain($org['empA']->id)
         ->and($employeeIds)->not->toContain($org['centerManager']->fresh()->employee_id);
 });
+
+it('lets a director use organization-wide operations without admin system controls', function () {
+    $org = seedOrg();
+    $unchanged = [
+        'director' => $org['director']->only(['id', 'role', 'is_active', 'login_id']),
+        'admin' => $org['admin']->only(['id', 'role', 'is_active', 'login_id']),
+        'manager_centers' => $org['centerManager']->managedCenters()->pluck('centers.id')->all(),
+        'head_centers' => $org['projectHead']->headedCenters()->pluck('centers.id')->all(),
+    ];
+
+    $this->postJson('/api/login', [
+        'login_id' => 'fielddirector',
+        'password' => 'Director@123',
+        'device_id' => 'director-device-1',
+    ])->assertOk()
+        ->assertJsonPath('user.role', UserRole::Director->value)
+        ->assertJsonPath('permissions', [
+            'director_dashboard',
+            'attendance_view_all',
+            'route_tracking_view_all',
+            'leave_view_all',
+            'expense_approve_all',
+            'expense_payment',
+            'admissions_view_all',
+            'admission_target_view_all',
+        ]);
+
+    $this->actingAs($org['director'], 'sanctum')
+        ->getJson('/api/dashboard')
+        ->assertOk()
+        ->assertJsonPath('data.role', UserRole::Director->value)
+        ->assertJsonPath('data.centers', 2);
+
+    $this->actingAs($org['director'], 'sanctum')
+        ->getJson('/api/director/centers')
+        ->assertOk()
+        ->assertJsonFragment(['name' => 'Center A'])
+        ->assertJsonFragment(['name' => 'Center B']);
+
+    $this->actingAs($org['director'], 'sanctum')
+        ->getJson('/api/director/employees')
+        ->assertOk();
+
+    $this->actingAs($org['director'], 'sanctum')
+        ->getJson('/api/director/expenses?status=pending')
+        ->assertOk();
+
+    $this->actingAs($org['director'], 'web')
+        ->get('/admin')
+        ->assertOk()
+        ->assertSee('Director Dashboard')
+        ->assertSee('Main Dashboard')
+        ->assertSee('Center Dashboard')
+        ->assertSee('Team Management')
+        ->assertSee('Expenses')
+        ->assertDontSee('App Update Settings')
+        ->assertDontSee('Device Management')
+        ->assertDontSee('System');
+
+    $this->actingAs($org['director'])->get('/admin/users')->assertOk();
+    $this->actingAs($org['director'])->get('/admin/centers')->assertOk()->assertSee('Center A')->assertSee('Center B');
+    $this->actingAs($org['director'])->get('/admin/expense-claims')->assertOk();
+    $this->actingAs($org['director'])->get('/admin/app-update-settings')->assertForbidden();
+    $this->actingAs($org['director'])->get('/admin/device-management')->assertForbidden();
+    $this->actingAs($org['director'])->get('/admin/directors')->assertForbidden();
+
+    $this->flushSession();
+
+    $this->actingAs($org['admin'], 'web')->get('/admin/app-update-settings')->assertOk();
+    $this->actingAs($org['admin'], 'web')->get('/admin/device-management')->assertOk();
+
+    expect($org['director']->fresh()->only(['id', 'role', 'is_active', 'login_id']))->toBe($unchanged['director'])
+        ->and($org['admin']->fresh()->only(['id', 'role', 'is_active', 'login_id']))->toBe($unchanged['admin'])
+        ->and($org['centerManager']->fresh()->managedCenters()->pluck('centers.id')->all())->toBe($unchanged['manager_centers'])
+        ->and($org['projectHead']->fresh()->headedCenters()->pluck('centers.id')->all())->toBe($unchanged['head_centers']);
+});

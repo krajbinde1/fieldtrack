@@ -66,7 +66,7 @@ class ExpenseClaimResource extends Resource
         $user = auth()->user();
 
         // A collapsible group labelled Expenses hides the link of the same name.
-        // Center Managers get a direct item on the center sidebar instead.
+        // Center Managers get a direct sidebar link instead of that group.
         if ($user instanceof User && $user->isCenterManager()) {
             return null;
         }
@@ -86,9 +86,13 @@ class ExpenseClaimResource extends Resource
                     return false;
                 }
 
-                $centerOpen = app(AdminCenterContext::class)->showsCenterModuleNavigation($user);
+                if ($user->isCenterManager()) {
+                    // Home clears the selected center, so this link cannot wait
+                    // for a center to be open or it disappears from the sidebar.
+                    return true;
+                }
 
-                return $user->isCenterManager() ? $centerOpen : ! $centerOpen;
+                return ! app(AdminCenterContext::class)->showsCenterModuleNavigation($user);
             }),
             parent::getNavigationItems(),
         );

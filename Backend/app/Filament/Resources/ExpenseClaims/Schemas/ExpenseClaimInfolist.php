@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ExpenseClaims\Schemas;
 use App\Enums\ExpenseClaimStatus;
 use App\Enums\ExpensePaymentStatus;
 use App\Models\ExpenseClaim;
+use App\Services\Expenses\ExpenseClaimService;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -79,14 +80,14 @@ class ExpenseClaimInfolist
                     ->columnSpanFull(),
                 TextEntry::make('approval_summary')
                     ->label('Approval history')
-                    ->state(fn (ExpenseClaim $record): string => $record->approvals->map(fn ($approval): string => sprintf(
-                        'Level %d %s by %s (%s)%s',
-                        $approval->level,
-                        $approval->action,
-                        $approval->approver_name,
-                        $approval->role,
-                        filled($approval->remarks) ? ' — '.$approval->remarks : '',
-                    ))->join("\n") ?: '—')
+                    ->state(fn (ExpenseClaim $record): array => app(ExpenseClaimService::class)->approvalHistoryLines($record))
+                    ->listWithLineBreaks()
+                    ->placeholder('—')
+                    ->columnSpanFull(),
+                TextEntry::make('pending_approval')
+                    ->label('Currently pending')
+                    ->state(fn (ExpenseClaim $record): ?string => app(ExpenseClaimService::class)->pendingApprovalText($record))
+                    ->visible(fn (ExpenseClaim $record): bool => app(ExpenseClaimService::class)->pendingApprovalText($record) !== null)
                     ->columnSpanFull(),
             ]),
         ]);

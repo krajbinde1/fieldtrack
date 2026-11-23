@@ -18,6 +18,7 @@ use App\Services\AdminCenterContext;
 use App\Services\Notifications\ExpensePushNotifier;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -268,17 +269,10 @@ final class ExpenseClaimService
 
     public function queueQuery(User $user): Builder
     {
-        $query = $this->visibleQuery($user);
+        $query = $this->assignedCenterQuery($user);
 
-        if ($user->isAdmin()) {
-            return $query->whereIn('status', [
-                ExpenseClaimStatus::PendingFinal->value,
-                ExpenseClaimStatus::NeedsResolution->value,
-            ]);
-        }
-
-        if ($user->isDirector()) {
-            return $query->where('status', ExpenseClaimStatus::PendingFinal->value);
+        if ($user->isAdmin() || $user->isDirector()) {
+            return $this->whereReadyForFinalApproval($query);
         }
 
         if ($user->isCenterCoordinator()) {
@@ -298,18 +292,50 @@ final class ExpenseClaimService
 
     public function visibleQuery(User $user): Builder
     {
-        $query = ExpenseClaim::query();
-        $centers = $this->access->visibleCenterIds($user);
-        if (is_array($centers)) {
-            $query->whereIn('center_id', $centers === [] ? [-1] : $centers);
-        }
-
+        $query = $this->assignedCenterQuery($user);
         $selected = $this->centers->idFor($user);
         if ($selected !== null) {
             $query->where('center_id', $selected);
         }
 
         return $query;
+    }
+
+    /**
+     * Assigned centers only. The open center must not hide a claim that is
+     * already waiting for this approver.
+     */
+    private function assignedCenterQuery(User $user): Builder
+    {
+        $query = ExpenseClaim::query();
+        $centers = $this->access->visibleCenterIds($user);
+        if (is_array($centers)) {
+            $query->whereIn('center_id', $centers === [] ? [-1] : $centers);
+        }
+
+        return $query;
+    }
+
+    private function whereReadyForFinalApproval(Builder $query): Builder
+    {
+        $approvedAt = fn (int $level): Closure => fn (Builder $approvals): Builder => $approvals
+            ->where('level', $level)
+            ->where('action', 'approved');
+
+        return $query
+            ->where('status', ExpenseClaimStatus::PendingFinal->value)
+            ->where(function (Builder $ready) use ($approvedAt): void {
+                $ready->where(function (Builder $managerClaim) use ($approvedAt): void {
+                    $managerClaim
+                        ->whereHas('createdBy', fn (Builder $creator): Builder => $creator->where('role', UserRole::CenterManager->value))
+                        ->whereHas('approvals', $approvedAt(2));
+                })->orWhere(function (Builder $mobilizerClaim) use ($approvedAt): void {
+                    $mobilizerClaim
+                        ->whereDoesntHave('createdBy', fn (Builder $creator): Builder => $creator->where('role', UserRole::CenterManager->value))
+                        ->whereHas('approvals', $approvedAt(1))
+                        ->whereHas('approvals', $approvedAt(2));
+                });
+            });
     }
 
     public function pendingCountFor(?User $user): int
@@ -376,6 +402,8 @@ final class ExpenseClaimService
                 'remarks' => $approval->remarks,
                 'created_at' => $approval->created_at?->toDateTimeString(),
             ])->values()->all(),
+            'approval_history' => $this->approvalHistoryLines($claim),
+            'pending_approval' => $this->pendingApprovalText($claim),
             'payment' => $claim->payment === null ? null : [
                 'amount' => number_format((float) $claim->payment->amount, 2, '.', ''),
                 'payment_mode' => $claim->payment->payment_mode,
@@ -385,6 +413,111 @@ final class ExpenseClaimService
                 'paid_by_name' => $claim->payment->paid_by_name,
             ],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function approvalHistoryLines(ExpenseClaim $claim): array
+    {
+        $claim->loadMissing('approvals');
+
+        return $claim->approvals
+            ->map(function (ExpenseApproval $approval): string {
+                $when = $approval->created_at?->format('d M Y H:i');
+                $line = sprintf(
+                    'Level %d %s by %s (%s)%s',
+                    $approval->level,
+                    $approval->action,
+                    $approval->approver_name,
+                    $approval->role,
+                    $when ? ' on '.$when : '',
+                );
+
+                if (filled($approval->remarks)) {
+                    $line .= ' — '.$approval->remarks;
+                }
+
+                return $line;
+            })
+            ->values()
+            ->all();
+    }
+
+    public function pendingApprovalText(ExpenseClaim $claim): ?string
+    {
+        $level = $this->pendingLevel($claim);
+        if ($level === null) {
+            return null;
+        }
+
+        $names = $this->pendingApproverNames($claim, $level);
+        $stage = $this->stageLabel($level);
+
+        if ($names === []) {
+            return $stage.' — no approver is assigned';
+        }
+
+        return $stage.' — waiting on '.implode(', ', $names);
+    }
+
+    private function pendingLevel(ExpenseClaim $claim): ?int
+    {
+        return match ($claim->status) {
+            ExpenseClaimStatus::PendingCenterManager => 1,
+            ExpenseClaimStatus::PendingCenterCoordinator => 2,
+            ExpenseClaimStatus::PendingFinal => 3,
+            ExpenseClaimStatus::NeedsResolution => $claim->blocked_level !== null
+                ? (int) $claim->blocked_level
+                : ((int) $claim->current_level > 0 ? (int) $claim->current_level : null),
+            default => null,
+        };
+    }
+
+    private function stageLabel(int $level): string
+    {
+        return match ($level) {
+            1 => 'Center Manager',
+            2 => 'Center Coordinator',
+            3 => 'Admin / Director',
+            default => 'Level '.$level,
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function pendingApproverNames(ExpenseClaim $claim, int $level): array
+    {
+        $claim->loadMissing('center');
+        $center = $claim->center;
+        $claimantId = (int) $claim->created_by_user_id;
+        $pool = match ($level) {
+            1 => $center === null ? collect() : $this->approvers->managers($center, $claimantId),
+            2 => $center === null ? collect() : $this->approvers->coordinators($center, $claimantId),
+            3 => $this->approvers->finalApprovers($claimantId),
+            default => collect(),
+        };
+
+        return $pool->map(fn (User $user): string => $user->name)->values()->all();
+    }
+
+    private function firstMissingApprovalLevel(ExpenseClaim $claim): ?int
+    {
+        $start = $this->openingLevel($claim);
+
+        for ($level = $start; $level < 3; $level++) {
+            $recorded = $claim->approvals()
+                ->where('level', $level)
+                ->where('action', 'approved')
+                ->exists();
+
+            if (! $recorded) {
+                return $level;
+            }
+        }
+
+        return null;
     }
 
     private function submitLocked(User $user, ExpenseClaim $claim): void
@@ -472,6 +605,13 @@ final class ExpenseClaimService
         $claimantId = (int) $claim->created_by_user_id;
 
         if ($level >= 3) {
+            $missing = $this->firstMissingApprovalLevel($claim);
+            if ($missing !== null) {
+                $this->routeToLevel($claim, $missing, $notifySubmitter);
+
+                return;
+            }
+
             $pool = $center === null ? collect() : $this->approvers->finalApprovers($claimantId);
             if ($pool->isEmpty()) {
                 $this->block($claim, 3);
@@ -586,11 +726,7 @@ final class ExpenseClaimService
         }
 
         if ($claim->status === ExpenseClaimStatus::NeedsResolution) {
-            if (! $user->isAdmin() || $claim->blocked_level === null) {
-                abort(403, 'This expense is waiting for an admin to resolve the missing approver.');
-            }
-
-            return (int) $claim->blocked_level;
+            abort(403, 'This expense is waiting because an approver is not assigned.');
         }
 
         $expected = match ($claim->status) {
@@ -613,6 +749,10 @@ final class ExpenseClaimService
             throw ValidationException::withMessages([
                 'status' => 'This approval level has already been decided.',
             ]);
+        }
+
+        if ($level === 3 && $this->firstMissingApprovalLevel($claim) !== null) {
+            abort(403, 'This expense is still waiting for an earlier approver.');
         }
 
         return $level;

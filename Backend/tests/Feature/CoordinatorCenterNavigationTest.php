@@ -249,12 +249,15 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
         ->toThrow(ValidationException::class);
 
     $this->flushSession();
-    $this->actingAs($org['centerManager'])->get('/admin')->assertOk();
+    $this->actingAs($org['centerManager'])->get('/admin')
+        ->assertOk()
+        ->assertSee('/admin/expense-claims', false);
 
     expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
         'Main Dashboard',
         'Center Dashboard',
         'Users',
+        'Expenses',
     ])
         ->and(array_values(array_intersect(array_merge(['Team Management'], $removed), coordinatorSidebarLabels())))->toBe([])
         ->and(EmployeeResource::getNavigationLabel())->toBe('Users')
@@ -287,12 +290,15 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
         ->assertRedirect('/admin/centers')
         ->assertSessionMissing(AdminCenterContext::SESSION_KEY);
 
-    $this->actingAs($org['centerManager'])->get('/admin/centers')->assertOk();
+    $this->actingAs($org['centerManager'])->get('/admin/centers')
+        ->assertOk()
+        ->assertSee('/admin/expense-claims', false);
 
     expect(coordinatorSidebarLabels())->toEqualCanonicalizing([
         'Main Dashboard',
         'Center Dashboard',
         'Users',
+        'Expenses',
     ]);
 });
 

@@ -7,7 +7,6 @@ use App\Models\AdmissionTarget;
 use App\Models\Attendance;
 use App\Models\Center;
 use App\Models\Employee;
-use App\Models\ExpenseClaim;
 use App\Models\LeaveRequest;
 use App\Models\Project;
 use App\Models\Scheme;
@@ -251,7 +250,6 @@ final class AdminCenterContext
             Employee::class => $this->scopeEmployeesByCenter($query, $user),
             Attendance::class => $this->scopeByEmployeeCenter($query, $user),
             LeaveRequest::class, AdmissionTarget::class => $this->scopeOwnedByCenter($query, $user),
-            ExpenseClaim::class => $this->scopeByCenterId($query, $user),
             default => $query,
         };
     }

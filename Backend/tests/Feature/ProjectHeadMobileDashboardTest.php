@@ -35,11 +35,13 @@ it('keeps a project manager record without mobile or organization access', funct
 it('deactivates existing project manager accounts without deleting their records', function () {
     $org = seedOrg();
     $org['projectHead']->createToken('mobile-session');
+    $directorBefore = $org['director']->only(['id', 'role', 'is_active', 'login_id']);
 
     $migration = require database_path('migrations/2026_11_22_120000_deactivate_project_manager_accounts.php');
     $migration->up();
 
     $fresh = $org['projectHead']->fresh();
+    $director = $org['director']->fresh();
 
     expect($fresh)->not->toBeNull()
         ->and($fresh->role)->toBe(UserRole::ProjectHead->value)
@@ -47,7 +49,10 @@ it('deactivates existing project manager accounts without deleting their records
         ->and($fresh->tokens()->count())->toBe(0)
         ->and($fresh->headedCenters()->pluck('centers.id')->all())->toContain($org['centerA']->id)
         ->and($fresh->canLoginToMobile())->toBeFalse()
-        ->and($fresh->canAccessPanel(filament()->getPanel('admin')))->toBeFalse();
+        ->and($fresh->canAccessPanel(filament()->getPanel('admin')))->toBeFalse()
+        ->and($director->only(['id', 'role', 'is_active', 'login_id']))->toBe($directorBefore)
+        ->and($director->canAccessPanel(filament()->getPanel('admin')))->toBeTrue()
+        ->and($director->canLoginToMobile())->toBeTrue();
 });
 
 it('lets an admin reassign a former project manager instead of granting that role access', function () {

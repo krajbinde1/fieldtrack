@@ -65,10 +65,28 @@ void main() {
     expect(RoutePermissions.canAccessPath('/director/employees', role), isTrue);
     expect(RoutePermissions.canAccessPath('/director/admission-targets', role), isTrue);
     expect(RoutePermissions.canAccessPath('/director/reports', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/expenses', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/expenses/9', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/team-attendance', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/leaves', role), isTrue);
     expect(RoutePermissions.canAccessPath('/director/field-activities', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/attendance/punch-in', role), isFalse);
     expect(RoutePermissions.canAccessPath('/manager/employees', role), isFalse);
     expect(RoutePermissions.canAccessPath('/manager/centers', role), isFalse);
     expect(RoutePermissions.canAccessPath('/manager/admission-targets/create', role), isFalse);
+  });
+
+  test('Admin reaches the same director routes without manager create routes', () {
+    const role = UserRole.admin;
+
+    expect(role.canAccessDirectorRoutes(), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/expenses', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/team-attendance', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/reports', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/employees', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/director/leaves', role), isTrue);
+    expect(RoutePermissions.canAccessPath('/manager/employees/create', role), isFalse);
+    expect(RoutePermissions.canAccessPath('/attendance/punch-in', role), isFalse);
   });
 
   testWidgets('Center Manager dashboard body shows summary and modules', (
@@ -245,6 +263,7 @@ void main() {
     expect(find.text('Active Routes'), findsOneWidget);
     expect(find.text('Project Manager Leave'), findsOneWidget);
     expect(find.text('Pending: 1'), findsOneWidget);
+    expect(find.text('Expenses'), findsOneWidget);
     expect(find.text('Confirmed Admissions'), findsOneWidget);
     expect(find.text('Total: 7'), findsOneWidget);
     await tester.scrollUntilVisible(

@@ -1,13 +1,16 @@
 <?php
 
+use App\Enums\ExpenseClaimStatus;
 use App\Enums\UserRole;
 use App\Filament\Resources\ExpenseClaims\Pages\CreateExpenseClaim;
 use App\Filament\Resources\ExpenseClaims\Pages\ListExpenseClaims;
+use App\Filament\Resources\ExpenseClaims\Pages\ViewExpenseClaim;
 use App\Models\AppNotification;
 use App\Models\ExpenseApproval;
 use App\Models\ExpenseClaim;
 use App\Models\User;
 use App\Services\AdminCenterContext;
+use App\Services\Expenses\ExpenseClaimService;
 use App\Services\Notifications\ExpensePushNotifier;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
@@ -178,16 +181,20 @@ it('stops the workflow when a claim is rejected', function () {
         ->toContain('Bill is unclear');
 });
 
-it('flags a claim for admin when the next approver is missing', function () {
+it('keeps a claim waiting when the coordinator is missing and does not let admin approve it', function () {
     $org = seedOrg();
     $id = $this->actingAs($org['userA'], 'sanctum')
         ->post('/api/expenses', expensePayload())
         ->json('data.id');
 
     $this->actingAs($org['centerManager'], 'sanctum')
-        ->postJson('/api/manager/expenses/'.$id.'/approve')
+        ->postJson('/api/manager/expenses/'.$id.'/approve', ['remarks' => 'Checked'])
         ->assertOk()
-        ->assertJsonPath('data.status', 'needs_resolution');
+        ->assertJsonPath('data.status', 'needs_resolution')
+        ->assertJsonPath('data.pending_approval', 'Center Coordinator — no approver is assigned');
+
+    $claim = ExpenseClaim::query()->findOrFail($id);
+    $service = app(ExpenseClaimService::class);
 
     $this->actingAs($org['director'], 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve')
@@ -195,10 +202,123 @@ it('flags a claim for admin when the next approver is missing', function () {
 
     $this->actingAs($org['admin'], 'sanctum')
         ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'No coordinator assigned'])
-        ->assertOk()
-        ->assertJsonPath('data.status', 'pending_final');
+        ->assertForbidden();
 
-    expect(AppNotification::query()->where('user_id', $org['admin']->id)->where('type', 'expense_needs_resolution_2')->count())->toBe(1);
+    expect($claim->fresh()->status)->toBe(ExpenseClaimStatus::NeedsResolution)
+        ->and($claim->fresh()->blocked_level)->toBe(2)
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->canDecide($org['admin'], $claim->fresh()))->toBeFalse()
+        ->and($service->approvalHistoryLines($claim->fresh())[0])->toContain('Level 1 approved by CM (Center Manager)')
+        ->and($service->approvalHistoryLines($claim->fresh())[0])->toContain('Checked')
+        ->and(AppNotification::query()->where('user_id', $org['admin']->id)->where('type', 'expense_needs_resolution_2')->count())->toBe(1);
+
+    $this->actingAs($org['admin'], 'sanctum')
+        ->getJson('/api/director/expenses?status=pending')
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+
+    $this->actingAs($org['admin'], 'sanctum')
+        ->getJson('/api/director/expenses/'.$id)
+        ->assertOk()
+        ->assertJsonPath('data.pending_approval', 'Center Coordinator — no approver is assigned')
+        ->assertJsonPath('data.status', 'needs_resolution');
+
+    $this->app['auth']->forgetGuards();
+
+    Livewire::actingAs($org['admin'])
+        ->test(ListExpenseClaims::class)
+        ->assertCanNotSeeTableRecords([$claim]);
+
+    Livewire::actingAs($org['admin'])
+        ->test(ListExpenseClaims::class)
+        ->set('activeTab', 'history')
+        ->assertCanSeeTableRecords([$claim]);
+
+    $history = $service->approvalHistoryLines($claim->fresh())[0];
+    Livewire::actingAs($org['admin'])
+        ->test(ViewExpenseClaim::class, ['record' => $id])
+        ->assertSee($history)
+        ->assertSee('Center Coordinator — no approver is assigned')
+        ->assertSee('Currently pending');
+});
+
+it('lists a mobilizer claim for the assigned center manager before any center is opened', function () {
+    $org = seedOrg();
+    $org['centerManager']->managedCenters()->attach($org['centerB']->id);
+    $coordinator = expenseCoordinator($org, 'coord-list', 'List Coordinator');
+
+    $created = $this->actingAs($org['userA'], 'sanctum')
+        ->post('/api/expenses', expensePayload())
+        ->assertCreated()
+        ->assertJsonPath('data.status', 'pending_center_manager')
+        ->assertJsonPath('data.pending_approval', 'Center Manager — waiting on CM');
+
+    $id = $created->json('data.id');
+    $claim = ExpenseClaim::query()->findOrFail($id);
+    $service = app(ExpenseClaimService::class);
+
+    expect($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['centerManager'])->whereKey($id)->exists())->toBeTrue();
+
+    $this->app['auth']->forgetGuards();
+
+    Livewire::actingAs($org['centerManager'])
+        ->test(ListExpenseClaims::class)
+        ->assertCanSeeTableRecords([$claim]);
+
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerB']->id]);
+
+    Livewire::actingAs($org['centerManager'])
+        ->test(ListExpenseClaims::class)
+        ->assertCanSeeTableRecords([$claim]);
+
+    Livewire::actingAs($org['centerManager'])
+        ->test(ListExpenseClaims::class)
+        ->set('activeTab', 'history')
+        ->assertCanNotSeeTableRecords([$claim]);
+
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->postJson('/api/manager/expenses/'.$id.'/approve', ['remarks' => 'Manager checked'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_center_coordinator')
+        ->assertJsonPath('data.pending_approval', 'Center Coordinator — waiting on List Coordinator');
+
+    expect($service->queueQuery($coordinator)->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($org['centerManager'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse();
+
+    $this->app['auth']->forgetGuards();
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerB']->id]);
+    $coordinator->coordinatedCenters()->attach($org['centerB']->id);
+
+    Livewire::actingAs($coordinator)
+        ->test(ListExpenseClaims::class)
+        ->assertCanSeeTableRecords([$claim->fresh()]);
+
+    $this->actingAs($coordinator, 'sanctum')
+        ->postJson('/api/director/expenses/'.$id.'/approve', ['remarks' => 'Coordinator checked'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_final')
+        ->assertJsonPath('data.pending_approval', 'Admin / Director — waiting on Admin, Director');
+
+    expect($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeTrue()
+        ->and($service->approvalHistoryLines($claim->fresh()))->toHaveCount(2);
+
+    $this->app['auth']->forgetGuards();
+    Livewire::actingAs($org['admin'])
+        ->test(ListExpenseClaims::class)
+        ->assertCanSeeTableRecords([$claim->fresh()]);
+
+    Livewire::actingAs($org['admin'])
+        ->test(ViewExpenseClaim::class, ['record' => $id])
+        ->assertSee('Level 1 approved by CM (Center Manager)')
+        ->assertSee('Manager checked')
+        ->assertSee('Level 2 approved by List Coordinator (Center Coordinator)')
+        ->assertSee('Coordinator checked')
+        ->assertSee('Admin / Director — waiting on Admin, Director');
 });
 
 it('does not let another center approve or view the claim', function () {

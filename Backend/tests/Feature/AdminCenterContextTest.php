@@ -548,10 +548,11 @@ it('does not force center selection on a center manager', function () {
         ->assertOk()
         ->assertSee('Main Dashboard')
         ->assertDontSee('Change Center')
-        ->assertSee('Center Dashboard');
+        ->assertSee('Center Dashboard')
+        ->assertSee('/admin/expense-claims', false);
 
     $this->actingAs($org['centerManager'])->get('/admin/center-dashboard')->assertRedirect('/admin/centers');
-    expect(centerContextNavLabels())->toEqualCanonicalizing(['Main Dashboard', 'Center Dashboard', 'Users'])
+    expect(centerContextNavLabels())->toEqualCanonicalizing(['Main Dashboard', 'Center Dashboard', 'Users', 'Expenses'])
         ->and(Dashboard::getNavigationLabel())->toBe('Main Dashboard');
 
     $this->actingAs($org['centerManager'])->get('/admin/attendances')->assertRedirect('/admin/centers');
