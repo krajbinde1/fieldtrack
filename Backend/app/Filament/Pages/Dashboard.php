@@ -7,6 +7,7 @@ use App\Filament\Widgets\CenterManagerDashboardWidget;
 use App\Filament\Widgets\DirectorAdminStatsWidget;
 use App\Filament\Widgets\DirectorConfirmedAdmissionsByCenterWidget;
 use App\Filament\Widgets\DirectorTodayTeamActivityWidget;
+use App\Filament\Widgets\ExpensePendingWidget;
 use App\Filament\Widgets\FieldTrackStatsWidget;
 use App\Models\User;
 use App\Services\AdminCenterContext;
@@ -103,12 +104,14 @@ class Dashboard extends BaseDashboard
                 AdmissionTargetPerformanceWidget::class,
                 $scope(DirectorConfirmedAdmissionsByCenterWidget::class),
                 $scope(DirectorTodayTeamActivityWidget::class),
+                ExpensePendingWidget::class,
             ];
         }
 
         if ($user instanceof User && $user->isCenterManager()) {
             return [
                 CenterManagerDashboardWidget::class,
+                ExpensePendingWidget::class,
             ];
         }
 
@@ -118,6 +121,7 @@ class Dashboard extends BaseDashboard
             AdmissionTargetPerformanceWidget::class,
             $scope(DirectorConfirmedAdmissionsByCenterWidget::class),
             $scope(DirectorTodayTeamActivityWidget::class),
+            ExpensePendingWidget::class,
         ];
     }
 

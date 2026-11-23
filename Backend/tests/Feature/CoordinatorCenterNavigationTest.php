@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AdmissionStatus;
+use App\Enums\UserRole;
 use App\Filament\Pages\AppUpdateSettings;
 use App\Filament\Pages\CenterDashboard;
 use App\Filament\Pages\Dashboard;
@@ -26,19 +27,20 @@ use App\Models\User;
 use App\Services\AdminCenterContext;
 use App\Support\AttendanceCalendar;
 use Filament\Actions\Testing\TestAction;
+use Filament\Navigation\NavigationManager;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 function resetFilamentNavigationRequest(): void
 {
-    app()->forgetInstance(\Filament\Navigation\NavigationManager::class);
+    app()->forgetInstance(NavigationManager::class);
     app()->forgetInstance('originalRequest');
 }
 
 function coordinatorSidebarLabels(): array
 {
-    app()->forgetInstance(\Filament\Navigation\NavigationManager::class);
+    app()->forgetInstance(NavigationManager::class);
 
     $labels = [];
 
@@ -64,10 +66,12 @@ function centerSidebarLabels(): array
         'Center Dashboard',
         'Attendances',
         'Employee Routes',
+        'Team Activity',
         'Admissions',
         'Admission Targets',
         'Leave Requests',
         'Reports',
+        'Expenses',
     ];
 }
 
@@ -105,7 +109,7 @@ function navigationCoordinator(array $org): User
         'email' => 'coord-nav@test.local',
         'login_id' => 'coordnav',
         'password' => Hash::make('Coordinator@123'),
-        'role' => \App\Enums\UserRole::CenterCoordinator->value,
+        'role' => UserRole::CenterCoordinator->value,
         'is_active' => true,
         'must_change_password' => false,
     ]);
@@ -120,10 +124,12 @@ it('switches the shared sidebar when a center is opened and restores it afterwar
     $removed = [
         'Attendances',
         'Employee Routes',
+        'Team Activity',
         'Admissions',
         'Admission Targets',
         'Leave Requests',
         'Reports',
+        'Expenses',
     ];
 
     $this->actingAs($coordinator)
@@ -337,6 +343,7 @@ it('scopes coordinator modules to the selected center and can switch assigned ce
 
     $this->actingAs($coordinator)->get('/admin/attendances')->assertRedirect('/admin/centers');
     $this->actingAs($coordinator)->get('/admin/employee-routes')->assertRedirect('/admin/centers');
+    $this->actingAs($coordinator)->get('/admin/team-activities')->assertRedirect('/admin/centers');
     $this->actingAs($coordinator)->get('/admin/admissions')->assertRedirect('/admin/centers');
     $this->actingAs($coordinator)->get('/admin/admission-targets')->assertRedirect('/admin/centers');
     $this->actingAs($coordinator)->get('/admin/leave-requests')->assertRedirect('/admin/centers');

@@ -176,6 +176,14 @@ class DirectorDashboardView extends StatelessWidget {
           background: const Color(0xFFFFF6E5),
         ),
       _DirectorTile(
+        icon: const Icon(Icons.receipt_long_rounded),
+        label: 'Expenses',
+        value: 'Pending: ${_count('pending_expenses')}',
+        path: _path('/director/expenses'),
+        color: const Color(0xFFB45309),
+        background: const Color(0xFFFFF7ED),
+      ),
+      _DirectorTile(
         icon: const Icon(Icons.how_to_reg_rounded),
         label: 'Confirmed Admissions',
         value: 'Total: $confirmedCount',

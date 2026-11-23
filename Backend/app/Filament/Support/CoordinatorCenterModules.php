@@ -18,6 +18,7 @@ final class CoordinatorCenterModules
         $bases = [
             'attendances',
             'employee-routes',
+            'team-activities',
             'admissions',
             'admission-targets',
             'leave-requests',

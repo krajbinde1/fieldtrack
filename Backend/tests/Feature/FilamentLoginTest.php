@@ -92,6 +92,7 @@ it('lets an admin open organization, people, and field-operation pages', functio
         '/admin/centers',
         '/admin/attendances',
         '/admin/employee-routes',
+        '/admin/team-activities',
         '/admin/admissions',
         '/admin/leave-requests',
         '/admin/reports',

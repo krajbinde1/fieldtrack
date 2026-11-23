@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../modules/auth/confirm_logout.dart';
 import '../../modules/auth/providers/auth_controller.dart';
+import '../../modules/expenses/api/expense_api.dart';
 import '../design/app_colors.dart';
 import '../design/app_spacing.dart';
 import 'design/pg_card.dart';
@@ -44,17 +45,45 @@ class RoleAppBar extends AppBar {
         );
 }
 
-class _RoleNotificationsButton extends StatelessWidget {
+class _RoleNotificationsButton extends StatefulWidget {
   const _RoleNotificationsButton({required this.auth});
 
   final AuthController auth;
 
   @override
+  State<_RoleNotificationsButton> createState() => _RoleNotificationsButtonState();
+}
+
+class _RoleNotificationsButtonState extends State<_RoleNotificationsButton> {
+  int _unread = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (!widget.auth.authenticated) return;
+    try {
+      final result = await (await ExpenseApi.create()).notifications();
+      if (mounted) setState(() => _unread = result.unread);
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: 'Notifications',
-      onPressed: () => context.push('/notifications'),
-      icon: const Icon(Icons.notifications_none_rounded),
+      onPressed: () async {
+        await context.push('/notifications');
+        await _load();
+      },
+      icon: Badge(
+        isLabelVisible: _unread > 0,
+        label: Text('$_unread'),
+        child: const Icon(Icons.notifications_none_rounded),
+      ),
     );
   }
 }

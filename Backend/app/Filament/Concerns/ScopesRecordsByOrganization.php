@@ -7,6 +7,7 @@ use App\Models\AdmissionTarget;
 use App\Models\Attendance;
 use App\Models\Center;
 use App\Models\Employee;
+use App\Models\ExpenseClaim;
 use App\Models\LeaveRequest;
 use App\Models\Scheme;
 use App\Services\AdminCenterContext;
@@ -32,10 +33,16 @@ trait ScopesRecordsByOrganization
             Center::class => $access->visibleCenterIds($user),
             Admission::class => $access->visibleCenterIds($user),
             Employee::class, Attendance::class, LeaveRequest::class, AdmissionTarget::class => $access->visibleEmployeeIds($user),
+            ExpenseClaim::class => $access->visibleCenterIds($user),
             default => null,
         };
 
-        if ($ids === null) {
+        if ($model === ExpenseClaim::class) {
+            $scoped = $ids === null
+                ? $query
+                : $query->whereIn('expense_claims.center_id', $ids === [] ? [-1] : $ids);
+            $scoped = $scoped->with(['employee', 'center', 'items', 'payment']);
+        } elseif ($ids === null) {
             $scoped = $query;
         } elseif ($model === Attendance::class) {
             $scoped = $query->whereIn('employee_id', $ids)->with(['employee.center.scheme']);

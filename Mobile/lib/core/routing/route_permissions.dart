@@ -19,6 +19,14 @@ class RoutePermissions {
       return role.canAccessOwnAttendance();
     }
 
+    if (path.startsWith('/expenses')) {
+      return role.isEmployee;
+    }
+
+    if (path.startsWith('/notifications')) {
+      return true;
+    }
+
     if (path.startsWith('/admissions') || path.startsWith('/leaves')) {
       return role.isEmployee;
     }

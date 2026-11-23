@@ -360,6 +360,14 @@ class SupervisorDashboardView extends StatelessWidget {
         color: const Color(0xFFEA580C),
         background: const Color(0xFFFFF6E5),
       ),
+      _DashboardTile(
+        icon: const Icon(Icons.receipt_long_rounded),
+        label: 'Expenses',
+        subtitle: 'Pending: ${_count('pending_expenses')}',
+        path: _path('$_prefix/expenses'),
+        color: const Color(0xFFB45309),
+        background: const Color(0xFFFFF7ED),
+      ),
       if (role.isCenterManager || _centerScopedDirector)
         _DashboardTile(
           icon: const Icon(Icons.photo_camera_outlined),

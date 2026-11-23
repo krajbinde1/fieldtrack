@@ -26,6 +26,11 @@ import '../../modules/director/screens/director_confirmed_admissions_screen.dart
 import '../../modules/director/screens/director_employees_screen.dart';
 import '../../modules/director/screens/director_route_tracking_screen.dart';
 import '../../modules/director/screens/director_today_attendance_screen.dart';
+import '../../modules/expenses/screens/expense_dashboard_screen.dart';
+import '../../modules/expenses/screens/expense_detail_screen.dart';
+import '../../modules/expenses/screens/expense_form_screen.dart';
+import '../../modules/expenses/screens/expense_queue_screen.dart';
+import '../../modules/notifications/screens/notification_list_screen.dart';
 import '../../modules/field_activities/screens/field_activity_detail_screen.dart';
 import '../../modules/field_activities/screens/field_activity_form_screen.dart';
 import '../../modules/field_activities/screens/field_activity_hub_screen.dart';
@@ -106,6 +111,24 @@ GoRouter createRouter(
         GoRoute(
           path: '/profile',
           builder: (_, _) => ProfileScreen(auth: auth),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (_, _) => const NotificationListScreen(),
+        ),
+        GoRoute(
+          path: '/expenses',
+          builder: (_, _) => const ExpenseDashboardScreen(),
+        ),
+        GoRoute(
+          path: '/expenses/new',
+          builder: (_, _) => const ExpenseFormScreen(),
+        ),
+        GoRoute(
+          path: '/expenses/:id',
+          builder: (_, state) => ExpenseDetailScreen(
+            claimId: int.parse(state.pathParameters['id']!),
+          ),
         ),
         GoRoute(
           path: '/attendance',
@@ -284,6 +307,21 @@ GoRouter createRouter(
           ),
         ),
         GoRoute(
+          path: '/manager/expenses',
+          builder: (_, _) => const ExpenseQueueScreen(
+            apiPrefix: '/manager/expenses',
+            detailPrefix: '/manager/expenses',
+          ),
+        ),
+        GoRoute(
+          path: '/manager/expenses/:id',
+          builder: (_, state) => ExpenseDetailScreen(
+            claimId: int.parse(state.pathParameters['id']!),
+            apiPrefix: '/manager/expenses',
+            canDecide: true,
+          ),
+        ),
+        GoRoute(
           path: '/manager/leaves',
           builder: (_, state) => SupervisorLeaveListScreen(
             auth: auth,
@@ -370,6 +408,22 @@ GoRouter createRouter(
             auth: auth,
             apiPrefix: 'director',
             admissionId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: '/director/expenses',
+          builder: (_, state) => ExpenseQueueScreen(
+            apiPrefix: '/director/expenses',
+            detailPrefix: '/director/expenses',
+          ),
+        ),
+        GoRoute(
+          path: '/director/expenses/:id',
+          builder: (_, state) => ExpenseDetailScreen(
+            claimId: int.parse(state.pathParameters['id']!),
+            apiPrefix: '/director/expenses',
+            canDecide: true,
+            canPay: auth.userRole.isAdmin,
           ),
         ),
         GoRoute(

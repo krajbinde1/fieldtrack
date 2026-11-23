@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminEmployeeRouteController;
 use App\Http\Controllers\Api\AdmissionLookupController;
+use App\Http\Controllers\Api\AppNotificationController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\DashboardController;
@@ -10,9 +11,11 @@ use App\Http\Controllers\Api\Director\DirectorRouteTrackingController;
 use App\Http\Controllers\Api\EmployeeAdmissionController;
 use App\Http\Controllers\Api\EmployeeAdmissionTargetController;
 use App\Http\Controllers\Api\EmployeeAuthController;
+use App\Http\Controllers\Api\EmployeeExpenseController;
 use App\Http\Controllers\Api\EmployeeFieldActivityController;
 use App\Http\Controllers\Api\EmployeeLeaveController;
 use App\Http\Controllers\Api\EmployeeRoutePointController;
+use App\Http\Controllers\Api\ExpenseApprovalController;
 use App\Http\Controllers\Api\Manager\ManagerAdmissionTargetController;
 use App\Http\Controllers\Api\Manager\ManagerEmployeeController;
 use App\Http\Controllers\Api\Manager\ManagerRouteTrackingController;
@@ -31,6 +34,8 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
     Route::post('change-password', [EmployeeAuthController::class, 'changePassword']);
     Route::post('profile-photo', [EmployeeAuthController::class, 'updateProfilePhoto']);
     Route::get('dashboard', DashboardController::class);
+    Route::get('notifications', [AppNotificationController::class, 'index']);
+    Route::post('notifications/{notification}/read', [AppNotificationController::class, 'markRead']);
 
     Route::middleware('role:employee,center_manager')->group(function () {
         if (! app()->environment('production')) {
@@ -82,6 +87,13 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
         Route::get('field-activities', [SupervisorFieldActivityController::class, 'index']);
         Route::get('field-activities/{fieldActivity}', [SupervisorFieldActivityController::class, 'show'])
             ->whereNumber('fieldActivity');
+        Route::get('expenses', [ExpenseApprovalController::class, 'index']);
+        Route::get('expenses/{expenseClaim}', [ExpenseApprovalController::class, 'show'])->whereNumber('expenseClaim');
+        Route::get('expenses/{expenseClaim}/items/{item}/receipt', [ExpenseApprovalController::class, 'receipt'])
+            ->whereNumber('expenseClaim')
+            ->whereNumber('item');
+        Route::post('expenses/{expenseClaim}/approve', [ExpenseApprovalController::class, 'approve'])->whereNumber('expenseClaim');
+        Route::post('expenses/{expenseClaim}/reject', [ExpenseApprovalController::class, 'reject'])->whereNumber('expenseClaim');
     });
 
     Route::middleware('role:admin,director,center_coordinator')->prefix('director')->group(function () {
@@ -112,6 +124,14 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
         Route::get('field-activities', [SupervisorFieldActivityController::class, 'index']);
         Route::get('field-activities/{fieldActivity}', [SupervisorFieldActivityController::class, 'show'])
             ->whereNumber('fieldActivity');
+        Route::get('expenses', [ExpenseApprovalController::class, 'index']);
+        Route::get('expenses/{expenseClaim}', [ExpenseApprovalController::class, 'show'])->whereNumber('expenseClaim');
+        Route::get('expenses/{expenseClaim}/items/{item}/receipt', [ExpenseApprovalController::class, 'receipt'])
+            ->whereNumber('expenseClaim')
+            ->whereNumber('item');
+        Route::post('expenses/{expenseClaim}/approve', [ExpenseApprovalController::class, 'approve'])->whereNumber('expenseClaim');
+        Route::post('expenses/{expenseClaim}/reject', [ExpenseApprovalController::class, 'reject'])->whereNumber('expenseClaim');
+        Route::post('expenses/{expenseClaim}/pay', [ExpenseApprovalController::class, 'pay'])->whereNumber('expenseClaim');
     });
 });
 
@@ -148,6 +168,17 @@ Route::middleware(['auth:sanctum', 'role:employee'])->prefix('field-activities')
     Route::post('/', [EmployeeFieldActivityController::class, 'store']);
     Route::get('{fieldActivity}', [EmployeeFieldActivityController::class, 'show'])
         ->whereNumber('fieldActivity');
+});
+
+Route::middleware(['auth:sanctum', 'role:employee'])->prefix('expenses')->group(function () {
+    Route::get('/', [EmployeeExpenseController::class, 'index']);
+    Route::post('/', [EmployeeExpenseController::class, 'store']);
+    Route::patch('{expenseClaim}', [EmployeeExpenseController::class, 'update'])->whereNumber('expenseClaim');
+    Route::post('{expenseClaim}/submit', [EmployeeExpenseController::class, 'submit'])->whereNumber('expenseClaim');
+    Route::get('{expenseClaim}/items/{item}/receipt', [EmployeeExpenseController::class, 'receipt'])
+        ->whereNumber('expenseClaim')
+        ->whereNumber('item');
+    Route::get('{expenseClaim}', [EmployeeExpenseController::class, 'show'])->whereNumber('expenseClaim');
 });
 
 Route::middleware(['auth:sanctum', 'role:employee'])->prefix('leaves')->group(function () {

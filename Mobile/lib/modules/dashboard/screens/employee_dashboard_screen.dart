@@ -172,6 +172,13 @@ class EmployeeDashboardView extends StatelessWidget {
       path: '/admissions/targets',
     ),
     _EmployeeModule(
+      icon: Icon(Icons.receipt_long_rounded),
+      label: 'Expenses',
+      subtitle: 'Submit and track claims',
+      color: Color(0xFFB45309),
+      path: '/expenses',
+    ),
+    _EmployeeModule(
       icon: Icon(Icons.photo_camera_outlined),
       label: 'Field Activity',
       subtitle: 'Add and view field work',

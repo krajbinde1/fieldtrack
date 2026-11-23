@@ -6,7 +6,6 @@ use App\Filament\Pages\AppUpdateSettings;
 use App\Filament\Pages\CenterDashboard;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\DeviceManagement;
-use App\Filament\Pages\Reports;
 use App\Filament\Pages\SelectCenter;
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Resources\Admissions\Pages\ListAdmissions;
@@ -30,6 +29,7 @@ use App\Services\AdminCenterContext;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Filament\Actions\Testing\TestAction;
+use Filament\Navigation\NavigationManager;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
@@ -42,7 +42,7 @@ function rememberAdminCenter(int $centerId): array
 
 function centerContextNavLabels(): array
 {
-    app()->forgetInstance(\Filament\Navigation\NavigationManager::class);
+    app()->forgetInstance(NavigationManager::class);
 
     $labels = [];
 
@@ -104,6 +104,7 @@ it('opens the main admin dashboard across all authorized centers', function () {
     foreach ([
         '/admin/attendances',
         '/admin/employee-routes',
+        '/admin/team-activities',
         '/admin/admissions',
         '/admin/admission-targets',
         '/admin/leave-requests',
@@ -252,10 +253,12 @@ it('persists the selected center and scopes lists, filters, and direct urls', fu
         'Center Dashboard',
         'Attendances',
         'Employee Routes',
+        'Team Activity',
         'Admissions',
         'Admission Targets',
         'Leave Requests',
         'Reports',
+        'Expenses',
         'App Update Settings',
         'Device Management',
     ]);

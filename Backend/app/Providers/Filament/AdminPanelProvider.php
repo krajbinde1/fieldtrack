@@ -54,6 +54,7 @@ class AdminPanelProvider extends PanelProvider
                 'Field Operations',
                 'Admissions',
                 'Leave',
+                'Expenses',
                 'Reports',
                 'System',
             ])

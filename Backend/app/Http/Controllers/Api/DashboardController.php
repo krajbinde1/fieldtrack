@@ -6,6 +6,7 @@ use App\Enums\LeaveStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Services\DirectorWorkforceService;
+use App\Services\Expenses\ExpenseClaimService;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\JsonResponse;
@@ -103,6 +104,7 @@ class DashboardController extends Controller
                 'admission_counts' => $admissionCounts,
                 'confirmed_admissions' => $admissionCounts['confirmed'],
                 'pending_leaves' => $leaveQuery->count(),
+                'pending_expenses' => app(ExpenseClaimService::class)->pendingCountFor($user),
                 'field_activities_today' => (clone $fieldActivityQuery)
                     ->whereDate('activity_at', $today)
                     ->count(),
