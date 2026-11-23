@@ -10,6 +10,7 @@ import '../../../core/widgets/design/pg_card.dart';
 import '../../../core/widgets/design/pg_empty_state.dart';
 import '../../../core/widgets/design/pg_scaffold.dart';
 import '../api/expense_api.dart';
+import '../widgets/expense_approval_timeline.dart';
 
 class ExpenseDetailScreen extends StatefulWidget {
   const ExpenseDetailScreen({
@@ -122,13 +123,15 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                       ),
                     ),
                   )),
-              const SizedBox(height: 8),
-              Text('Approval history', style: Theme.of(context).textTheme.titleMedium),
-              if (claim.approvals.isEmpty) const Text('No decisions yet.'),
-              ...claim.approvals.map((row) => Text(
-                    'Level ${row['level']} ${row['action']} by ${row['approver_name']}'
-                    '${row['remarks'] == null || '${row['remarks']}'.isEmpty ? '' : ' — ${row['remarks']}'}',
-                  )),
+              if (claim.timelineVisible) ...[
+                const SizedBox(height: 8),
+                PgCard(
+                  child: ExpenseApprovalTimeline(
+                    stages: claim.timelineStages.map(ExpenseTimelineStage.fromJson).toList(),
+                    pendingText: claim.timelinePendingText,
+                  ),
+                ),
+              ],
               if (claim.payment != null) ...[
                 const SizedBox(height: 12),
                 Text('Paid on ${claim.payment!['paid_on']} via ${claim.payment!['payment_mode']}'),

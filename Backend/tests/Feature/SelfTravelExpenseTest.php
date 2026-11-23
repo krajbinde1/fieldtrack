@@ -5,6 +5,7 @@ use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\EmployeeRoutePoint;
 use App\Models\ExpenseSelfTravelDay;
+use App\Models\User;
 use App\Services\AdminCenterContext;
 use App\Services\RouteDistanceCalculator;
 use App\Support\AttendanceCalendar;
@@ -292,4 +293,84 @@ it('keeps employee travel fields off the center expense form', function () {
         ->assertDontSee('Travel to')
         ->assertDontSee('Travel km')
         ->assertDontSee('Self Travelling amount is calculated from the recorded GPS KM and the employee KM rate');
+});
+
+it('returns only the signed-in employee route locations for the selected date', function () {
+    $org = seedOrg();
+    $date = '2026-11-20';
+    $org['empA']->update(['travel_km_rate' => 8, 'monthly_km_limit' => 500]);
+    $attendance = selfTravelRoute($org['empA'], $date);
+    $attendance->update(['punch_in_location' => 'Emp A Start Gate']);
+
+    $otherEmployee = selfTravelRoute($org['empB'], $date);
+    EmployeeRoutePoint::query()->where('attendance_id', $otherEmployee->id)->update([
+        'latitude' => 19.0760,
+        'longitude' => 72.8777,
+    ]);
+    $otherEmployee->update([
+        'punch_in_location' => 'Emp B Secret Place',
+        'punch_in_latitude' => 19.0760,
+        'punch_in_longitude' => 72.8777,
+    ]);
+
+    $otherDay = selfTravelRoute($org['empA'], '2026-11-18');
+    EmployeeRoutePoint::query()->where('attendance_id', $otherDay->id)->update([
+        'latitude' => 12.9716,
+        'longitude' => 77.5946,
+    ]);
+    $otherDay->update(['punch_in_location' => 'Emp A Other Day']);
+
+    $ownerIds = EmployeeRoutePoint::query()
+        ->where('attendance_id', $attendance->id)
+        ->orderBy('recorded_at')
+        ->orderBy('id')
+        ->pluck('id')
+        ->map(fn ($id): int => (int) $id)
+        ->all();
+
+    $response = $this->actingAs($org['userA'], 'sanctum')
+        ->getJson('/api/expenses/self-travel?date='.$date.'&employee_id='.$org['empB']->id)
+        ->assertOk();
+
+    $locations = $response->json('data.locations');
+    $payload = json_encode($locations);
+    $returnedIds = collect($locations)
+        ->pluck('id')
+        ->filter(fn ($id) => $id !== null)
+        ->map(fn ($id): int => (int) $id)
+        ->values()
+        ->all();
+    $expected = app(RouteDistanceCalculator::class)->calculate($attendance->fresh('routePoints')->routePoints);
+
+    expect($locations)->toHaveCount(4)
+        ->and($response->json('data.locations.0.address'))->toBe('Emp A Start Gate')
+        ->and($response->json('data.locations.1.label'))->toBe('18.52040, 73.85670')
+        ->and($returnedIds)->toBe($ownerIds)
+        ->and($payload)->toContain('Emp A Start Gate')
+        ->and($payload)->not->toContain('Emp B Secret Place')
+        ->and($payload)->not->toContain('Emp A Other Day')
+        ->and($payload)->not->toContain('19.076')
+        ->and($payload)->not->toContain('12.9716')
+        ->and((float) $response->json('data.recorded_km'))->toEqual((float) $expected['total_distance_km'])
+        ->and(round((float) $response->json('data.from.latitude'), 4))->toEqual(18.5204)
+        ->and(round((float) $response->json('data.to.longitude'), 4))->toEqual(73.8667);
+
+    $userB = User::query()->where('employee_id', $org['empB']->id)->firstOrFail();
+    $otherPayload = json_encode(
+        $this->actingAs($userB, 'sanctum')
+            ->getJson('/api/expenses/self-travel?date='.$date)
+            ->assertOk()
+            ->json('data.locations'),
+    );
+    expect($otherPayload)->toContain('Emp B Secret Place')
+        ->and($otherPayload)->toContain('19.076')
+        ->and($otherPayload)->not->toContain('Emp A Start Gate')
+        ->and($otherPayload)->not->toContain('18.52040');
+
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->getJson('/api/expenses/self-travel?date='.$date.'&employee_id='.$org['empA']->id)
+        ->assertOk()
+        ->assertJsonPath('data.locations', [])
+        ->assertDontSee('Emp A Start Gate')
+        ->assertDontSee('Emp B Secret Place');
 });

@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\EmployeeRouteLiveController;
+use App\Http\Controllers\ExpenseReceiptController;
 use App\Http\Controllers\LatestApkController;
 use App\Http\Controllers\PublicStorageController;
 use App\Models\User;
 use App\Services\AdminCenterContext;
+use Filament\Http\Middleware\Authenticate as FilamentAuthenticate;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -35,4 +37,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/employee-routes/tracking/{attendance}', [EmployeeRouteLiveController::class, 'show'])
         ->whereNumber('attendance')
         ->name('employee-routes.tracking.show');
+});
+
+Route::middleware(FilamentAuthenticate::class)->group(function () {
+    Route::get('/admin/expense-claims/{expenseClaim}/items/{item}/receipt', [ExpenseReceiptController::class, 'preview'])
+        ->whereNumber('expenseClaim')
+        ->whereNumber('item')
+        ->name('admin.expense-receipts.preview');
+    Route::get('/admin/expense-claims/{expenseClaim}/items/{item}/receipt/download', [ExpenseReceiptController::class, 'download'])
+        ->whereNumber('expenseClaim')
+        ->whereNumber('item')
+        ->name('admin.expense-receipts.download');
 });

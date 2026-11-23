@@ -28,10 +28,11 @@ class EmployeeExpenseController extends Controller
             'date' => ['required', 'date'],
         ]);
 
-        return $this->ok('Self travelling calculated.', app(SelfTravelService::class)->quote(
-            $request->user(),
-            (string) $data['date'],
-        ));
+        $service = app(SelfTravelService::class);
+        $quote = $service->quote($request->user(), (string) $data['date']);
+        $quote['locations'] = $service->routeLocations($request->user(), (string) $data['date']);
+
+        return $this->ok('Self travelling calculated.', $quote);
     }
 
     public function storeReceipt(Request $request): JsonResponse

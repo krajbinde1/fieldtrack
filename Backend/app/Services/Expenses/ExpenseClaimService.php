@@ -34,6 +34,7 @@ final class ExpenseClaimService
         private readonly OrganizationAccessService $access,
         private readonly AdminCenterContext $centers,
         private readonly SelfTravelService $selfTravel,
+        private readonly ExpenseApprovalTimeline $timeline,
     ) {}
 
     /**
@@ -49,7 +50,7 @@ final class ExpenseClaimService
             'designatedApprover',
             'items',
             'approvals.user',
-            'payment',
+            'payment.paidBy',
         ];
     }
 
@@ -457,6 +458,7 @@ final class ExpenseClaimService
             ])->values()->all(),
             'approval_history' => $this->approvalHistoryLines($claim),
             'pending_approval' => $this->pendingApprovalText($claim),
+            'timeline' => $this->timeline->forClaim($claim),
             'payment' => $claim->payment === null ? null : [
                 'amount' => number_format((float) $claim->payment->amount, 2, '.', ''),
                 'payment_mode' => $claim->payment->payment_mode,

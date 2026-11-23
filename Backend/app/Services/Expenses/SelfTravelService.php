@@ -13,6 +13,7 @@ use App\Services\RouteDistanceCalculator;
 use App\Support\AttendanceCalendar;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 final class SelfTravelService
@@ -133,6 +134,66 @@ final class SelfTravelService
         ];
     }
 
+    /**
+     * Ordered route suggestions for the signed-in employee's attendance on this date.
+     * Other employees' points and addresses are never included.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function routeLocations(User $user, string $date): array
+    {
+        $employee = $user->employee;
+        if (! $employee instanceof Employee) {
+            return [];
+        }
+
+        $day = Carbon::parse($date, AttendanceCalendar::TIMEZONE)->toDateString();
+        $attendances = Attendance::query()
+            ->where('employee_id', $employee->id)
+            ->whereDate('attendance_date', $day)
+            ->with(['routePoints' => function ($query) use ($employee): void {
+                $query->where('employee_id', $employee->id)
+                    ->orderBy('recorded_at')
+                    ->orderBy('id');
+            }])
+            ->orderBy('id')
+            ->get();
+
+        $locations = [];
+        foreach ($attendances as $attendance) {
+            if (filled($attendance->punch_in_location)) {
+                $locations[] = $this->locationRow(
+                    label: (string) $attendance->punch_in_location,
+                    address: (string) $attendance->punch_in_location,
+                    latitude: $attendance->punch_in_latitude,
+                    longitude: $attendance->punch_in_longitude,
+                    recordedAt: $attendance->punchInAt(),
+                );
+            }
+
+            foreach ($this->suggestionPoints($attendance->routePoints) as $point) {
+                $locations[] = $this->locationRow(
+                    id: (int) $point['id'],
+                    latitude: $point['latitude'],
+                    longitude: $point['longitude'],
+                    recordedAt: $point['recorded_at'] ?? null,
+                );
+            }
+
+            if (filled($attendance->punch_out_location)) {
+                $locations[] = $this->locationRow(
+                    label: (string) $attendance->punch_out_location,
+                    address: (string) $attendance->punch_out_location,
+                    latitude: $attendance->punch_out_latitude,
+                    longitude: $attendance->punch_out_longitude,
+                    recordedAt: $attendance->punchOutAt(),
+                );
+            }
+        }
+
+        return $locations;
+    }
+
     public function assertAvailable(User $user, string $date, ?int $exceptClaimId = null, float $additionalKm = 0): array
     {
         $quote = $this->quote($user, $date, $exceptClaimId, $additionalKm);
@@ -238,5 +299,92 @@ final class SelfTravelService
     private function money(float $amount): string
     {
         return number_format($amount, 2, '.', '');
+    }
+
+    /**
+     * Accepted GPS points in travel order. A long trace is sampled, keeping the
+     * first and last points, so the dropdown stays the employee's real route.
+     *
+     * @param  Collection<int, mixed>  $points
+     * @return list<array<string, mixed>>
+     */
+    private function suggestionPoints(Collection $points): array
+    {
+        if ($points->isEmpty()) {
+            return [];
+        }
+
+        $valid = $this->distance->calculate($points)['valid_points'];
+        if ($valid !== []) {
+            return $this->sampleInOrder($valid, 40);
+        }
+
+        $raw = [];
+        foreach ($points as $point) {
+            $raw[] = [
+                'id' => (int) $point->id,
+                'latitude' => (float) $point->latitude,
+                'longitude' => (float) $point->longitude,
+                'recorded_at' => $point->recorded_at,
+            ];
+        }
+
+        return $this->sampleInOrder($raw, 40);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $points
+     * @return list<array<string, mixed>>
+     */
+    private function sampleInOrder(array $points, int $limit): array
+    {
+        $count = count($points);
+        if ($count <= $limit || $limit < 2) {
+            return $points;
+        }
+
+        $sampled = [];
+        $lastIndex = $count - 1;
+        for ($slot = 0; $slot < $limit; $slot++) {
+            $index = (int) round($slot * $lastIndex / ($limit - 1));
+            $sampled[$index] = $points[$index];
+        }
+
+        return array_values($sampled);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function locationRow(
+        ?string $label = null,
+        ?string $address = null,
+        mixed $latitude = null,
+        mixed $longitude = null,
+        mixed $recordedAt = null,
+        ?int $id = null,
+    ): array {
+        $lat = $latitude === null || $latitude === '' ? null : round((float) $latitude, 7);
+        $lng = $longitude === null || $longitude === '' ? null : round((float) $longitude, 7);
+        $text = trim((string) $label);
+        if ($text === '' && $lat !== null && $lng !== null) {
+            $text = number_format($lat, 5, '.', '').', '.number_format($lng, 5, '.', '');
+        }
+
+        $recorded = null;
+        if ($recordedAt instanceof Carbon) {
+            $recorded = $recordedAt->timezone(AttendanceCalendar::TIMEZONE)->format('Y-m-d H:i:s');
+        } elseif (filled($recordedAt)) {
+            $recorded = Carbon::parse($recordedAt)->timezone(AttendanceCalendar::TIMEZONE)->format('Y-m-d H:i:s');
+        }
+
+        return [
+            'id' => $id,
+            'label' => $text === '' ? null : $text,
+            'address' => filled($address) ? trim((string) $address) : null,
+            'latitude' => $lat,
+            'longitude' => $lng,
+            'recorded_at' => $recorded,
+        ];
     }
 }

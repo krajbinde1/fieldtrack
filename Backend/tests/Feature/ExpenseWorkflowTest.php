@@ -236,11 +236,13 @@ it('keeps a claim waiting when the coordinator is missing and does not let admin
         ->assertCanSeeTableRecords([$claim]);
 
     $history = $service->approvalHistoryLines($claim->fresh())[0];
+    expect($history)->toContain('Level 1 approved by CM (Center Manager)');
     Livewire::actingAs($org['admin'])
         ->test(ViewExpenseClaim::class, ['record' => $id])
-        ->assertSee($history)
-        ->assertSee('Center Coordinator — no approver is assigned')
-        ->assertSee('Currently pending');
+        ->assertSee('Center Manager Approval')
+        ->assertSee('CM')
+        ->assertSee('Checked')
+        ->assertSee('No approver is assigned');
 });
 
 it('lists a mobilizer claim for the assigned center manager before any center is opened', function () {
@@ -314,11 +316,13 @@ it('lists a mobilizer claim for the assigned center manager before any center is
 
     Livewire::actingAs($org['admin'])
         ->test(ViewExpenseClaim::class, ['record' => $id])
-        ->assertSee('Level 1 approved by CM (Center Manager)')
+        ->assertSee('Center Manager Approval')
+        ->assertSee('CM')
         ->assertSee('Manager checked')
-        ->assertSee('Level 2 approved by List Coordinator (Center Coordinator)')
+        ->assertSee('List Coordinator')
         ->assertSee('Coordinator checked')
-        ->assertSee('Admin / Director — waiting on Admin, Director');
+        ->assertSee('Admin/Director Final Approval')
+        ->assertSee('waiting on Admin, Director');
 });
 
 it('does not let another center approve or view the claim', function () {

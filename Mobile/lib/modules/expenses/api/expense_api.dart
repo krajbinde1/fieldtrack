@@ -61,6 +61,24 @@ class ExpenseRecord {
   Map<String, dynamic>? get payment => json['payment'] is Map
       ? Map<String, dynamic>.from(json['payment'] as Map)
       : null;
+
+  Map<String, dynamic>? get timeline {
+    final value = json['timeline'];
+    return value is Map ? Map<String, dynamic>.from(value) : null;
+  }
+
+  bool get timelineVisible => timeline?['visible'] == true;
+
+  String? get timelinePendingText {
+    final text = '${timeline?['pending_text'] ?? ''}'.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  List<Map<String, dynamic>> get timelineStages =>
+      (timeline?['stages'] as List? ?? const [])
+          .whereType<Map>()
+          .map((stage) => Map<String, dynamic>.from(stage))
+          .toList();
 }
 
 class ExpenseApi {
