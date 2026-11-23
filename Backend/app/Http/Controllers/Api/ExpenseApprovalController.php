@@ -29,7 +29,8 @@ class ExpenseApprovalController extends Controller
             default => $this->expenses->visibleQuery($request->user())->where('status', '!=', ExpenseClaimStatus::Draft->value),
         };
 
-        if ($request->filled('center_id')) {
+        // A selected center must not hide a claim that is already waiting for this approver.
+        if ($status !== 'pending' && $request->filled('center_id')) {
             $query->where('center_id', (int) $request->query('center_id'));
         }
         if ($request->filled('employee_id')) {

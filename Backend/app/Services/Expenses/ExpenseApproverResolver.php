@@ -20,7 +20,20 @@ final class ExpenseApproverResolver
      */
     public function managers(Center $center, int $claimantUserId): Collection
     {
-        return $this->activeAssigned($center->centerManagers(), UserRole::CenterManager)
+        $managers = $this->activeAssigned($center->centerManagers(), UserRole::CenterManager);
+        $center->loadMissing('primaryCenterManager');
+        $primary = $center->primaryCenterManager;
+        if (
+            $primary instanceof User
+            && $primary->is_active === true
+            && $primary->isCenterManager()
+            && ! $primary->isCenterLogin()
+            && ! $managers->contains(fn (User $user): bool => (int) $user->id === (int) $primary->id)
+        ) {
+            $managers->push($primary);
+        }
+
+        return $managers
             ->reject(fn (User $user): bool => (int) $user->id === $claimantUserId)
             ->values();
     }

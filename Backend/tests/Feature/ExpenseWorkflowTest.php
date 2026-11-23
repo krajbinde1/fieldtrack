@@ -656,3 +656,84 @@ it('lets a director record payment after final approval', function () {
 
     expect(AppNotification::query()->where('user_id', $org['userA']->id)->where('type', 'expense_paid')->count())->toBe(1);
 });
+
+it('shows a mobilizer claim to the assigned center manager when another center is selected', function () {
+    $org = seedOrg();
+    $org['centerManager']->managedCenters()->attach($org['centerB']->id);
+    $coordinator = expenseCoordinator($org, 'coord-visible', 'Visible Coordinator');
+
+    $id = $this->actingAs($org['userA'], 'sanctum')
+        ->post('/api/expenses', expensePayload())
+        ->assertCreated()
+        ->json('data.id');
+    $claim = ExpenseClaim::query()->findOrFail($id);
+    $service = app(ExpenseClaimService::class);
+
+    expect($claim->center_id)->toBe($org['centerA']->id)
+        ->and($claim->employee_id)->toBe($org['empA']->id)
+        ->and($claim->status)->toBe(ExpenseClaimStatus::PendingCenterManager)
+        ->and($service->queueQuery($org['centerManager'])->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse();
+
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->getJson('/api/manager/expenses?status=pending&center_id='.$org['centerB']->id)
+        ->assertOk()
+        ->assertJsonFragment(['id' => $id]);
+
+    $this->app['auth']->forgetGuards();
+    $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerB']->id]);
+    Livewire::actingAs($org['centerManager'])
+        ->test(ListExpenseClaims::class)
+        ->assertCanSeeTableRecords([$claim]);
+
+    $claim->update(['center_id' => $org['centerB']->id]);
+    $org['centerManager']->managedCenters()->detach($org['centerB']->id);
+
+    expect($service->queueQuery($org['centerManager']->fresh())->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse();
+
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->getJson('/api/manager/expenses?status=pending&center_id='.$org['centerB']->id)
+        ->assertOk()
+        ->assertJsonFragment(['id' => $id]);
+
+    $this->app['auth']->forgetGuards();
+    Livewire::actingAs($org['centerManager']->fresh())
+        ->test(ListExpenseClaims::class)
+        ->assertCanSeeTableRecords([$claim->fresh()]);
+
+    $this->actingAs($org['centerManager'], 'sanctum')
+        ->postJson('/api/manager/expenses/'.$id.'/approve', ['remarks' => 'Assigned center'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'pending_center_coordinator');
+
+    expect($claim->fresh()->center_id)->toBe($org['centerA']->id)
+        ->and($service->queueQuery($coordinator)->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($org['centerManager']->fresh())->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse()
+        ->and($service->queueQuery($org['director'])->whereKey($id)->exists())->toBeFalse();
+});
+
+it('shows a mobilizer claim to the primary center manager without a pivot row', function () {
+    $org = seedOrg();
+    $org['centerManager']->managedCenters()->detach();
+    $org['centerA']->update(['primary_center_manager_id' => $org['centerManager']->id]);
+
+    $id = $this->actingAs($org['userA'], 'sanctum')
+        ->post('/api/expenses', expensePayload())
+        ->assertCreated()
+        ->assertJsonPath('data.status', 'pending_center_manager')
+        ->json('data.id');
+
+    $service = app(ExpenseClaimService::class);
+    $claim = ExpenseClaim::query()->findOrFail($id);
+
+    expect($service->queueQuery($org['centerManager']->fresh())->whereKey($id)->exists())->toBeTrue()
+        ->and($service->queueQuery($org['admin'])->whereKey($id)->exists())->toBeFalse()
+        ->and($claim->current_level)->toBe(1);
+
+    $this->app['auth']->forgetGuards();
+    Livewire::actingAs($org['centerManager']->fresh())
+        ->test(ListExpenseClaims::class)
+        ->assertCanSeeTableRecords([$claim]);
+});

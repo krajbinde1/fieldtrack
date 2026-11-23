@@ -11,6 +11,7 @@ use App\Models\ExpenseClaim;
 use App\Models\LeaveRequest;
 use App\Models\Scheme;
 use App\Services\AdminCenterContext;
+use App\Services\Expenses\ExpenseClaimService;
 use App\Services\OrganizationAccessService;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -33,15 +34,13 @@ trait ScopesRecordsByOrganization
             Center::class => $access->visibleCenterIds($user),
             Admission::class => $access->visibleCenterIds($user),
             Employee::class, Attendance::class, LeaveRequest::class, AdmissionTarget::class => $access->visibleEmployeeIds($user),
-            ExpenseClaim::class => $access->visibleCenterIds($user),
             default => null,
         };
 
         if ($model === ExpenseClaim::class) {
-            $scoped = $ids === null
-                ? $query
-                : $query->whereIn('expense_claims.center_id', $ids === [] ? [-1] : $ids);
-            $scoped = $scoped->with(['employee', 'center', 'createdBy', 'items', 'payment']);
+            $scoped = app(ExpenseClaimService::class)
+                ->applyVisibilityScope($query, $user)
+                ->with(['employee', 'center', 'createdBy', 'items', 'payment']);
         } elseif ($ids === null) {
             $scoped = $query;
         } elseif ($model === Attendance::class) {

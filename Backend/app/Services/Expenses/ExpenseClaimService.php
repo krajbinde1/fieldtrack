@@ -125,6 +125,10 @@ final class ExpenseClaimService
             $level = $this->assertCanDecide($user, $claim);
             $this->recordDecision($claim, $user, $level, 'approved', $remarks);
 
+            if ($level === 1) {
+                $this->alignCenterToActingManager($user, $claim);
+            }
+
             if ($level >= 3) {
                 $claim->update([
                     'status' => ExpenseClaimStatus::Approved,
@@ -234,7 +238,7 @@ final class ExpenseClaimService
             return;
         }
 
-        if (! $this->centerIsVisible($user, (int) $claim->center_id)) {
+        if (! $this->claimIsVisible($user, $claim)) {
             abort(403, 'You cannot view this expense.');
         }
 
@@ -282,7 +286,7 @@ final class ExpenseClaimService
         }
 
         if ($user->isCenterManager()) {
-            return $query
+            return $this->applyVisibilityScope(ExpenseClaim::query(), $user)
                 ->where('status', ExpenseClaimStatus::PendingCenterManager->value)
                 ->where('created_by_user_id', '!=', $user->id);
         }
@@ -299,6 +303,55 @@ final class ExpenseClaimService
         }
 
         return $query;
+    }
+
+    /**
+     * Claims this user may see. The open center must not hide a claim that is
+     * already waiting for the assigned Center Manager.
+     */
+    public function applyVisibilityScope(Builder $query, User $user): Builder
+    {
+        $centers = $this->expenseCenterIds($user);
+        if ($centers === null) {
+            return $query;
+        }
+
+        $ids = $centers === [] ? [-1] : $centers;
+        if (! $user->isCenterManager()) {
+            return $query->whereIn('expense_claims.center_id', $ids);
+        }
+
+        return $query->where(function (Builder $inner) use ($ids): void {
+            $inner->whereIn('expense_claims.center_id', $ids)
+                ->orWhereHas('employee', function (Builder $employee) use ($ids): void {
+                    $employee->where(function (Builder $match) use ($ids): void {
+                        $match->whereIn('employees.center_id', $ids)
+                            ->orWhereHas('assignedCenters', fn (Builder $assigned): Builder => $assigned->whereIn('centers.id', $ids));
+                    });
+                });
+        });
+    }
+
+    /**
+     * Pivot assignments plus the center's primary Center Manager.
+     * A selected center is not applied here.
+     *
+     * @return list<int>|null
+     */
+    private function expenseCenterIds(User $user): ?array
+    {
+        $ids = $this->access->visibleCenterIds($user);
+        if ($ids === null || ! $user->isCenterManager() || $user->isCenterLogin()) {
+            return $ids;
+        }
+
+        $primary = Center::query()
+            ->where('primary_center_manager_id', $user->id)
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        return array_values(array_unique(array_map(intval(...), array_merge($ids, $primary))));
     }
 
     /**
@@ -553,8 +606,11 @@ final class ExpenseClaimService
     {
         if ($user->isEmployeeUser()) {
             $employee = $user->employee;
-            $center = $employee?->center;
-            if ($employee === null || $center === null) {
+            $center = $employee?->assignedCenters()->orderByDesc('employee_center_assignments.id')->first();
+            if (! $center instanceof Center) {
+                $center = $employee?->center;
+            }
+            if ($employee === null || ! $center instanceof Center) {
                 throw ValidationException::withMessages([
                     'center' => 'This account is not assigned to a center.',
                 ]);
@@ -721,7 +777,7 @@ final class ExpenseClaimService
     private function assertCanDecide(User $user, ExpenseClaim $claim): int
     {
         $this->assertNotSelf($user, $claim);
-        if (! $this->centerIsVisible($user, (int) $claim->center_id)) {
+        if (! $this->claimIsVisible($user, $claim)) {
             abort(403, 'This expense is outside your centers.');
         }
 
@@ -771,7 +827,11 @@ final class ExpenseClaimService
             ? $this->approvers->managers($center, $claimantId)
             : $this->approvers->coordinators($center, $claimantId);
 
-        return $pool->contains(fn (User $approver): bool => (int) $approver->id === (int) $user->id);
+        if ($pool->contains(fn (User $approver): bool => (int) $approver->id === (int) $user->id)) {
+            return true;
+        }
+
+        return $level === 1 && $this->employeeAssignedToManager($user, $claim);
     }
 
     private function recordDecision(ExpenseClaim $claim, User $user, int $level, string $action, ?string $remarks): void
@@ -997,9 +1057,71 @@ final class ExpenseClaimService
 
     private function centerIsVisible(User $user, int $centerId): bool
     {
-        $visible = $this->access->visibleCenterIds($user);
+        $visible = $this->expenseCenterIds($user);
 
         return $visible === null || in_array($centerId, $visible, true);
+    }
+
+    private function claimIsVisible(User $user, ExpenseClaim $claim): bool
+    {
+        return $this->centerIsVisible($user, (int) $claim->center_id)
+            || $this->employeeAssignedToManager($user, $claim);
+    }
+
+    private function employeeAssignedToManager(User $user, ExpenseClaim $claim): bool
+    {
+        if (! $user->isCenterManager() || $user->isCenterLogin()) {
+            return false;
+        }
+
+        $centers = $this->expenseCenterIds($user) ?? [];
+        $employee = $claim->relationLoaded('employee') ? $claim->employee : $claim->employee()->first();
+        if ($employee === null || $centers === []) {
+            return false;
+        }
+
+        foreach ($employee->assignedCenterIds() as $centerId) {
+            if (in_array($centerId, $centers, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * A mobilizer claim stored against another center still belongs to the
+     * center that employee is assigned to. The next approver follows that center.
+     */
+    private function alignCenterToActingManager(User $user, ExpenseClaim $claim): void
+    {
+        if (! $this->employeeAssignedToManager($user, $claim)) {
+            return;
+        }
+
+        $centers = $this->expenseCenterIds($user) ?? [];
+        if (in_array((int) $claim->center_id, $centers, true)) {
+            return;
+        }
+
+        $employee = $claim->relationLoaded('employee') ? $claim->employee : $claim->employee()->first();
+        if ($employee === null) {
+            return;
+        }
+
+        $preferred = in_array((int) $employee->center_id, $centers, true)
+            ? (int) $employee->center_id
+            : (array_values(array_intersect($centers, $employee->assignedCenterIds()))[0] ?? null);
+        $center = $preferred === null ? null : Center::query()->find($preferred);
+        if (! $center instanceof Center) {
+            return;
+        }
+
+        $claim->update([
+            'center_id' => $center->id,
+            'scheme_id' => $center->scheme_id,
+        ]);
+        $claim->unsetRelation('center');
     }
 
     private function nullableString(mixed $value): ?string
