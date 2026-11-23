@@ -102,7 +102,12 @@ it('creates a coordinator from the center form and assigns them without a center
         ->test(CreateCenter::class)
         ->assertForbidden();
 
-    Livewire::actingAs($org['admin'])
+    dump([
+        'db' => config('database.connections.sqlite.database'),
+        'logins' => User::query()->pluck('login_id', 'id')->all(),
+    ]);
+
+    $component = Livewire::actingAs($org['admin'])
         ->test(CreateCenter::class)
         ->fillForm([
             'scheme_id' => $org['projectA']->id,
@@ -113,8 +118,15 @@ it('creates a coordinator from the center form and assigns them without a center
             'name' => 'Modal Coordinator',
             'mobile' => '9123456788',
             'email' => null,
-        ])
-        ->assertHasNoFormErrors()
+        ]);
+
+    try {
+        dump($component->instance()->form->getState());
+    } catch (Throwable $e) {
+        dump($e::class, $e->getMessage());
+    }
+    dump($component->errors()->toArray());
+    $component->assertHasNoFormErrors()
         ->call('create')
         ->assertHasNoFormErrors();
 
