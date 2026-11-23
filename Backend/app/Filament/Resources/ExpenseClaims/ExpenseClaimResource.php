@@ -25,7 +25,6 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Navigation\NavigationItem;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
@@ -60,6 +59,19 @@ class ExpenseClaimResource extends Resource
     public static function shouldRegisterNavigation(): bool
     {
         return static::canAccess();
+    }
+
+    public static function getNavigationGroup(): string|\UnitEnum|null
+    {
+        $user = auth()->user();
+
+        // A collapsible group labelled Expenses hides the link of the same name.
+        // Center Managers get a direct item on the center sidebar instead.
+        if ($user instanceof User && $user->isCenterManager()) {
+            return null;
+        }
+
+        return parent::getNavigationGroup();
     }
 
     /**
@@ -118,36 +130,17 @@ class ExpenseClaimResource extends Resource
                     Select::make('type')
                         ->label('Category')
                         ->options(CenterExpenseCategory::options())
-                        ->required()
-                        ->live(),
-                    Select::make('travel_mode')
-                        ->label('Travelling type')
-                        ->options([
-                            'self' => 'Self Travelling',
-                            'public' => 'Public Transport',
-                        ])
-                        ->required(fn (Get $get): bool => self::isTravelCategory($get('type')))
-                        ->visible(fn (Get $get): bool => self::isTravelCategory($get('type')))
-                        ->live(),
+                        ->required(),
                     TextInput::make('amount')
                         ->label('Amount')
                         ->numeric()
-                        ->required(fn (Get $get): bool => $get('travel_mode') !== 'self')
+                        ->required()
                         ->minValue(0.01)
-                        ->maxValue(9999999.99)
-                        ->helperText('Self Travelling amount is calculated from the recorded GPS KM and the employee KM rate.'),
+                        ->maxValue(9999999.99),
                     Textarea::make('description')
                         ->label('Description')
                         ->required()
                         ->columnSpanFull(),
-                    TextInput::make('travel_from')
-                        ->label('Travel from')
-                        ->required(fn (Get $get): bool => $get('travel_mode') === 'public')
-                        ->visible(fn (Get $get): bool => self::isTravelCategory($get('type'))),
-                    TextInput::make('travel_to')
-                        ->label('Travel to')
-                        ->required(fn (Get $get): bool => $get('travel_mode') === 'public')
-                        ->visible(fn (Get $get): bool => self::isTravelCategory($get('type'))),
                     FileUpload::make('receipt')
                         ->label('Bill Upload')
                         ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
@@ -170,11 +163,6 @@ class ExpenseClaimResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return ExpenseClaimInfolist::configure($schema);
-    }
-
-    private static function isTravelCategory(mixed $type): bool
-    {
-        return in_array($type, ['travelling', CenterExpenseCategory::TravelConveyance->value], true);
     }
 
     public static function table(Table $table): Table

@@ -685,8 +685,7 @@ final class ExpenseClaimService
                 ]);
             }
 
-            $isTravel = $type === ExpenseType::Travelling
-                || $centerCategory === CenterExpenseCategory::TravelConveyance;
+            $isTravel = $type === ExpenseType::Travelling;
 
             if ($isTravel && ! in_array($mode, ['self', 'public'], true)) {
                 throw ValidationException::withMessages([

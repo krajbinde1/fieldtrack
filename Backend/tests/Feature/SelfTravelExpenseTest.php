@@ -272,7 +272,7 @@ it('stores a receipt only after the upload succeeds and lets a manager set mobil
         ])->assertStatus(422);
 });
 
-it('shows travel from and to after a travel category is chosen', function () {
+it('keeps employee travel fields off the center expense form', function () {
     $org = seedOrg();
     $this->withSession([AdminCenterContext::SESSION_KEY => $org['centerA']->id]);
 
@@ -286,7 +286,10 @@ it('shows travel from and to after a travel category is chosen', function () {
                 'description' => 'Village visit',
             ]],
         ])
-        ->assertSee('Self Travelling')
-        ->assertSee('Public Transport')
-        ->assertSee('Travel from');
+        ->assertDontSee('Self Travelling')
+        ->assertDontSee('Public Transport')
+        ->assertDontSee('Travel from')
+        ->assertDontSee('Travel to')
+        ->assertDontSee('Travel km')
+        ->assertDontSee('Self Travelling amount is calculated from the recorded GPS KM and the employee KM rate');
 });
