@@ -5,6 +5,7 @@ namespace App\Filament\Support;
 use App\Enums\UserRole;
 use App\Filament\Concerns\HoldsPendingCenterAccounts;
 use App\Models\User;
+use App\Services\IssuedManagerCredentials;
 use App\Support\LoginId;
 use App\Support\UserIdentity;
 use Filament\Forms\Components\Select;
@@ -72,12 +73,14 @@ final class PendingCenterAccount
             ]);
         }
 
+        $plainPassword = LoginId::defaultPasswordFromMobile($payload['mobile']);
+
         try {
             $user = User::query()->create([
                 'name' => $payload['name'],
                 'email' => $payload['email'],
                 'login_id' => $payload['mobile'],
-                'password' => Hash::make(LoginId::defaultPasswordFromMobile($payload['mobile'])),
+                'password' => Hash::make($plainPassword),
                 'role' => $role->value,
                 'is_active' => true,
                 'is_center_login' => false,
@@ -87,6 +90,10 @@ final class PendingCenterAccount
             throw ValidationException::withMessages([
                 $errorKey => 'This Login ID is already taken.',
             ]);
+        }
+
+        if ($role === UserRole::CenterManager) {
+            app(IssuedManagerCredentials::class)->record($payload['mobile'], $plainPassword);
         }
 
         $token = $key;

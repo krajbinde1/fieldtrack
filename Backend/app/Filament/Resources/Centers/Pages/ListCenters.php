@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Centers\Pages;
 
 use App\Filament\Concerns\HoldsPendingCenterAccounts;
 use App\Filament\Resources\Centers\CenterResource;
+use App\Filament\Support\CreateCenterManagerAction;
 use App\Models\User;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
@@ -40,6 +41,7 @@ class ListCenters extends ListRecords
         return [
             CreateAction::make()
                 ->visible(fn (): bool => CenterResource::canCreate()),
+            CreateCenterManagerAction::make(),
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\IssuedManagerCredentials;
 use App\Services\OrganizationAccessService;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Table;
@@ -13,6 +14,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(OrganizationAccessService::class);
+        $this->app->singleton(IssuedManagerCredentials::class);
     }
 
     public function boot(): void

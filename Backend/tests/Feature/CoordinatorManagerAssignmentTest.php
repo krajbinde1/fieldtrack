@@ -90,7 +90,7 @@ it('lets an assigned coordinator set and replace only their center manager', fun
             ->callAction(TestAction::make('assignManager')->table($org['centerB']), [
                 'centerManagers' => [(string) $replacement->id],
             ]);
-    } catch (\Throwable) {
+    } catch (Throwable) {
         $blocked = true;
     }
 
@@ -233,7 +233,9 @@ it('lets an assigned coordinator create a center manager account for that center
     expect(User::query()->where('login_id', '9123456842')->exists())->toBeFalse()
         ->and(json_encode($list->instance()->pendingManagers))->not->toContain('"password"');
 
-    $list->callMountedAction()->assertHasNoActionErrors();
+    $list->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertNotified('Center Manager created. Login ID: 9123456842. Temporary password: 6842.');
 
     $manager = User::query()->where('login_id', '9123456842')->firstOrFail();
 
@@ -254,7 +256,7 @@ it('lets an assigned coordinator create a center manager account for that center
             ->callAction(TestAction::make('assignManager')->table($org['centerB']), [
                 'centerManagers' => [(string) $manager->id],
             ]);
-    } catch (\Throwable) {
+    } catch (Throwable) {
         $blocked = true;
     }
 

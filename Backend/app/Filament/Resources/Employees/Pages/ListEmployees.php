@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Employees\Pages;
 use App\Enums\UserRole;
 use App\Filament\Resources\Employees\EmployeeResource;
 use App\Filament\Resources\OrgUsers\OrgUserResource;
+use App\Filament\Support\CreateCenterManagerAction;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\CenterStaffCredentialService;
@@ -68,6 +69,7 @@ class ListEmployees extends ListRecords
                 ->color(fn (): string => $this->teamLayout === 'hierarchy' ? 'primary' : 'gray')
                 ->action(fn () => $this->setLayout('hierarchy')),
             CreateAction::make(),
+            CreateCenterManagerAction::make(),
         ];
     }
 

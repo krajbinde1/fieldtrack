@@ -7,6 +7,7 @@ use App\Filament\Concerns\HoldsPendingCenterAccounts;
 use App\Filament\Resources\Centers\CenterResource;
 use App\Models\Center;
 use App\Services\CenterLoginService;
+use App\Services\IssuedManagerCredentials;
 use Filament\Resources\Pages\EditRecord;
 
 class EditCenter extends EditRecord
@@ -39,5 +40,18 @@ class EditCenter extends EditRecord
         return app(CenterLoginService::class)->applyManagerSelection($data, [
             'centerManagers' => $ids,
         ]);
+    }
+
+    public function save(bool $shouldRedirect = true, bool $shouldSendSavedNotification = true): void
+    {
+        try {
+            parent::save($shouldRedirect, $shouldSendSavedNotification);
+        } catch (\Throwable $exception) {
+            app(IssuedManagerCredentials::class)->clear();
+
+            throw $exception;
+        }
+
+        app(IssuedManagerCredentials::class)->notify();
     }
 }

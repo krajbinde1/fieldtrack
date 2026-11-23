@@ -5,7 +5,9 @@ namespace App\Filament\Support;
 use App\Enums\UserRole;
 use App\Models\Center;
 use App\Models\User;
+use App\Services\IssuedManagerCredentials;
 use App\Services\OrganizationAccessService;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -14,7 +16,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Closure;
+use Throwable;
 
 final class CenterManagerSelect
 {
@@ -133,6 +135,10 @@ final class CenterManagerSelect
                 abort_unless(self::canAssign($record), 403);
             })
             ->action(function (): void {
+                if (app(IssuedManagerCredentials::class)->notify()) {
+                    return;
+                }
+
                 Notification::make()
                     ->title('Center Manager updated.')
                     ->success()
@@ -219,47 +225,61 @@ final class CenterManagerSelect
         ));
 
         DB::transaction(function () use ($component, $record, $selected): void {
-            $ids = [];
+            try {
+                self::syncSelected($component, $record, $selected);
+            } catch (Throwable $exception) {
+                app(IssuedManagerCredentials::class)->clear();
 
-            foreach ($selected as $value) {
-                if (PendingCenterAccount::isPending($value)) {
-                    abort_unless(self::canCreate($record), 403);
-                    $ids[] = PendingCenterAccount::materialize(
-                        $component->getLivewire(),
-                        PendingCenterAccount::MANAGERS,
-                        (string) $value,
-                        UserRole::CenterManager,
-                        reuseManager: true,
-                        errorKey: 'centerManagers',
-                    );
-
-                    continue;
-                }
-
-                $ids[] = (int) $value;
+                throw $exception;
             }
-
-            $ids = array_values(array_unique($ids));
-            $valid = $ids === []
-                ? []
-                : User::query()
-                    ->where('role', UserRole::CenterManager->value)
-                    ->where('is_center_login', false)
-                    ->whereIn('id', $ids)
-                    ->pluck('id')
-                    ->map(fn ($id): int => (int) $id)
-                    ->all();
-
-            if (count($valid) > 1) {
-                throw ValidationException::withMessages([
-                    'centerManagers' => 'A center can have only one active Center Manager.',
-                ]);
-            }
-
-            $record->centerManagers()->sync($valid);
-            $record->forceFill([
-                'primary_center_manager_id' => $valid[0] ?? null,
-            ])->save();
         });
+    }
+
+    /**
+     * @param  list<mixed>  $selected
+     */
+    private static function syncSelected(Select $component, Center $record, array $selected): void
+    {
+        $ids = [];
+
+        foreach ($selected as $value) {
+            if (PendingCenterAccount::isPending($value)) {
+                abort_unless(self::canCreate($record), 403);
+                $ids[] = PendingCenterAccount::materialize(
+                    $component->getLivewire(),
+                    PendingCenterAccount::MANAGERS,
+                    (string) $value,
+                    UserRole::CenterManager,
+                    reuseManager: true,
+                    errorKey: 'centerManagers',
+                );
+
+                continue;
+            }
+
+            $ids[] = (int) $value;
+        }
+
+        $ids = array_values(array_unique($ids));
+        $valid = $ids === []
+            ? []
+            : User::query()
+                ->where('role', UserRole::CenterManager->value)
+                ->where('is_center_login', false)
+                ->whereIn('id', $ids)
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
+        if (count($valid) > 1) {
+            throw ValidationException::withMessages([
+                'centerManagers' => 'A center can have only one active Center Manager.',
+            ]);
+        }
+
+        $record->centerManagers()->sync($valid);
+        $record->forceFill([
+            'primary_center_manager_id' => $valid[0] ?? null,
+        ])->save();
     }
 }

@@ -147,7 +147,8 @@ it('creates a center manager from the center form modal, auto-selects them, and 
         ])
         ->assertHasNoFormErrors()
         ->call('save')
-        ->assertHasNoFormErrors();
+        ->assertHasNoFormErrors()
+        ->assertNotified('Center Manager created. Login ID: 9123456790. Temporary password: 6790.');
 
     $manager = User::query()->where('login_id', '9123456790')->first();
     expect($manager)->not->toBeNull()

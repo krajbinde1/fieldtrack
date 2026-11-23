@@ -749,9 +749,16 @@ final class OrganizationAccessService
 
         if ($actor->isCenterCoordinator() && $record->isCenterManager()) {
             $centerIds = $this->visibleCenterIds($actor) ?? [];
+            if ($centerIds === []) {
+                return false;
+            }
 
-            return $centerIds !== []
-                && $record->managedCenters()->whereIn('centers.id', $centerIds)->exists();
+            $managed = $record->managedCenters()
+                ->pluck('centers.id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
+            return $managed !== [] && array_diff($managed, $centerIds) === [];
         }
 
         return false;

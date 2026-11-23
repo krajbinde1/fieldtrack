@@ -6,6 +6,7 @@ use App\Models\Center;
 use App\Models\Scheme;
 use App\Models\User;
 use App\Services\CenterLoginService;
+use App\Services\CenterManagerAccountService;
 use App\Services\OrganizationAccessService;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,6 +45,17 @@ final class CenterAssignmentSelect
                     : 'Coordinators can view only the selected centers. A center can have more than one coordinator.',
             )
             ->saveRelationshipsUsing(function (User $record, $state) use ($access, $user, $name): void {
+                $actor = auth()->user();
+                if ($name === 'managedCenters' && $actor instanceof User && $actor->isCenterCoordinator()) {
+                    app(CenterManagerAccountService::class)->syncVisibleAssignments(
+                        $actor,
+                        $record,
+                        is_array($state) ? $state : [],
+                    );
+
+                    return;
+                }
+
                 $selected = array_map('intval', $state ?? []);
                 $visible = $user ? $access->visibleCenterIds($user) : [];
                 $relation = $record->{$name}();
