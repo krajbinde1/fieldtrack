@@ -49,6 +49,7 @@ class ExpenseRecord {
   String get employeeName => '${json['employee_name'] ?? ''}';
   String get centerName => '${json['center_name'] ?? ''}';
   String get rejection => '${json['rejection_remarks'] ?? ''}';
+  String get pendingWith => '${json['pending_with'] ?? ''}'.trim();
   List<Map<String, dynamic>> get items => (json['items'] as List? ?? const [])
       .whereType<Map>()
       .map((item) => Map<String, dynamic>.from(item))
@@ -79,6 +80,13 @@ class ExpenseRecord {
           .whereType<Map>()
           .map((stage) => Map<String, dynamic>.from(stage))
           .toList();
+}
+
+class ExpenseQueueResult {
+  const ExpenseQueueResult({required this.claims, required this.counts});
+
+  final List<ExpenseRecord> claims;
+  final Map<String, int> counts;
 }
 
 class ExpenseApi {
@@ -127,15 +135,22 @@ class ExpenseApi {
     return _call(() async => ExpenseRecord(await _data('$prefix/$id')));
   }
 
-  Future<List<ExpenseRecord>> queue(String prefix, {String status = 'pending'}) async {
+  Future<ExpenseQueueResult> queue(String prefix, {String status = 'pending'}) async {
     return _call(() async {
       final response = await _dio.get(prefix, queryParameters: {'status': status});
       final data = response.data;
       final rows = data is Map ? data['data'] : null;
-      return (rows as List? ?? const [])
-          .whereType<Map>()
-          .map((item) => ExpenseRecord(Map<String, dynamic>.from(item)))
-          .toList();
+      final rawCounts = data is Map && data['counts'] is Map ? data['counts'] as Map : const {};
+      return ExpenseQueueResult(
+        claims: (rows as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => ExpenseRecord(Map<String, dynamic>.from(item)))
+            .toList(),
+        counts: {
+          for (final entry in rawCounts.entries)
+            '${entry.key}': int.tryParse('${entry.value}') ?? 0,
+        },
+      );
     });
   }
 

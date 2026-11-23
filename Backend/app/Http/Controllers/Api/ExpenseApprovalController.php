@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\ExpenseClaimStatus;
 use App\Http\Controllers\Controller;
 use App\Models\ExpenseClaim;
 use App\Models\ExpenseItem;
@@ -20,14 +19,10 @@ class ExpenseApprovalController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
         $status = (string) $request->query('status', 'pending');
-        $query = match ($status) {
-            'pending' => $this->expenses->queueQuery($request->user()),
-            'approved' => $this->expenses->visibleQuery($request->user())->where('status', ExpenseClaimStatus::Approved->value),
-            'rejected' => $this->expenses->visibleQuery($request->user())->where('status', ExpenseClaimStatus::Rejected->value),
-            'paid', 'payment' => $this->expenses->visibleQuery($request->user())->where('payment_status', 'paid'),
-            default => $this->expenses->visibleQuery($request->user())->where('status', '!=', ExpenseClaimStatus::Draft->value),
-        };
+        $counts = $this->expenses->tabCounts($user);
+        $query = $this->expenses->tabQuery($user, $status);
 
         // A selected center must not hide a claim that is already waiting for this approver.
         if ($status !== 'pending' && $request->filled('center_id')) {
@@ -59,7 +54,8 @@ class ExpenseApprovalController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Expenses loaded.',
-            'pending_count' => $this->expenses->pendingCountFor($request->user()),
+            'pending_count' => $counts['pending'],
+            'counts' => $counts,
             'data' => $claims,
         ]);
     }

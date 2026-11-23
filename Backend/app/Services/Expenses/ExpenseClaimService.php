@@ -295,6 +295,34 @@ final class ExpenseClaimService
         return $query->whereRaw('1 = 0');
     }
 
+    /**
+     * Live tab membership for the signed-in user. Each call queries the database.
+     * Pending is only the claim waiting on this user. A paid or rejected claim is never pending or approved.
+     */
+    public function tabQuery(User $user, string $status): Builder
+    {
+        return match ($status) {
+            'pending' => $this->queueQuery($user),
+            'approved' => $this->approvedTabQuery($user),
+            'rejected' => $this->rejectedTabQuery($user),
+            'paid', 'payment' => $this->paidTabQuery($user),
+            default => $this->historyTabQuery($user),
+        };
+    }
+
+    /**
+     * @return array{pending: int, approved: int, rejected: int, paid: int, history: int}
+     */
+    public function tabCounts(User $user): array
+    {
+        $counts = [];
+        foreach (['pending', 'approved', 'rejected', 'paid', 'history'] as $status) {
+            $counts[$status] = $this->tabQuery($user, $status)->count();
+        }
+
+        return $counts;
+    }
+
     public function visibleQuery(User $user): Builder
     {
         $query = $this->assignedCenterQuery($user);
@@ -368,6 +396,72 @@ final class ExpenseClaimService
         }
 
         return $query;
+    }
+
+    private function approvedTabQuery(User $user): Builder
+    {
+        return ExpenseClaim::query()
+            ->where('status', '!=', ExpenseClaimStatus::Rejected->value)
+            ->where('payment_status', '!=', ExpensePaymentStatus::Paid->value)
+            ->whereHas('approvals', function (Builder $approvals) use ($user): void {
+                $approvals->where('expense_approvals.user_id', $user->id)
+                    ->where('action', 'approved');
+            });
+    }
+
+    private function rejectedTabQuery(User $user): Builder
+    {
+        return ExpenseClaim::query()
+            ->where('status', ExpenseClaimStatus::Rejected->value)
+            ->where(function (Builder $inner) use ($user): void {
+                $inner->whereIn(
+                    'expense_claims.id',
+                    $this->rejectedCenterQuery($user)->select('expense_claims.id'),
+                )->orWhereHas('approvals', function (Builder $approvals) use ($user): void {
+                    $approvals->where('expense_approvals.user_id', $user->id);
+                });
+            });
+    }
+
+    private function paidTabQuery(User $user): Builder
+    {
+        $paid = ExpenseClaim::query()->where('payment_status', ExpensePaymentStatus::Paid->value);
+
+        if ($user->isAdmin() || $user->isDirector()) {
+            return $this->applyVisibilityScope($paid, $user);
+        }
+
+        return $paid->whereHas('approvals', function (Builder $approvals) use ($user): void {
+            $approvals->where('expense_approvals.user_id', $user->id)
+                ->where('action', 'approved');
+        });
+    }
+
+    private function historyTabQuery(User $user): Builder
+    {
+        return ExpenseClaim::query()->where(function (Builder $inner) use ($user): void {
+            $inner->whereHas('approvals', function (Builder $approvals) use ($user): void {
+                $approvals->where('expense_approvals.user_id', $user->id);
+            })->orWhereIn(
+                'expense_claims.id',
+                $this->queueQuery($user)->select('expense_claims.id'),
+            );
+        });
+    }
+
+    /**
+     * Rejected claims in this user's centers. Admin and Director keep organization-wide visibility.
+     * Another center is not included for a center manager or coordinator.
+     */
+    private function rejectedCenterQuery(User $user): Builder
+    {
+        $query = ExpenseClaim::query();
+        $centers = $this->expenseCenterIds($user);
+        if ($centers === null) {
+            return $query;
+        }
+
+        return $query->whereIn('expense_claims.center_id', $centers === [] ? [-1] : $centers);
     }
 
     private function whereReadyForFinalApproval(Builder $query): Builder
@@ -458,6 +552,7 @@ final class ExpenseClaimService
             ])->values()->all(),
             'approval_history' => $this->approvalHistoryLines($claim),
             'pending_approval' => $this->pendingApprovalText($claim),
+            'pending_with' => $this->pendingWithText($claim),
             'timeline' => $this->timeline->forClaim($claim),
             'payment' => $claim->payment === null ? null : [
                 'amount' => number_format((float) $claim->payment->amount, 2, '.', ''),
@@ -497,6 +592,21 @@ final class ExpenseClaimService
             })
             ->values()
             ->all();
+    }
+
+    public function pendingWithText(ExpenseClaim $claim): ?string
+    {
+        if ($claim->payment_status === ExpensePaymentStatus::Paid
+            || $claim->status === ExpenseClaimStatus::Rejected
+            || $claim->status === ExpenseClaimStatus::Draft) {
+            return null;
+        }
+
+        if ($claim->status === ExpenseClaimStatus::Approved && $claim->payment_status === ExpensePaymentStatus::Unpaid) {
+            return 'Payment';
+        }
+
+        return $this->pendingApprovalText($claim);
     }
 
     public function pendingApprovalText(ExpenseClaim $claim): ?string

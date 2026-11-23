@@ -233,7 +233,7 @@ it('keeps a claim waiting when the coordinator is missing and does not let admin
     Livewire::actingAs($org['admin'])
         ->test(ListExpenseClaims::class)
         ->set('activeTab', 'history')
-        ->assertCanSeeTableRecords([$claim]);
+        ->assertCanNotSeeTableRecords([$claim]);
 
     $history = $service->approvalHistoryLines($claim->fresh())[0];
     expect($history)->toContain('Level 1 approved by CM (Center Manager)');

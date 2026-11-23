@@ -2,11 +2,11 @@
 
 namespace App\Filament\Resources\ExpenseClaims\Schemas;
 
-use App\Enums\ExpenseClaimStatus;
 use App\Enums\ExpensePaymentStatus;
 use App\Models\ExpenseClaim;
 use App\Models\ExpenseItem;
 use App\Services\Expenses\ExpenseApprovalTimeline;
+use App\Services\Expenses\ExpenseClaimService;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ViewEntry;
 use Filament\Schemas\Components\Section;
@@ -25,8 +25,13 @@ class ExpenseClaimInfolist
                     ->state(fn (ExpenseClaim $record): string => $record->employee?->full_name ?: ($record->createdBy?->name ?? '—')),
                 TextEntry::make('center.name')->label('Center'),
                 TextEntry::make('status')
+                    ->label('Status')
                     ->badge()
-                    ->formatStateUsing(fn ($state): string => $state instanceof ExpenseClaimStatus ? $state->label() : (string) $state),
+                    ->state(fn (ExpenseClaim $record): string => $record->displayStatus()),
+                TextEntry::make('pending_with')
+                    ->label('Pending With')
+                    ->placeholder('—')
+                    ->state(fn (ExpenseClaim $record): ?string => app(ExpenseClaimService::class)->pendingWithText($record)),
                 TextEntry::make('payment_status')
                     ->label('Payment')
                     ->formatStateUsing(fn ($state): string => $state instanceof ExpensePaymentStatus ? $state->label() : (string) $state),

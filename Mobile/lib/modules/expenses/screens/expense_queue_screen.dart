@@ -27,7 +27,8 @@ class ExpenseQueueScreen extends StatefulWidget {
 
 class _ExpenseQueueScreenState extends State<ExpenseQueueScreen> {
   String _status = 'pending';
-  late Future<List<ExpenseRecord>> _future;
+  Map<String, int> _counts = const {};
+  late Future<ExpenseQueueResult> _future;
 
   @override
   void initState() {
@@ -35,8 +36,26 @@ class _ExpenseQueueScreenState extends State<ExpenseQueueScreen> {
     _future = _load();
   }
 
-  Future<List<ExpenseRecord>> _load() async {
-    return (await ExpenseApi.create()).queue(widget.apiPrefix, status: _status);
+  Future<ExpenseQueueResult> _load() async {
+    final result = await (await ExpenseApi.create()).queue(widget.apiPrefix, status: _status);
+    if (mounted) {
+      setState(() => _counts = result.counts);
+    }
+    return result;
+  }
+
+  String _chipLabel(String key, String name) {
+    final count = _counts[key];
+    return count == null ? name : '$name ($count)';
+  }
+
+  String _claimLines(ExpenseRecord claim) {
+    final pending = claim.pendingWith.isEmpty ? null : 'Pending with ${claim.pendingWith}';
+    return [
+      claim.statusLabel,
+      ?pending,
+      _summary(claim),
+    ].join('\n');
   }
 
   String _summary(ExpenseRecord claim) {
@@ -75,14 +94,14 @@ class _ExpenseQueueScreenState extends State<ExpenseQueueScreen> {
                   spacing: 8,
                   children: [
                     for (final filter in const [
-                      ('pending', 'Pending'),
+                      ('pending', 'Pending Approval'),
                       ('approved', 'Approved'),
                       ('rejected', 'Rejected'),
                       ('paid', 'Paid'),
                       ('history', 'History'),
                     ])
                       ChoiceChip(
-                        label: Text(filter.$2),
+                        label: Text(_chipLabel(filter.$1, filter.$2)),
                         selected: _status == filter.$1,
                         onSelected: (_) => setState(() {
                           _status = filter.$1;
@@ -95,7 +114,7 @@ class _ExpenseQueueScreenState extends State<ExpenseQueueScreen> {
             ),
           ),
           Expanded(
-            child: FutureBuilder<List<ExpenseRecord>>(
+            child: FutureBuilder<ExpenseQueueResult>(
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
@@ -104,7 +123,7 @@ class _ExpenseQueueScreenState extends State<ExpenseQueueScreen> {
                 if (snapshot.hasError) {
                   return PgErrorState(message: '${snapshot.error}', onRetry: () => setState(() => _future = _load()));
                 }
-                final items = snapshot.data ?? const <ExpenseRecord>[];
+                final items = snapshot.data?.claims ?? const <ExpenseRecord>[];
                 if (items.isEmpty) {
                   return const PgEmptyState(message: 'No expenses in this list.');
                 }
@@ -120,7 +139,7 @@ class _ExpenseQueueScreenState extends State<ExpenseQueueScreen> {
                         child: ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(claim.employeeName.isEmpty ? claim.number : claim.employeeName),
-                          subtitle: Text(_summary(claim)),
+                          subtitle: Text(_claimLines(claim)),
                           trailing: Text('₹${claim.amount}'),
                         ),
                       ),

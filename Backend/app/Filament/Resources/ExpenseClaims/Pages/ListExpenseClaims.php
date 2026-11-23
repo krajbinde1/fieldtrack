@@ -2,8 +2,6 @@
 
 namespace App\Filament\Resources\ExpenseClaims\Pages;
 
-use App\Enums\ExpenseClaimStatus;
-use App\Enums\ExpensePaymentStatus;
 use App\Filament\Resources\ExpenseClaims\ExpenseClaimResource;
 use App\Models\User;
 use App\Services\AdminCenterContext;
@@ -33,36 +31,47 @@ class ListExpenseClaims extends ListRecords
 
         if ($user?->isCenterManager() === true) {
             $tabs['mine'] = Tab::make('My Expenses')
+                ->badge(fn (): string => (string) $this->inSelectedCenter(
+                    ExpenseClaimResource::getEloquentQuery()->where('created_by_user_id', $user->id),
+                )->count())
                 ->modifyQueryUsing(fn (Builder $query): Builder => $this->inSelectedCenter($query)
                     ->where('created_by_user_id', $user->id));
         }
 
-        $tabs['pending'] = Tab::make('Pending Approval')
-            ->modifyQueryUsing(function (Builder $query) use ($user): Builder {
-                if ($user === null) {
-                    return $query->whereRaw('1 = 0');
-                }
-
-                return $query->whereIn(
-                    'expense_claims.id',
-                    app(ExpenseClaimService::class)->queueQuery($user)->select('expense_claims.id'),
-                );
-            });
-        $tabs['approved'] = Tab::make('Approved')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $this->inSelectedCenter($query)
-                ->where('status', ExpenseClaimStatus::Approved->value)
-                ->where('payment_status', ExpensePaymentStatus::Unpaid->value));
-        $tabs['rejected'] = Tab::make('Rejected')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $this->inSelectedCenter($query)
-                ->where('status', ExpenseClaimStatus::Rejected->value));
-        $tabs['paid'] = Tab::make('Paid')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $this->inSelectedCenter($query)
-                ->where('payment_status', ExpensePaymentStatus::Paid->value));
-        $tabs['history'] = Tab::make('History')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $this->inSelectedCenter($query)
-                ->where('status', '!=', ExpenseClaimStatus::Draft->value));
+        $tabs['pending'] = $this->statusTab('pending', 'Pending Approval', false);
+        $tabs['approved'] = $this->statusTab('approved', 'Approved', true);
+        $tabs['rejected'] = $this->statusTab('rejected', 'Rejected', true);
+        $tabs['paid'] = $this->statusTab('paid', 'Paid', true);
+        $tabs['history'] = $this->statusTab('history', 'History', true);
 
         return $tabs;
+    }
+
+    private function statusTab(string $key, string $label, bool $limitToSelectedCenter): Tab
+    {
+        return Tab::make($label)
+            ->badge(fn (): string => (string) $this->statusTabQuery($key, $limitToSelectedCenter)->count())
+            ->modifyQueryUsing(fn (Builder $query): Builder => $this->applyStatusTab($query, $key, $limitToSelectedCenter));
+    }
+
+    private function statusTabQuery(string $key, bool $limitToSelectedCenter): Builder
+    {
+        return $this->applyStatusTab(ExpenseClaimResource::getEloquentQuery(), $key, $limitToSelectedCenter);
+    }
+
+    private function applyStatusTab(Builder $query, string $key, bool $limitToSelectedCenter): Builder
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $query->whereIn(
+            'expense_claims.id',
+            app(ExpenseClaimService::class)->tabQuery($user, $key)->select('expense_claims.id'),
+        );
+
+        return $limitToSelectedCenter ? $this->inSelectedCenter($query) : $query;
     }
 
     public function getDefaultActiveTab(): string|int|null

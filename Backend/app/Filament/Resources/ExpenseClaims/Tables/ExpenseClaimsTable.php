@@ -8,6 +8,7 @@ use App\Enums\ExpenseType;
 use App\Filament\Support\EmployeeSelect;
 use App\Models\ExpenseClaim;
 use App\Services\AdminCenterContext;
+use App\Services\Expenses\ExpenseClaimService;
 use App\Services\OrganizationAccessService;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -40,8 +41,12 @@ class ExpenseClaimsTable
                     ->formatStateUsing(fn ($state): string => '₹'.number_format((float) $state, 2))
                     ->sortable(),
                 TextColumn::make('status')
+                    ->label('Status')
                     ->badge()
-                    ->formatStateUsing(fn ($state): string => $state instanceof ExpenseClaimStatus ? $state->label() : (string) $state),
+                    ->state(fn (ExpenseClaim $record): string => $record->displayStatus()),
+                TextColumn::make('pending_with')
+                    ->label('Pending With')
+                    ->state(fn (ExpenseClaim $record): string => app(ExpenseClaimService::class)->pendingWithText($record) ?? '—'),
                 TextColumn::make('payment_status')
                     ->label('Payment')
                     ->formatStateUsing(fn ($state): string => $state instanceof ExpensePaymentStatus ? $state->label() : (string) $state),
