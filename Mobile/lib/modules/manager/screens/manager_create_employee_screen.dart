@@ -27,6 +27,8 @@ class _ManagerCreateEmployeeScreenState
   final _name = TextEditingController();
   final _mobile = TextEditingController();
   final _email = TextEditingController();
+  final _kmRate = TextEditingController();
+  final _kmLimit = TextEditingController();
 
   late final ManagerApi _api;
   bool _loading = true;
@@ -55,6 +57,8 @@ class _ManagerCreateEmployeeScreenState
     _name.dispose();
     _mobile.dispose();
     _email.dispose();
+    _kmRate.dispose();
+    _kmLimit.dispose();
     super.dispose();
   }
 
@@ -107,6 +111,8 @@ class _ManagerCreateEmployeeScreenState
         staffRole: _staffRole,
         centerId: _centerId,
         email: _email.text.trim(),
+        travelKmRate: _staffRole == 'mobilizer' ? _kmRate.text.trim() : null,
+        monthlyKmLimit: _staffRole == 'mobilizer' ? _kmLimit.text.trim() : null,
       );
       if (!mounted) return;
       context.pop(true);
@@ -205,6 +211,30 @@ class _ManagerCreateEmployeeScreenState
                             if (value != null) setState(() => _staffRole = value);
                           },
                         ),
+                        if (_staffRole == 'mobilizer') ...[
+                          const SizedBox(height: AppSpacing.md),
+                          TextFormField(
+                            controller: _kmRate,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(labelText: 'Travelling KM Rate (? per KM)'),
+                            validator: (value) {
+                              final rate = double.tryParse(value?.trim() ?? '');
+                              if (rate == null || rate <= 0) return 'Enter the KM rate';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextFormField(
+                            controller: _kmLimit,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(labelText: 'Monthly Allowed KM Limit'),
+                            validator: (value) {
+                              final limit = double.tryParse(value?.trim() ?? '');
+                              if (limit == null || limit <= 0) return 'Enter the monthly KM limit';
+                              return null;
+                            },
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -216,7 +246,7 @@ class _ManagerCreateEmployeeScreenState
                 const SizedBox(height: AppSpacing.md),
                 FilledButton(
                   onPressed: _saving ? null : _save,
-                  child: Text(_saving ? 'Saving…' : 'Create User'),
+                  child: Text(_saving ? 'Saving?' : 'Create User'),
                 ),
               ],
             ),

@@ -173,6 +173,9 @@ Route::middleware(['auth:sanctum', 'role:employee'])->prefix('field-activities')
 Route::middleware(['auth:sanctum', 'role:employee,center_manager'])->prefix('expenses')->group(function () {
     Route::get('/', [EmployeeExpenseController::class, 'index']);
     Route::post('/', [EmployeeExpenseController::class, 'store']);
+    Route::get('self-travel', [EmployeeExpenseController::class, 'selfTravel']);
+    Route::post('receipts', [EmployeeExpenseController::class, 'storeReceipt']);
+    Route::delete('receipts/{token}', [EmployeeExpenseController::class, 'destroyReceipt']);
     Route::patch('{expenseClaim}', [EmployeeExpenseController::class, 'update'])->whereNumber('expenseClaim');
     Route::post('{expenseClaim}/submit', [EmployeeExpenseController::class, 'submit'])->whereNumber('expenseClaim');
     Route::get('{expenseClaim}/items/{item}/receipt', [EmployeeExpenseController::class, 'receipt'])

@@ -32,6 +32,8 @@ it('lets a center manager create a user with login id and password from mobile',
             'mobile' => '9123456780',
             'email' => 'mobilizer@fieldtrack.local',
             'staff_role' => CenterStaffRole::Mobilizer->value,
+            'travel_km_rate' => 5,
+            'monthly_km_limit' => 300,
             'status' => true,
         ])
         ->call('create')
@@ -104,6 +106,8 @@ it('lets a center manager create a user from the mobile api with the same creden
             'full_name' => 'Api Mobilizer',
             'mobile' => '9876543219',
             'staff_role' => CenterStaffRole::Mobilizer->value,
+            'travel_km_rate' => 5,
+            'monthly_km_limit' => 300,
             'login_id' => 'custom.api',
             'login_password' => 'ShouldIgnore@1',
         ])

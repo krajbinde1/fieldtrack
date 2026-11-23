@@ -87,6 +87,8 @@ class ManagerEmployeeController extends Controller
             'email' => ['nullable', 'email', 'max:255'],
             'staff_role' => ['required', Rule::in(array_keys(CenterStaffRole::assignableOptions()))],
             'status' => ['sometimes', 'boolean'],
+            'travel_km_rate' => ['nullable', 'numeric', 'min:0.01', 'max:9999', Rule::requiredIf(fn () => $request->input('staff_role') === 'mobilizer')],
+            'monthly_km_limit' => ['nullable', 'numeric', 'min:0.01', 'max:99999', Rule::requiredIf(fn () => $request->input('staff_role') === 'mobilizer')],
         ]);
 
         if (count($centerIds) === 1) {
@@ -113,6 +115,8 @@ class ManagerEmployeeController extends Controller
                 'department' => 'Center',
                 'created_by_user_id' => $actor->id,
                 'status' => (bool) ($data['status'] ?? true),
+                'travel_km_rate' => $data['travel_km_rate'] ?? null,
+                'monthly_km_limit' => $data['monthly_km_limit'] ?? null,
             ])->load(['center:id,name', 'user:id,employee_id,login_id']);
         });
 
@@ -164,6 +168,8 @@ class ManagerEmployeeController extends Controller
             'center_name' => $employee->center?->name,
             'login_id' => $employee->user?->login_id,
             'status' => (bool) $employee->status,
+            'travel_km_rate' => $employee->travel_km_rate,
+            'monthly_km_limit' => $employee->monthly_km_limit,
         ];
     }
 }

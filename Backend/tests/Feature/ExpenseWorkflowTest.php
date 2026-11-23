@@ -340,6 +340,9 @@ it('moves a 500 rupee travelling expense through every approver and then payment
             'items' => json_encode([[
                 'expense_date' => '2026-11-20',
                 'type' => 'travelling',
+                'travel_mode' => 'public',
+                'travel_from' => 'Center',
+                'travel_to' => 'Village',
                 'amount' => 500,
                 'description' => 'Village visit',
             ]]),

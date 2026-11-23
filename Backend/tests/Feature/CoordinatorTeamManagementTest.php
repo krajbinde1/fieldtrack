@@ -11,12 +11,13 @@ use App\Filament\Widgets\DirectorAdminStatsWidget;
 use App\Models\Attendance;
 use App\Models\User;
 use App\Support\AttendanceCalendar;
+use Filament\Navigation\NavigationManager;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 
 function coordinatorPeopleLabels(): array
 {
-    app()->forgetInstance(\Filament\Navigation\NavigationManager::class);
+    app()->forgetInstance(NavigationManager::class);
 
     $labels = [];
 
@@ -91,6 +92,8 @@ it('shows coordinators only Team Management and scopes the existing user list', 
             'full_name' => 'Coordinator Hire',
             'mobile' => '9123456701',
             'staff_role' => CenterStaffRole::Mobilizer->value,
+            'travel_km_rate' => 5,
+            'monthly_km_limit' => 300,
             'status' => true,
         ])
         ->call('create')
@@ -155,7 +158,7 @@ it('keeps admin and center manager people menus unchanged', function () {
         ->and(EmployeeResource::canAccess())->toBeFalse();
 
     $this->flushSession();
-    app()->forgetInstance(\Filament\Navigation\NavigationManager::class);
+    app()->forgetInstance(NavigationManager::class);
     $this->actingAs($org['centerManager'])
         ->get('/admin')
         ->assertOk()

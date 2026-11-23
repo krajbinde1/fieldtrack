@@ -47,6 +47,13 @@ class _ExpenseDashboardScreenState extends State<ExpenseDashboardScreen> {
     };
   }
 
+  String _rejectedAmount(List<ExpenseRecord> claims) {
+    final total = claims
+        .where((claim) => claim.status == 'rejected')
+        .fold<double>(0, (sum, claim) => sum + (double.tryParse(claim.amount) ?? 0));
+    return total.toStringAsFixed(2);
+  }
+
   @override
   Widget build(BuildContext context) {
     return PgPageScaffold(
@@ -74,10 +81,31 @@ class _ExpenseDashboardScreenState extends State<ExpenseDashboardScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _Amount(label: 'Total Submitted', value: amount(data.summary.totalSubmitted)),
-                    _Amount(label: 'Pending Approval', value: amount(data.summary.pendingApproval)),
-                    _Amount(label: 'Approved', value: amount(data.summary.approved)),
-                    _Amount(label: 'Paid', value: amount(data.summary.paid)),
+                    _Amount(
+                      label: 'Total Submitted',
+                      value: amount(data.summary.totalSubmitted),
+                      onTap: () => setState(() => _filter = 'all'),
+                    ),
+                    _Amount(
+                      label: 'Pending Approval',
+                      value: amount(data.summary.pendingApproval),
+                      onTap: () => setState(() => _filter = 'pending'),
+                    ),
+                    _Amount(
+                      label: 'Approved',
+                      value: amount(data.summary.approved),
+                      onTap: () => setState(() => _filter = 'approved'),
+                    ),
+                    _Amount(
+                      label: 'Rejected',
+                      value: amount(_rejectedAmount(data.claims)),
+                      onTap: () => setState(() => _filter = 'rejected'),
+                    ),
+                    _Amount(
+                      label: 'Paid',
+                      value: amount(data.summary.paid),
+                      onTap: () => setState(() => _filter = 'paid'),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -141,15 +169,17 @@ class _ExpenseDashboardScreenState extends State<ExpenseDashboardScreen> {
 }
 
 class _Amount extends StatelessWidget {
-  const _Amount({required this.label, required this.value});
+  const _Amount({required this.label, required this.value, this.onTap});
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: 160,
       child: PgCard(
+        onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

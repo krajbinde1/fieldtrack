@@ -47,6 +47,10 @@ class EditEmployee extends EditRecord
         $role = CenterStaffRole::tryFromMixed($data['staff_role'] ?? $this->record->staff_role);
         $data['staff_role'] = $role->value;
         $data['designation'] = $role->label();
+        if ($role !== CenterStaffRole::Mobilizer) {
+            $data['travel_km_rate'] = null;
+            $data['monthly_km_limit'] = null;
+        }
 
         UserIdentity::assertAvailable(
             (string) ($data['full_name'] ?? $this->record->full_name),

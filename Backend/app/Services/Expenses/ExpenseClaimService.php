@@ -2,6 +2,7 @@
 
 namespace App\Services\Expenses;
 
+use App\Enums\CenterExpenseCategory;
 use App\Enums\ExpenseClaimStatus;
 use App\Enums\ExpensePaymentStatus;
 use App\Enums\ExpenseType;
@@ -11,6 +12,7 @@ use App\Models\ExpenseApproval;
 use App\Models\ExpenseClaim;
 use App\Models\ExpenseItem;
 use App\Models\ExpensePayment;
+use App\Models\ExpenseReceiptUpload;
 use App\Models\User;
 use App\Services\AdminCenterContext;
 use App\Services\Notifications\ExpensePushNotifier;
@@ -19,6 +21,7 @@ use App\Support\AttendanceCalendar;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -29,6 +32,7 @@ final class ExpenseClaimService
         private readonly ExpensePushNotifier $notifier,
         private readonly OrganizationAccessService $access,
         private readonly AdminCenterContext $centers,
+        private readonly SelfTravelService $selfTravel,
     ) {}
 
     /**
@@ -89,7 +93,7 @@ final class ExpenseClaimService
                 ]);
             }
 
-            $this->replaceItems($claim, $items, $receipts);
+            $this->replaceItems($claim, $user, $items, $receipts);
             $claim->update([
                 'total_amount' => $claim->items()->sum('amount'),
             ]);
@@ -165,6 +169,7 @@ final class ExpenseClaimService
                 'rejected_at' => now(),
                 'rejection_remarks' => $remarks,
             ]);
+            $this->selfTravel->release($claim);
             $this->tellMobilizer(
                 $claim->fresh(),
                 'expense_rejected',
@@ -348,6 +353,20 @@ final class ExpenseClaimService
                 'travel_from' => $item->travel_from,
                 'travel_to' => $item->travel_to,
                 'travel_km' => $item->travel_km,
+                'travel_mode' => $item->travel_mode,
+                'recorded_km' => $item->recorded_km,
+                'eligible_km' => $item->eligible_km,
+                'km_rate' => $item->km_rate,
+                'monthly_km_used' => $item->monthly_km_used,
+                'monthly_km_limit' => $item->monthly_km_limit,
+                'travel_from_latitude' => $item->travel_from_latitude,
+                'travel_from_longitude' => $item->travel_from_longitude,
+                'travel_to_latitude' => $item->travel_to_latitude,
+                'travel_to_longitude' => $item->travel_to_longitude,
+                'travel_from_source' => $item->travel_from_source,
+                'travel_to_source' => $item->travel_to_source,
+                'gps_from_address' => $item->gps_from_address,
+                'gps_to_address' => $item->gps_to_address,
             ])->values()->all(),
             'approvals' => $claim->approvals->map(fn (ExpenseApproval $approval): array => [
                 'level' => $approval->level,
@@ -387,6 +406,7 @@ final class ExpenseClaimService
             'submitted_at' => now(),
             'total_amount' => $claim->items->sum(fn (ExpenseItem $item) => (float) $item->amount),
         ]);
+        $this->selfTravel->reserve($user, $claim);
         $this->routeToLevel($claim, $this->openingLevel($claim), false);
         $this->tellMobilizer(
             $claim->fresh(),
@@ -631,7 +651,7 @@ final class ExpenseClaimService
      * @param  list<array<string, mixed>>  $items
      * @param  array<int, UploadedFile|null>  $receipts
      */
-    private function replaceItems(ExpenseClaim $claim, array $items, array $receipts): void
+    private function replaceItems(ExpenseClaim $claim, User $user, array $items, array $receipts): void
     {
         if ($items === []) {
             throw ValidationException::withMessages([
@@ -640,16 +660,22 @@ final class ExpenseClaimService
         }
 
         $previous = $claim->items()->orderBy('sort_order')->orderBy('id')->get()->values();
+        $selfDates = [];
+        $selfKmByMonth = [];
 
         foreach (array_values($items) as $index => $item) {
-            $type = ExpenseType::tryFrom((string) ($item['type'] ?? ''));
-            $amount = round((float) ($item['amount'] ?? 0), 2);
+            $rawType = (string) ($item['type'] ?? '');
+            $type = ExpenseType::tryFrom($rawType);
+            $centerCategory = $type === null && $user->isCenterManager()
+                ? CenterExpenseCategory::tryFrom($rawType)
+                : null;
             $date = (string) ($item['expense_date'] ?? '');
             $description = trim((string) ($item['description'] ?? ''));
+            $mode = (string) ($item['travel_mode'] ?? '');
 
-            if ($type === null || $date === '' || $description === '' || $amount <= 0 || $amount > 9999999.99) {
+            if (($type === null && $centerCategory === null) || $date === '' || $description === '') {
                 throw ValidationException::withMessages([
-                    'items' => 'Each expense needs a date, type, description, and a valid amount.',
+                    'items' => 'Each expense needs a date, type, and description.',
                 ]);
             }
 
@@ -659,26 +685,74 @@ final class ExpenseClaimService
                 ]);
             }
 
+            $isTravel = $type === ExpenseType::Travelling
+                || $centerCategory === CenterExpenseCategory::TravelConveyance;
+
+            if ($isTravel && ! in_array($mode, ['self', 'public'], true)) {
+                throw ValidationException::withMessages([
+                    'items' => 'Choose Self Travelling or Public Transport.',
+                ]);
+            }
+
             $stored = [
                 'expense_date' => $date,
-                'type' => $type,
-                'amount' => $amount,
+                'type' => $centerCategory ?? $type,
                 'description' => $description,
+                'travel_mode' => $isTravel ? $mode : null,
                 'travel_from' => $this->nullableString($item['travel_from'] ?? null),
                 'travel_to' => $this->nullableString($item['travel_to'] ?? null),
-                'travel_km' => filled($item['travel_km'] ?? null) ? round((float) $item['travel_km'], 2) : null,
+                'travel_from_source' => $this->locationSource($item['travel_from_source'] ?? null),
+                'travel_to_source' => $this->locationSource($item['travel_to_source'] ?? null),
                 'sort_order' => $index,
             ];
 
+            if ($isTravel && $mode === 'self') {
+                if (isset($selfDates[$date])) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Self Travelling is already included for '.$date.'.',
+                    ]);
+                }
+                $selfDates[$date] = true;
+                $this->selfTravel->assertNoDuplicate($user, $date, $claim->id);
+                $month = substr($date, 0, 7);
+                $quote = $this->selfTravel->assertAvailable($user, $date, $claim->id, $selfKmByMonth[$month] ?? 0.0);
+                $selfKmByMonth[$month] = ($selfKmByMonth[$month] ?? 0) + (float) $quote['eligible_km'];
+                $stored['amount'] = $quote['amount'];
+                $stored['travel_km'] = $quote['eligible_km'];
+                $stored['recorded_km'] = $quote['recorded_km'];
+                $stored['eligible_km'] = $quote['eligible_km'];
+                $stored['km_rate'] = $quote['km_rate'];
+                $stored['monthly_km_used'] = $quote['monthly_km_used'];
+                $stored['monthly_km_limit'] = $quote['monthly_km_limit'];
+                $stored['travel_from_latitude'] = $quote['from']['latitude'];
+                $stored['travel_from_longitude'] = $quote['from']['longitude'];
+                $stored['travel_to_latitude'] = $quote['to']['latitude'];
+                $stored['travel_to_longitude'] = $quote['to']['longitude'];
+                $stored['gps_from_address'] = $this->nullableString($item['gps_from_address'] ?? null);
+                $stored['gps_to_address'] = $this->nullableString($item['gps_to_address'] ?? null);
+            } else {
+                $amount = round((float) ($item['amount'] ?? 0), 2);
+                if ($amount <= 0 || $amount > 9999999.99) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Each expense needs a valid amount.',
+                    ]);
+                }
+                if ($isTravel && ($stored['travel_from'] === null || $stored['travel_to'] === null)) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Public Transport needs a from and to location.',
+                    ]);
+                }
+                $stored['amount'] = $amount;
+                $stored['travel_km'] = null;
+            }
+
             $file = $receipts[$index] ?? null;
             $old = $previous->get($index);
+            $token = $this->nullableString($item['receipt_token'] ?? null);
             if ($file instanceof UploadedFile) {
-                $this->assertReceipt($file);
-                $path = $file->store('expenses/'.$claim->id, 'local');
-                $stored['receipt_disk'] = 'local';
-                $stored['receipt_path'] = $path;
-                $stored['receipt_original_name'] = $file->getClientOriginalName();
-                $stored['receipt_mime'] = $file->getMimeType();
+                $stored = array_merge($stored, $this->storeReceiptFile($file, $claim));
+            } elseif ($token !== null) {
+                $stored = array_merge($stored, $this->consumeReceiptToken($user, $token, $claim));
             } elseif ($old instanceof ExpenseItem && $old->hasReceipt()) {
                 $stored['receipt_disk'] = $old->receipt_disk;
                 $stored['receipt_path'] = $old->receipt_path;
@@ -694,6 +768,60 @@ final class ExpenseClaimService
             $item->deleteStoredReceipt();
             $item->delete();
         });
+    }
+
+    /**
+     * @return array{receipt_disk: string, receipt_path: string, receipt_original_name: string, receipt_mime: ?string}
+     */
+    private function storeReceiptFile(UploadedFile $file, ExpenseClaim $claim): array
+    {
+        $this->assertReceipt($file);
+        $path = $file->store('expenses/'.$claim->id, 'local');
+
+        return [
+            'receipt_disk' => 'local',
+            'receipt_path' => $path,
+            'receipt_original_name' => $file->getClientOriginalName(),
+            'receipt_mime' => $file->getMimeType(),
+        ];
+    }
+
+    /**
+     * @return array{receipt_disk: string, receipt_path: string, receipt_original_name: string, receipt_mime: ?string}
+     */
+    private function consumeReceiptToken(User $user, string $token, ExpenseClaim $claim): array
+    {
+        $upload = ExpenseReceiptUpload::query()
+            ->where('user_id', $user->id)
+            ->where('token', $token)
+            ->whereNull('consumed_at')
+            ->first();
+        if ($upload === null || ! Storage::disk($upload->disk)->exists($upload->path)) {
+            throw ValidationException::withMessages([
+                'receipts' => 'Upload the receipt again. The previous upload was not saved.',
+            ]);
+        }
+
+        $target = 'expenses/'.$claim->id.'/'.basename($upload->path);
+        Storage::disk($upload->disk)->move($upload->path, $target);
+        $upload->forceFill([
+            'path' => $target,
+            'consumed_at' => now(),
+        ])->save();
+
+        return [
+            'receipt_disk' => $upload->disk,
+            'receipt_path' => $target,
+            'receipt_original_name' => $upload->original_name,
+            'receipt_mime' => $upload->mime,
+        ];
+    }
+
+    private function locationSource(mixed $source): ?string
+    {
+        $source = $this->nullableString($source);
+
+        return in_array($source, ['gps', 'manual'], true) ? $source : null;
     }
 
     private function assertReceipt(UploadedFile $file): void

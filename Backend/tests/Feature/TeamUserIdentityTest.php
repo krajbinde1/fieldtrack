@@ -7,10 +7,11 @@ use App\Filament\Resources\Employees\Pages\EditEmployee;
 use App\Filament\Resources\Employees\Pages\ListEmployees;
 use App\Models\Employee;
 use App\Models\User;
-use Illuminate\Support\Facades\Schema;
 use App\Services\DuplicateUserReport;
 use App\Support\UserIdentity;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 function identityCoordinator(array $org): User
@@ -40,6 +41,8 @@ it('reuses one account when the same person is assigned to another center', func
             'full_name' => 'Shared Person',
             'mobile' => '9123456709',
             'staff_role' => CenterStaffRole::Mobilizer->value,
+            'travel_km_rate' => 5,
+            'monthly_km_limit' => 300,
             'status' => true,
         ])
         ->call('create')
@@ -52,6 +55,8 @@ it('reuses one account when the same person is assigned to another center', func
             'full_name' => '  shared   person ',
             'mobile' => '9123456709',
             'staff_role' => CenterStaffRole::Mobilizer->value,
+            'travel_km_rate' => 5,
+            'monthly_km_limit' => 300,
             'status' => true,
         ])
         ->call('create')
@@ -95,6 +100,8 @@ it('rejects a second account with the same mobile or the same name and mobile', 
             'full_name' => 'First Person',
             'mobile' => '9123456710',
             'staff_role' => CenterStaffRole::Mobilizer->value,
+            'travel_km_rate' => 5,
+            'monthly_km_limit' => 300,
             'status' => true,
         ])
         ->call('create')
@@ -107,6 +114,8 @@ it('rejects a second account with the same mobile or the same name and mobile', 
             'full_name' => 'Someone Else',
             'mobile' => '9123456710',
             'staff_role' => CenterStaffRole::Mobilizer->value,
+            'travel_km_rate' => 5,
+            'monthly_km_limit' => 300,
             'status' => true,
         ])
         ->call('create')
@@ -140,40 +149,40 @@ it('reports existing duplicate accounts and does not merge or delete them', func
     }
 
     try {
-    $first = Employee::query()->create([
-        'center_id' => $org['centerA']->id,
-        'full_name' => 'Duplicate Person',
-        'mobile' => '9123456711',
-        'status' => true,
-    ]);
-    User::query()->create([
-        'employee_id' => $first->id,
-        'name' => 'Duplicate Person',
-        'email' => 'dup-a@test.local',
-        'login_id' => '9123456711',
-        'password' => Hash::make('6711'),
-        'role' => UserRole::Employee->value,
-        'is_active' => true,
-    ]);
-    $second = Employee::query()->create([
-        'center_id' => $org['centerB']->id,
-        'full_name' => 'duplicate person',
-        'mobile' => '9123456711',
-        'status' => true,
-    ]);
+        $first = Employee::query()->create([
+            'center_id' => $org['centerA']->id,
+            'full_name' => 'Duplicate Person',
+            'mobile' => '9123456711',
+            'status' => true,
+        ]);
+        User::query()->create([
+            'employee_id' => $first->id,
+            'name' => 'Duplicate Person',
+            'email' => 'dup-a@test.local',
+            'login_id' => '9123456711',
+            'password' => Hash::make('6711'),
+            'role' => UserRole::Employee->value,
+            'is_active' => true,
+        ]);
+        $second = Employee::query()->create([
+            'center_id' => $org['centerB']->id,
+            'full_name' => 'duplicate person',
+            'mobile' => '9123456711',
+            'status' => true,
+        ]);
 
-    $before = User::query()->count();
-    $groups = app(DuplicateUserReport::class)->groups();
-    $match = collect($groups)->first(fn (array $group): bool => $group['match'] === 'name_mobile' && str_contains($group['key'], '9123456711'));
+        $before = User::query()->count();
+        $groups = app(DuplicateUserReport::class)->groups();
+        $match = collect($groups)->first(fn (array $group): bool => $group['match'] === 'name_mobile' && str_contains($group['key'], '9123456711'));
 
-    expect($match)->not->toBeNull()
-        ->and($match['resolution'][0])->toBe('Do not merge or delete these accounts automatically.')
-        ->and(User::query()->count())->toBe($before)
-        ->and($first->fresh())->not->toBeNull()
-        ->and($second->fresh())->not->toBeNull();
+        expect($match)->not->toBeNull()
+            ->and($match['resolution'][0])->toBe('Do not merge or delete these accounts automatically.')
+            ->and(User::query()->count())->toBe($before)
+            ->and($first->fresh())->not->toBeNull()
+            ->and($second->fresh())->not->toBeNull();
 
-    expect(fn () => UserIdentity::assertAvailable('Duplicate Person', '9123456711', allowEmployeeReuse: true))
-        ->toThrow(Illuminate\Validation\ValidationException::class);
+        expect(fn () => UserIdentity::assertAvailable('Duplicate Person', '9123456711', allowEmployeeReuse: true))
+            ->toThrow(ValidationException::class);
     } finally {
         User::query()->where('login_id', '9123456711')->delete();
         Employee::withTrashed()->where('mobile', '9123456711')->get()->each->forceDelete();

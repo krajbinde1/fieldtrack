@@ -56,14 +56,26 @@ class ExpenseClaimInfolist
                     ->visible(fn (ExpenseClaim $record): bool => $record->payment !== null),
                 TextEntry::make('items_summary')
                     ->label('Items')
-                    ->state(fn (ExpenseClaim $record): string => $record->items->map(fn ($item): string => sprintf(
-                        '%s · %s · ₹%s · %s%s',
-                        $item->expense_date?->format('d M Y'),
-                        $item->type->label(),
-                        number_format((float) $item->amount, 2),
-                        $item->description,
-                        $item->hasReceipt() ? ' · receipt attached' : '',
-                    ))->join("\n"))
+                    ->state(fn (ExpenseClaim $record): string => $record->items->map(function ($item): string {
+                        $type = match ($item->travel_mode) {
+                            'self' => 'Self Travelling',
+                            'public' => 'Public Transport',
+                            default => $item->type?->label() ?? '—',
+                        };
+                        $distance = $item->travel_mode === 'self' && $item->recorded_km !== null
+                            ? ' · '.$item->recorded_km.' recorded km · ₹'.$item->km_rate.'/km'
+                            : '';
+
+                        return sprintf(
+                            '%s · %s · ₹%s · %s%s%s',
+                            $item->expense_date?->format('d M Y'),
+                            $type,
+                            number_format((float) $item->amount, 2),
+                            $item->description,
+                            $distance,
+                            $item->hasReceipt() ? ' · receipt attached' : '',
+                        );
+                    })->join("\n"))
                     ->columnSpanFull(),
                 TextEntry::make('approval_summary')
                     ->label('Approval history')

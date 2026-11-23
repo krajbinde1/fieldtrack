@@ -14,7 +14,6 @@ use App\Services\CenterStaffCredentialService;
 use App\Services\OrganizationAccessService;
 use App\Support\LoginId;
 use App\Support\UserIdentity;
-use Filament\Schemas\Components\Utilities\Get;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
@@ -24,9 +23,9 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Navigation\NavigationItem;
 use Filament\Notifications\Notification;
-use Illuminate\Validation\ValidationException;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -35,6 +34,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 
 class EmployeeResource extends Resource
 {
@@ -198,7 +198,22 @@ class EmployeeResource extends Resource
                 ->label('Login Role')
                 ->options(CenterStaffRole::options())
                 ->required()
+                ->live()
                 ->native(false),
+            TextInput::make('travel_km_rate')
+                ->label('Travelling KM Rate (₹ per KM)')
+                ->numeric()
+                ->minValue(0.01)
+                ->maxValue(9999)
+                ->required(fn (Get $get): bool => $get('staff_role') === CenterStaffRole::Mobilizer->value)
+                ->visible(fn (Get $get): bool => $get('staff_role') === CenterStaffRole::Mobilizer->value),
+            TextInput::make('monthly_km_limit')
+                ->label('Monthly Allowed KM Limit')
+                ->numeric()
+                ->minValue(0.01)
+                ->maxValue(99999)
+                ->required(fn (Get $get): bool => $get('staff_role') === CenterStaffRole::Mobilizer->value)
+                ->visible(fn (Get $get): bool => $get('staff_role') === CenterStaffRole::Mobilizer->value),
             Toggle::make('status')->label('Active')->default(true),
             Section::make('Organization')
                 ->description('Linked automatically from the Center Manager assignment.')

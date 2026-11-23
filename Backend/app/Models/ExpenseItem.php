@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\ExpenseType;
+use App\Casts\ExpenseItemTypeCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +13,7 @@ class ExpenseItem extends Model
         'expense_claim_id',
         'expense_date',
         'type',
+        'travel_mode',
         'amount',
         'description',
         'receipt_disk',
@@ -22,6 +23,19 @@ class ExpenseItem extends Model
         'travel_from',
         'travel_to',
         'travel_km',
+        'recorded_km',
+        'eligible_km',
+        'km_rate',
+        'monthly_km_used',
+        'monthly_km_limit',
+        'travel_from_latitude',
+        'travel_from_longitude',
+        'travel_to_latitude',
+        'travel_to_longitude',
+        'travel_from_source',
+        'travel_to_source',
+        'gps_from_address',
+        'gps_to_address',
         'sort_order',
     ];
 
@@ -29,9 +43,18 @@ class ExpenseItem extends Model
     {
         return [
             'expense_date' => 'date',
-            'type' => ExpenseType::class,
+            'type' => ExpenseItemTypeCast::class,
             'amount' => 'decimal:2',
             'travel_km' => 'decimal:2',
+            'recorded_km' => 'decimal:2',
+            'eligible_km' => 'decimal:2',
+            'km_rate' => 'decimal:2',
+            'monthly_km_used' => 'decimal:2',
+            'monthly_km_limit' => 'decimal:2',
+            'travel_from_latitude' => 'decimal:7',
+            'travel_from_longitude' => 'decimal:7',
+            'travel_to_latitude' => 'decimal:7',
+            'travel_to_longitude' => 'decimal:7',
             'sort_order' => 'integer',
         ];
     }

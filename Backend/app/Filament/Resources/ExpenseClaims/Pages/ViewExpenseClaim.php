@@ -39,7 +39,7 @@ class ViewExpenseClaim extends ViewRecord
             }
 
             $actions[] = Action::make('receipt'.$item->id)
-                ->label('Receipt · '.$item->type->label())
+                ->label('Receipt · '.($item->type?->label() ?? 'Expense'))
                 ->icon('heroicon-o-arrow-down-tray')
                 ->action(function () use ($item) {
                     abort_unless(

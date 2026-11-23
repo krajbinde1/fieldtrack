@@ -37,6 +37,7 @@ class CenterStaffCredentialService
         if ($match instanceof Employee) {
             $this->reusedExistingAccount = true;
             $match->assignCenter($centerId);
+            $match->fill($this->travelSettings($data))->save();
             if ($match->user === null) {
                 $this->createLoginUser($match);
             }
@@ -54,11 +55,33 @@ class CenterStaffCredentialService
             'department' => $data['department'] ?? 'Center',
             'created_by_user_id' => $data['created_by_user_id'] ?? null,
             'status' => (bool) ($data['status'] ?? true),
+            ...$this->travelSettings($data),
         ]);
         $this->createLoginUser($employee);
         $employee->assignCenter($centerId);
 
         return $employee->load('user');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function travelSettings(array $data): array
+    {
+        if (($data['staff_role'] ?? null) !== 'mobilizer') {
+            return [];
+        }
+
+        $settings = [];
+        if (array_key_exists('travel_km_rate', $data)) {
+            $settings['travel_km_rate'] = $data['travel_km_rate'];
+        }
+        if (array_key_exists('monthly_km_limit', $data)) {
+            $settings['monthly_km_limit'] = $data['monthly_km_limit'];
+        }
+
+        return $settings;
     }
 
     public function createLoginUser(Employee $employee): User

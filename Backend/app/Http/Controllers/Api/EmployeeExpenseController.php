@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ExpenseClaim;
 use App\Models\ExpenseItem;
+use App\Models\ExpenseReceiptUpload;
 use App\Services\Expenses\ExpenseClaimService;
+use App\Services\Expenses\SelfTravelService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -18,6 +21,58 @@ class EmployeeExpenseController extends Controller
     public function __construct(
         private readonly ExpenseClaimService $expenses,
     ) {}
+
+    public function selfTravel(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+        ]);
+
+        return $this->ok('Self travelling calculated.', app(SelfTravelService::class)->quote(
+            $request->user(),
+            (string) $data['date'],
+        ));
+    }
+
+    public function storeReceipt(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'receipt' => ['required', 'file', 'max:5120', 'mimetypes:image/jpeg,image/png,image/webp,application/pdf'],
+        ]);
+        /** @var UploadedFile $file */
+        $file = $data['receipt'];
+        $token = (string) Str::uuid();
+        $path = $file->store('expenses/staging/'.$request->user()->id, 'local');
+        ExpenseReceiptUpload::query()->create([
+            'user_id' => $request->user()->id,
+            'token' => $token,
+            'disk' => 'local',
+            'path' => $path,
+            'original_name' => $file->getClientOriginalName(),
+            'mime' => $file->getMimeType(),
+        ]);
+
+        return $this->ok('Receipt uploaded.', [
+            'token' => $token,
+            'filename' => $file->getClientOriginalName(),
+            'status' => 'uploaded',
+        ], 201);
+    }
+
+    public function destroyReceipt(Request $request, string $token): JsonResponse
+    {
+        $upload = ExpenseReceiptUpload::query()
+            ->where('user_id', $request->user()->id)
+            ->where('token', $token)
+            ->whereNull('consumed_at')
+            ->first();
+        if ($upload !== null) {
+            Storage::disk($upload->disk)->delete($upload->path);
+            $upload->delete();
+        }
+
+        return $this->ok('Receipt removed.');
+    }
 
     public function index(Request $request): JsonResponse
     {

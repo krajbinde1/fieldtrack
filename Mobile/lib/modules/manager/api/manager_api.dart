@@ -228,6 +228,8 @@ class ManagerApi {
     required String staffRole,
     int? centerId,
     String? email,
+    String? travelKmRate,
+    String? monthlyKmLimit,
   }) async {
     try {
       final response = await _dio.post(
@@ -238,6 +240,8 @@ class ManagerApi {
           'staff_role': staffRole,
           'center_id': ?centerId,
           if (email != null && email.isNotEmpty) 'email': email,
+          if (travelKmRate != null && travelKmRate.isNotEmpty) 'travel_km_rate': travelKmRate,
+          if (monthlyKmLimit != null && monthlyKmLimit.isNotEmpty) 'monthly_km_limit': monthlyKmLimit,
         },
       );
       return Map<String, dynamic>.from(

@@ -155,6 +155,34 @@ class ExpenseApi {
     });
   }
 
+  Future<Map<String, dynamic>> selfTravel(String date) {
+    return _call(() async {
+      final response = await _dio.get('/expenses/self-travel', queryParameters: {'date': date});
+      final data = response.data;
+      final payload = data is Map ? data['data'] : null;
+      return Map<String, dynamic>.from(payload is Map ? payload : const {});
+    });
+  }
+
+  Future<({String token, String filename})> uploadReceipt(String path) {
+    return _call(() async {
+      final form = FormData();
+      form.files.add(MapEntry(
+        'receipt',
+        await MultipartFile.fromFile(path, filename: path.split(Platform.pathSeparator).last),
+      ));
+      final response = await _dio.post('/expenses/receipts', data: form);
+      final data = response.data;
+      final payload = data is Map ? data['data'] : null;
+      final map = Map<String, dynamic>.from(payload is Map ? payload : const {});
+      final token = '${map['token'] ?? ''}';
+      if (token.isEmpty) {
+        throw const ExpenseApiException('Upload failed.');
+      }
+      return (token: token, filename: '${map['filename'] ?? ''}');
+    });
+  }
+
   Future<ExpenseRecord> decide(String prefix, int id, String action, {String? remarks}) {
     return _call(() async {
       final response = await _dio.post('$prefix/$id/$action', data: {

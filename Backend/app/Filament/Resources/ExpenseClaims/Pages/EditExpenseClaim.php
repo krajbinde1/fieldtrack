@@ -29,12 +29,9 @@ class EditExpenseClaim extends EditRecord
         if ($record instanceof ExpenseClaim) {
             $data['items'] = $record->items->map(fn ($item): array => [
                 'expense_date' => $item->expense_date?->toDateString(),
-                'type' => $item->type->value,
+                'type' => $item->type instanceof \BackedEnum ? $item->type->value : null,
                 'amount' => $item->amount,
                 'description' => $item->description,
-                'travel_from' => $item->travel_from,
-                'travel_to' => $item->travel_to,
-                'travel_km' => $item->travel_km,
             ])->all();
         }
 

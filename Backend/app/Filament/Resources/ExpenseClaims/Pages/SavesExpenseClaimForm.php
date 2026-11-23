@@ -59,10 +59,13 @@ trait SavesExpenseClaimForm
             $items[] = [
                 'expense_date' => $date instanceof \DateTimeInterface ? $date->format('Y-m-d') : (string) $date,
                 'type' => $item['type'] ?? null,
+                'travel_mode' => $item['travel_mode'] ?? null,
                 'amount' => $item['amount'] ?? null,
                 'description' => $item['description'] ?? null,
                 'travel_from' => $item['travel_from'] ?? null,
                 'travel_to' => $item['travel_to'] ?? null,
+                'travel_from_source' => $item['travel_from_source'] ?? null,
+                'travel_to_source' => $item['travel_to_source'] ?? null,
                 'travel_km' => $item['travel_km'] ?? null,
             ];
 

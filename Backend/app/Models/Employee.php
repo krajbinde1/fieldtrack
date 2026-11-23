@@ -8,10 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -70,6 +70,8 @@ class Employee extends Authenticatable
         'salary',
         'daily_allowance',
         'travel_allowance',
+        'travel_km_rate',
+        'monthly_km_limit',
         'aadhaar_number',
         'pan_number',
         'bank_name',
@@ -87,6 +89,8 @@ class Employee extends Authenticatable
             'salary' => 'decimal:2',
             'daily_allowance' => 'decimal:2',
             'travel_allowance' => 'decimal:2',
+            'travel_km_rate' => 'decimal:2',
+            'monthly_km_limit' => 'decimal:2',
             'status' => 'boolean',
         ];
     }

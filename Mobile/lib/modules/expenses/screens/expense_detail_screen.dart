@@ -110,6 +110,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                         contentPadding: EdgeInsets.zero,
                         title: Text('${item['type_label']} · ₹${item['amount']}'),
                         subtitle: Text('${item['expense_date']} · ${item['description']}'
+                            '${item['travel_mode'] == 'self' ? '\n${item['recorded_km']} km × ₹${item['km_rate']}' : ''}'
                             '${item['travel_from'] == null || '${item['travel_from']}'.isEmpty ? '' : '\n${item['travel_from']} → ${item['travel_to']}'}'),
                         trailing: item['has_receipt'] == true
                             ? IconButton(
