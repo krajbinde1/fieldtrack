@@ -36,13 +36,13 @@ try {
 
     $utf8 = New-Object System.Text.UTF8Encoding $false
     $text = [System.IO.File]::ReadAllText($pubspecPath)
-    $matches = [regex]::Matches($text, '(?m)^version:\s*(?<name>\d+\.\d+\.\d+)\+(?<build>\d+)\s*$')
-    if ($matches.Count -ne 1) {
+    $versionLines = [regex]::Matches($text, '(?m)^version:\s*(?<name>\d+\.\d+\.\d+)\+(?<build>\d+)\s*$')
+    if ($versionLines.Count -ne 1) {
         throw 'pubspec.yaml must contain exactly one line like version: 1.0.7+8.'
     }
 
-    $versionName = $matches[0].Groups['name'].Value
-    $currentBuild = [int]$matches[0].Groups['build'].Value
+    $versionName = $versionLines[0].Groups['name'].Value
+    $currentBuild = [int]$versionLines[0].Groups['build'].Value
     $newBuild = $currentBuild + 1
     if ($newBuild -le $currentBuild) {
         throw "Refusing to reuse build number $currentBuild."
