@@ -12,6 +12,8 @@ class RoutePointStore {
 
   final SharedPreferences _prefs;
 
+  SharedPreferences get preferences => _prefs;
+
   RouteTrackingSession? get session {
     final raw = _prefs.getString(_sessionKey);
     if (raw == null) return null;

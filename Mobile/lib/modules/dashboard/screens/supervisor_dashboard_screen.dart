@@ -284,6 +284,18 @@ class SupervisorDashboardView extends StatelessWidget {
     ];
   }
 
+  List<Map<String, dynamic>> _presenceRows() {
+    final raw = data['mobilizer_presence'];
+    if (raw is! List) return const [];
+    return raw.whereType<Map>().map((row) {
+      return Map<String, dynamic>.from(row);
+    }).where((row) {
+      if (!role.isCenterManager || centerId == null) return true;
+      final rowCenter = int.tryParse('${row['center_id'] ?? ''}');
+      return rowCenter == null || rowCenter == centerId;
+    }).toList();
+  }
+
   String get _ownAttendanceValue {
     final record = ownAttendance;
     if (record == null || record.punchIn == null) return '—';
@@ -449,6 +461,10 @@ class SupervisorDashboardView extends StatelessWidget {
                 : _path('$_prefix/team-attendance'),
           ),
         ),
+        if (role.isCenterManager && data['mobilizer_presence'] is List) ...[
+          const SizedBox(height: 12),
+          _MobilizerPresenceList(rows: _presenceRows(), onOpen: onOpen),
+        ],
         const SizedBox(height: AppSpacing.md),
         _SummaryGrid(tiles: _summary, onOpen: onOpen),
         const SizedBox(height: AppSpacing.lg),
@@ -462,6 +478,61 @@ class SupervisorDashboardView extends StatelessWidget {
         _ModuleGrid(tiles: _modules, onOpen: onOpen),
       ],
     ),
+    );
+  }
+}
+
+class _MobilizerPresenceList extends StatelessWidget {
+  const _MobilizerPresenceList({required this.rows, required this.onOpen});
+
+  final List<Map<String, dynamic>> rows;
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Mobilizer tracking',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (rows.isEmpty)
+          const Text('No punched-in mobilizers.')
+        else
+          ...rows.map((row) {
+            final status = '${row['status'] ?? ''}';
+            final route = '${row['route'] ?? ''}';
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: route.startsWith('/') ? () => onOpen(route) : null,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${row['employee_name'] ?? ''}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      Text('${row['center_name'] ?? ''}'),
+                      Text(status),
+                      Text('Last location: ${row['last_location'] ?? '—'}'),
+                      Text('Last update: ${row['last_update_at'] ?? '—'}'),
+                      Text(
+                        'Offline duration: ${row['offline_duration'] ?? '—'}',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+      ],
     );
   }
 }

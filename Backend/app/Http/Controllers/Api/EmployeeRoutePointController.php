@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
+use App\Models\AttendancePresence;
+use App\Models\Employee;
 use App\Models\EmployeeRoutePoint;
 use App\Services\CenterManagerAttendanceProfile;
 use App\Services\EmployeeRouteAnalysisService;
+use App\Services\MobilizerPresenceService;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,6 +22,7 @@ class EmployeeRoutePointController extends Controller
 {
     public function __construct(
         private readonly EmployeeRouteAnalysisService $routeAnalysisService,
+        private readonly MobilizerPresenceService $presence,
     ) {}
 
     public function storeBatch(Request $request): JsonResponse
@@ -47,6 +51,20 @@ class EmployeeRoutePointController extends Controller
             'points.*.heading' => ['nullable', 'numeric', 'between:0,360'],
             'points.*.recorded_at' => ['required', 'date'],
             'points.*.source' => ['nullable', 'string', 'max:50'],
+            'presence' => ['nullable', 'array'],
+            'presence.heartbeat' => ['sometimes', 'boolean'],
+            'presence.latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'presence.longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'presence.location_label' => ['nullable', 'string', 'max:255'],
+            'presence.gps_services_enabled' => ['nullable', 'boolean'],
+            'presence.gps_fix_valid' => ['nullable', 'boolean'],
+            'presence.events' => ['nullable', 'array', 'max:100'],
+            'presence.events.*.local_uuid' => ['required', 'string', 'max:64'],
+            'presence.events.*.event_type' => ['required', 'in:gps_off,gps_on,internet_off,internet_on'],
+            'presence.events.*.recorded_at' => ['required', 'date'],
+            'presence.events.*.latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'presence.events.*.longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'presence.events.*.location_label' => ['nullable', 'string', 'max:255'],
         ]);
 
         $attendance = Attendance::query()->findOrFail($validated['attendance_id']);
@@ -135,7 +153,13 @@ class EmployeeRoutePointController extends Controller
             }
         });
 
-        $distanceKm = $this->routeAnalysisService->recalculateAndPersistDistance($attendance->fresh());
+        $freshAttendance = $attendance->fresh();
+        $distanceKm = $this->routeAnalysisService->recalculateAndPersistDistance($freshAttendance);
+        $this->presence->applyRouteBatch(
+            $freshAttendance->fresh(),
+            $validated['points'],
+            $validated['presence'] ?? null,
+        );
 
         return response()->json([
             'message' => 'Route points processed successfully.',
@@ -144,5 +168,66 @@ class EmployeeRoutePointController extends Controller
             'rejected' => $rejected,
             'total_route_distance_km' => $distanceKm,
         ], 201);
+    }
+
+    public function heartbeat(Request $request): JsonResponse
+    {
+        $employee = $this->employee($request);
+        $validated = $request->validate([
+            'attendance_id' => ['required', 'integer', 'exists:attendances,id'],
+            'heartbeat' => ['sometimes', 'boolean'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'location_label' => ['nullable', 'string', 'max:255'],
+            'gps_services_enabled' => ['nullable', 'boolean'],
+            'gps_fix_valid' => ['nullable', 'boolean'],
+            'events' => ['nullable', 'array', 'max:100'],
+            'events.*.local_uuid' => ['required', 'string', 'max:64'],
+            'events.*.event_type' => ['required', 'in:gps_off,gps_on,internet_off,internet_on'],
+            'events.*.recorded_at' => ['required', 'date'],
+            'events.*.latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'events.*.longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'events.*.location_label' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $attendance = Attendance::query()->findOrFail($validated['attendance_id']);
+        if ($attendance->employee_id !== $employee->id) {
+            throw ValidationException::withMessages([
+                'attendance_id' => ['This attendance record does not belong to you.'],
+            ]);
+        }
+
+        if (blank($attendance->punch_in_time)) {
+            throw ValidationException::withMessages([
+                'attendance_id' => ['Presence updates require an attendance record with punch-in.'],
+            ]);
+        }
+
+        $status = $this->presence->ingest($attendance, $validated);
+        $row = AttendancePresence::query()->where('attendance_id', $attendance->id)->first();
+
+        return response()->json([
+            'message' => 'Presence updated.',
+            'status' => $status,
+            'confirmed_internet_off' => $row?->connectivity_state === 'off',
+        ]);
+    }
+
+    private function employee(Request $request): Employee
+    {
+        $user = $request->user();
+        $employee = $user->employee;
+
+        if ($employee === null && $user->isCenterManager()) {
+            $employee = app(CenterManagerAttendanceProfile::class)->employeeFor($user);
+        }
+
+        if ($employee === null) {
+            throw ValidationException::withMessages([
+                'employee' => ['Employee profile is not linked to this account.'],
+            ]);
+        }
+
+        return $employee;
     }
 }

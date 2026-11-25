@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Services\DirectorWorkforceService;
 use App\Services\Expenses\ExpenseClaimService;
+use App\Services\MobilizerPresenceService;
 use App\Services\OrganizationAccessService;
 use App\Support\AttendanceCalendar;
 use Illuminate\Http\JsonResponse;
@@ -113,7 +114,9 @@ class DashboardController extends Controller
                     : $access->projectHeadLeaveQuery($user)->where('status', LeaveStatus::Pending->value)->count(),
                 'admission_targets' => $targetQuery->count(),
                 'center' => $centerPayload,
-            ],
+            ] + ($user->isCenterManager()
+                ? ['mobilizer_presence' => app(MobilizerPresenceService::class)->dashboardRows($user, $centerId)]
+                : []),
         ]);
     }
 }

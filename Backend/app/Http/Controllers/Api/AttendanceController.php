@@ -8,6 +8,7 @@ use App\Models\EmployeeRoutePoint;
 use App\Services\Attendance\AttendanceStatusCalculator;
 use App\Services\CenterManagerAttendanceProfile;
 use App\Services\EmployeeRouteAnalysisService;
+use App\Services\MobilizerPresenceService;
 use App\Support\AttendanceCalendar;
 use App\Support\PublicStorage;
 use Illuminate\Http\JsonResponse;
@@ -96,6 +97,8 @@ class AttendanceController extends Controller
             'approval_status' => 'Pending',
         ]);
 
+        app(MobilizerPresenceService::class)->bootFromPunchIn($attendance);
+
         return $this->ok('Punch in recorded.', $this->formatAttendance($attendance), 201);
     }
 
@@ -130,6 +133,7 @@ class AttendanceController extends Controller
         ]);
 
         $fresh = $attendance->fresh();
+        app(MobilizerPresenceService::class)->stopMonitoring($fresh);
         app(EmployeeRouteAnalysisService::class)
             ->recalculateAndPersistDistance($fresh);
 

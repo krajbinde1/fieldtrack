@@ -57,6 +57,13 @@ class NotificationInbox extends Page
         $claimId = $notification->data['expense_claim_id'] ?? null;
         if (filled($claimId)) {
             $this->redirect(ExpenseClaimResource::getUrl('view', ['record' => $claimId]));
+
+            return;
+        }
+
+        $webRoute = $notification->data['web_route'] ?? null;
+        if (is_string($webRoute) && str_starts_with($webRoute, '/')) {
+            $this->redirect($webRoute);
         }
     }
 }

@@ -42,6 +42,7 @@ Route::middleware(['auth:sanctum', 'mobile.session'])->group(function () {
             Route::post('employee/attendance/reset-today', [AttendanceController::class, 'resetToday']);
         }
         Route::post('employee/route-points/batch', [EmployeeRoutePointController::class, 'storeBatch']);
+        Route::post('employee/presence/heartbeat', [EmployeeRoutePointController::class, 'heartbeat']);
     });
 
     Route::middleware('role:center_manager')->prefix('manager')->group(function () {

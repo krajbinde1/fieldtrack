@@ -52,6 +52,41 @@
             @endforeach
         </div>
 
+        <section class="ft-cm-panel">
+            <div class="ft-cm-panel-head">
+                <h3>Mobilizer tracking</h3>
+                <span>Punched-in mobilizers</span>
+            </div>
+            <div class="ft-cm-table-wrap">
+                <table class="ft-cm-table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Center</th>
+                            <th>Status</th>
+                            <th>Last location</th>
+                            <th>Last update</th>
+                            <th>Offline duration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($dash['presenceRows'] as $row)
+                            <tr>
+                                <td><a href="{{ $row['web_route'] }}">{{ $row['employee_name'] }}</a></td>
+                                <td>{{ $row['center_name'] }}</td>
+                                <td>{{ $row['status'] }}</td>
+                                <td>{{ $row['last_location'] }}</td>
+                                <td>{{ $row['last_update_at'] ? \Illuminate\Support\Carbon::parse($row['last_update_at'])->timezone('Asia/Kolkata')->format('d M, h:i A') : '—' }}</td>
+                                <td>{{ $row['offline_duration'] }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6" class="ft-cm-empty">No punched-in mobilizers.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <div class="ft-cm-grid">
             <section class="ft-cm-panel">
                 <div class="ft-cm-panel-head">

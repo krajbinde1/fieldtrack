@@ -44,11 +44,14 @@ class RoutePointApi {
     required int attendanceId,
     int? activeAttendanceId,
     required List<RoutePoint> points,
+    List<Map<String, dynamic>> presenceEvents = const [],
   }) async {
     if (points.isEmpty) return;
     final payload = {
       'attendance_id': attendanceId,
       'points': points.map((point) => point.toApiPayload()).toList(),
+      if (presenceEvents.isNotEmpty)
+        'presence': {'heartbeat': true, 'events': presenceEvents},
     };
     routeTrackingLog(
       'Upload request POST /employee/route-points/batch '
@@ -70,6 +73,23 @@ class RoutePointApi {
         'body=${error.response?.data}',
       );
       throw RoutePointApiException(_message(error));
+    }
+  }
+
+  /// Lightweight punched-in heartbeat. Returns false when the request does not land.
+  Future<bool> uploadHeartbeat(Map<String, dynamic> payload) async {
+    try {
+      await _dio.post('/employee/presence/heartbeat', data: payload);
+      return true;
+    } on DioException catch (error) {
+      routeTrackingLog(
+        'Presence heartbeat failed status=${error.response?.statusCode} '
+        'body=${error.response?.data}',
+      );
+      return false;
+    } catch (error) {
+      routeTrackingLog('Presence heartbeat failed: $error');
+      return false;
     }
   }
 

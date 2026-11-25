@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Services\AdminCenterContext;
 use App\Services\AdmissionTargetService;
 use App\Services\Attendance\AttendanceStatusCalculator;
+use App\Services\MobilizerPresenceService;
 use App\Services\OrganizationAccessService;
 use App\Support\AdmissionTargetPeriod;
 use App\Support\AttendanceCalendar;
@@ -131,6 +132,7 @@ class CenterManagerDashboardWidget extends Widget
             ])->all(),
             'pendingLeavesUrl' => $this->leaveUrl($centerId),
             'activities' => $this->activities($user, $centerId, $start, $end),
+            'presenceRows' => app(MobilizerPresenceService::class)->dashboardRows($user, $centerId),
             'routesUrl' => FilamentFilterUrl::for(EmployeeRouteResource::class, [
                 'attendance_date' => ['date' => $focus->toDateString()],
             ]),
@@ -475,6 +477,7 @@ class CenterManagerDashboardWidget extends Widget
             'pendingLeaves' => [],
             'pendingLeavesUrl' => '#',
             'activities' => [],
+            'presenceRows' => [],
             'routesUrl' => '#',
         ];
     }

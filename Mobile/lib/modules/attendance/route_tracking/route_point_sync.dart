@@ -1,4 +1,6 @@
 import 'models/route_point.dart';
+import 'presence_cycle.dart';
+import 'presence_event_store.dart';
 import 'route_point_api.dart';
 import 'route_point_store.dart';
 import 'route_tracking_log.dart';
@@ -47,6 +49,13 @@ class RoutePointSync {
     int? activeAttendanceId,
     bool allowClosedAttendance = false,
   }) async {
+    try {
+      await _prefsReload();
+      await _tickPresence();
+    } catch (error) {
+      routeTrackingLog('Presence tick failed (route sync continues): $error');
+    }
+
     var pending = _store.pendingPoints();
     if (pending.isEmpty) {
       routeTrackingLog('Sync skipped: no pending route points');
@@ -115,12 +124,23 @@ class RoutePointSync {
           'activeAttendanceId=$activeAttendanceId count=${batch.length}',
         );
         try {
+          final presenceStore = SharedPrefsPresenceEventStore(
+            _store.preferences,
+          );
+          final presenceEvents = presenceStore
+              .pendingFor(uploadAttendanceId)
+              .map((event) => event.toApi())
+              .toList();
           await _api.uploadBatch(
             attendanceId: uploadAttendanceId,
             activeAttendanceId: activeAttendanceId,
             points: batch,
+            presenceEvents: presenceEvents,
           );
           await _store.markSynced(batch.map((point) => point.localUuid));
+          await presenceStore.markSynced(
+            presenceEvents.map((event) => '${event['local_uuid']}'),
+          );
           routeTrackingLog(
             'Upload success: removed ${batch.length} synced point(s) from queue',
           );
@@ -147,6 +167,38 @@ class RoutePointSync {
         }
         offset += batch.length;
       }
+    }
+  }
+
+  Future<void> _prefsReload() async {
+    try {
+      await _store.preferences.reload();
+    } catch (_) {}
+  }
+
+  /// Heartbeat while punched in. After punch out, only flush events already stored.
+  Future<void> _tickPresence() async {
+    final session = _store.session;
+    final presenceStore = SharedPrefsPresenceEventStore(_store.preferences);
+    final cycle = PresenceCycle(
+      store: presenceStore,
+      upload: _api.uploadHeartbeat,
+    );
+    if (session != null && session.isActive && session.attendanceId > 0) {
+      await cycle.tick(
+        attendanceId: session.attendanceId,
+        lastLatitude: session.lastLatitude,
+        lastLongitude: session.lastLongitude,
+      );
+      return;
+    }
+
+    final attendanceIds = presenceStore
+        .pending()
+        .map((event) => event.attendanceId)
+        .toSet();
+    for (final attendanceId in attendanceIds) {
+      await cycle.flush(attendanceId: attendanceId, heartbeat: false);
     }
   }
 }

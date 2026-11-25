@@ -332,4 +332,86 @@ void main() {
     expect(find.text('Leave Requests'), findsNothing);
     expect(find.text('Reports'), findsNothing);
   });
+
+  testWidgets('Center Manager dashboard shows mobilizer presence statuses', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SupervisorDashboardView(
+            name: 'Anita Sharma',
+            role: UserRole.centerManager,
+            data: const {
+              'employees': 2,
+              'mobilizer_presence': [
+                {
+                  'employee_name': 'Ravi Mobilizer',
+                  'center_name': 'Center A',
+                  'center_id': 1,
+                  'status': 'Online / Tracking',
+                  'last_location': '18.52000, 73.85000',
+                  'last_update_at': '2026-11-25T10:00:00+05:30',
+                  'offline_duration': '—',
+                  'route': '/manager/route-tracking/4',
+                },
+                {
+                  'employee_name': 'Mina Mobilizer',
+                  'center_name': 'Center A',
+                  'center_id': 1,
+                  'status': 'GPS OFF',
+                  'last_location': '18.53000, 73.86000',
+                  'last_update_at': '2026-11-25T10:04:00+05:30',
+                  'offline_duration': '4 minutes',
+                  'route': '/manager/route-tracking/5',
+                },
+                {
+                  'employee_name': 'Lost Signal',
+                  'center_name': 'Center A',
+                  'center_id': 1,
+                  'status': 'GPS Signal Lost',
+                  'last_location': '18.54000, 73.87000',
+                  'last_update_at': '2026-11-25T10:05:00+05:30',
+                  'offline_duration': '2 minutes',
+                  'route': '/manager/route-tracking/6',
+                },
+                {
+                  'employee_name': 'No Internet',
+                  'center_name': 'Center A',
+                  'center_id': 1,
+                  'status': 'Internet Disconnected / Offline',
+                  'last_location': '18.55000, 73.88000',
+                  'last_update_at': '2026-11-25T10:06:00+05:30',
+                  'offline_duration': '6 minutes',
+                  'route': '/manager/route-tracking/7',
+                },
+                {
+                  'employee_name': 'Silent Phone',
+                  'center_name': 'Center A',
+                  'center_id': 1,
+                  'status': 'Employee Offline / Connection Lost',
+                  'last_location': '18.56000, 73.89000',
+                  'last_update_at': '2026-11-25T10:07:00+05:30',
+                  'offline_duration': '5 minutes',
+                  'route': '/manager/route-tracking/8',
+                },
+              ],
+            },
+            onOpen: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Mobilizer tracking'), findsOneWidget);
+    expect(find.text('Ravi Mobilizer'), findsOneWidget);
+    expect(find.text('Online / Tracking'), findsOneWidget);
+    expect(find.text('GPS OFF'), findsOneWidget);
+    expect(find.text('GPS Signal Lost'), findsOneWidget);
+    expect(find.text('Internet Disconnected / Offline'), findsOneWidget);
+    expect(find.text('Employee Offline / Connection Lost'), findsOneWidget);
+    expect(find.textContaining('Last location: 18.52000, 73.85000'), findsOneWidget);
+    expect(find.textContaining('Offline duration: 5 minutes'), findsOneWidget);
+  });
 }

@@ -242,6 +242,16 @@ class Attendance extends Model
         return $this->hasMany(EmployeeRoutePoint::class);
     }
 
+    public function presence(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(AttendancePresence::class);
+    }
+
+    public function presenceEvents(): HasMany
+    {
+        return $this->hasMany(EmployeePresenceEvent::class);
+    }
+
     public function approver(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'approved_by');
