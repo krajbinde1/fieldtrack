@@ -1,14 +1,22 @@
 <?php
 
+use App\Enums\CenterStaffRole;
 use App\Enums\UserRole;
+use App\Filament\Resources\Centers\Pages\EditCenter;
 use App\Filament\Resources\Centers\Pages\ListCenters;
+use App\Filament\Resources\Employees\Pages\CreateEmployee;
 use App\Filament\Resources\Employees\Pages\ListEmployees;
 use App\Filament\Resources\OrgUsers\OrgUserResource;
+use App\Filament\Resources\OrgUsers\Pages\CreateOrgUser;
 use App\Filament\Resources\OrgUsers\Pages\EditOrgUser;
 use App\Models\Center;
+use App\Models\Employee;
 use App\Models\User;
 use App\Services\CenterManagerAccountService;
+use App\Services\CenterStaffCredentialService;
 use App\Services\OrganizationAccessService;
+use Filament\Actions\Testing\TestAction;
+use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -27,11 +35,76 @@ function createManagerCoordinator(string $name, string $loginId): User
     ]);
 }
 
-it('shows create center manager to coordinators and creates one for their centers', function () {
+function coordinatorLoginRoleOptions(): array
+{
+    return [
+        UserRole::CenterManager->value => 'Center Manager',
+        CenterStaffRole::Trainer->value => 'Trainer',
+        CenterStaffRole::Mobilizer->value => 'Mobilizer',
+        CenterStaffRole::FoodHostelSupervisor->value => 'Food & Hostel Supervisor',
+    ];
+}
+
+it('lists center manager on the coordinator new user form and hides the separate button', function () {
     $org = seedOrg();
     $coordinator = createManagerCoordinator('Creator Coord', '9123456900');
     $coordinator->coordinatedCenters()->attach($org['centerA']->id);
-    $org['centerA']->forceFill(['primary_center_manager_id' => $org['centerManager']->id])->save();
+
+    Livewire::actingAs($coordinator)
+        ->test(ListEmployees::class)
+        ->assertActionVisible('create')
+        ->assertSee('New User')
+        ->assertActionDoesNotExist('createCenterManager')
+        ->assertDontSee('Create Center Manager');
+
+    Livewire::actingAs($coordinator)
+        ->test(ListCenters::class)
+        ->assertActionDoesNotExist('createCenterManager');
+
+    Livewire::actingAs($org['admin'])
+        ->test(ListCenters::class)
+        ->assertActionDoesNotExist('createCenterManager');
+
+    Livewire::actingAs($org['director'])
+        ->test(ListCenters::class)
+        ->assertActionDoesNotExist('createCenterManager');
+
+    Livewire::actingAs($org['centerManager'])
+        ->test(ListEmployees::class)
+        ->assertActionDoesNotExist('createCenterManager');
+
+    Livewire::actingAs($coordinator)
+        ->test(CreateEmployee::class)
+        ->assertFormFieldExists('full_name')
+        ->assertFormFieldExists('mobile')
+        ->assertFormFieldExists('email')
+        ->assertFormFieldExists('center_id')
+        ->assertFormFieldExists('status')
+        ->assertFormFieldExists('staff_role', function (Select $field): bool {
+            expect($field->getOptions())->toBe(coordinatorLoginRoleOptions())
+                ->and(array_key_exists(UserRole::Admin->value, $field->getOptions()))->toBeFalse()
+                ->and(array_key_exists(UserRole::Director->value, $field->getOptions()))->toBeFalse()
+                ->and(array_key_exists(UserRole::CenterCoordinator->value, $field->getOptions()))->toBeFalse();
+
+            return true;
+        });
+
+    Livewire::actingAs($org['centerManager'])
+        ->test(CreateEmployee::class)
+        ->assertFormFieldExists('staff_role', function (Select $field): bool {
+            expect($field->getOptions())->toBe(CenterStaffRole::options())
+                ->and(array_key_exists(UserRole::CenterManager->value, $field->getOptions()))->toBeFalse();
+
+            return true;
+        });
+});
+
+it('creates a center manager from the new user form for an assigned center', function () {
+    $org = seedOrg();
+    $coordinator = createManagerCoordinator('Creator Coord', '9123456900');
+    $coordinator->coordinatedCenters()->attach($org['centerA']->id);
+    $org['centerA']->centerManagers()->detach();
+    $org['centerA']->forceFill(['primary_center_manager_id' => null])->save();
     $beforeUsers = User::query()->pluck('id')->all();
     $directorCenters = $org['director']->directedCenters()->pluck('centers.id')->all();
     $headCenters = $org['projectHead']->headedCenters()->pluck('centers.id')->all();
@@ -39,31 +112,17 @@ it('shows create center manager to coordinators and creates one for their center
     $originalPassword = $org['centerManager']->getRawOriginal('password');
 
     Livewire::actingAs($coordinator)
-        ->test(ListEmployees::class)
-        ->assertActionVisible('createCenterManager')
-        ->assertSee('Create Center Manager');
-
-    Livewire::actingAs($coordinator)
-        ->test(ListCenters::class)
-        ->assertActionVisible('createCenterManager');
-
-    Livewire::actingAs($org['admin'])
-        ->test(ListCenters::class)
-        ->assertActionHidden('createCenterManager');
-
-    Livewire::actingAs($org['centerManager'])
-        ->test(ListEmployees::class)
-        ->assertActionHidden('createCenterManager');
-
-    Livewire::actingAs($coordinator)
-        ->test(ListEmployees::class)
-        ->callAction('createCenterManager', [
-            'name' => 'Created Manager',
+        ->test(CreateEmployee::class)
+        ->fillForm([
+            'center_id' => $org['centerA']->id,
+            'full_name' => 'Created Manager',
             'mobile' => '9123456901',
             'email' => null,
-            'center_ids' => [(string) $org['centerA']->id],
+            'staff_role' => UserRole::CenterManager->value,
+            'status' => true,
         ])
-        ->assertHasNoActionErrors()
+        ->call('create')
+        ->assertHasNoFormErrors()
         ->assertNotified('Center Manager created. Login ID: 9123456901. Temporary password: 6901.');
 
     $manager = User::query()->where('login_id', '9123456901')->firstOrFail();
@@ -74,6 +133,7 @@ it('shows create center manager to coordinators and creates one for their center
         ->and($manager->must_change_password)->toBeTrue()
         ->and(Hash::check('6901', $manager->password))->toBeTrue()
         ->and($manager->getRawOriginal('password'))->not->toBe('6901')
+        ->and(Employee::query()->where('mobile', '9123456901')->exists())->toBeFalse()
         ->and($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$manager->id])
         ->and($org['centerA']->fresh()->primary_center_manager_id)->toBe($manager->id)
         ->and($org['centerB']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([])
@@ -90,68 +150,66 @@ it('shows create center manager to coordinators and creates one for their center
         ->and($org['admin']->fresh()->role)->toBe(UserRole::Admin->value)
         ->and($org['empA']->fresh()->center_id)->toBe($org['centerA']->id)
         ->and(User::query()->whereIn('id', $beforeUsers)->count())->toBe(count($beforeUsers));
+
+    $this->postJson('/api/login', [
+        'login_id' => '9123456901',
+        'password' => '6901',
+        'device_id' => 'device-new-manager',
+    ])->assertOk()
+        ->assertJsonPath('user.login_id', '9123456901')
+        ->assertJsonPath('user.role', UserRole::CenterManager->value)
+        ->assertJsonPath('user.must_change_password', true);
 });
 
-it('assigns one new center manager to several of the coordinator centers', function () {
-    $org = seedOrg();
-    $coordinator = createManagerCoordinator('Multi Creator', '9123456910');
-    $coordinator->coordinatedCenters()->attach([$org['centerA']->id, $org['centerB']->id]);
-    $org['centerManager']->managedCenters()->attach($org['centerB']->id);
-    $org['centerA']->forceFill(['primary_center_manager_id' => $org['centerManager']->id])->save();
-    $org['centerB']->forceFill(['primary_center_manager_id' => $org['centerManager']->id])->save();
-
-    Livewire::actingAs($coordinator)
-        ->test(ListCenters::class)
-        ->callAction('createCenterManager', [
-            'name' => 'Shared Created Manager',
-            'mobile' => '9123456911',
-            'center_ids' => [(string) $org['centerA']->id, (string) $org['centerB']->id],
-        ])
-        ->assertHasNoActionErrors()
-        ->assertNotified('Center Manager created. Login ID: 9123456911. Temporary password: 6911.');
-
-    $manager = User::query()->where('login_id', '9123456911')->firstOrFail();
-
-    expect($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$manager->id])
-        ->and($org['centerB']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$manager->id])
-        ->and($org['centerA']->fresh()->primary_center_manager_id)->toBe($manager->id)
-        ->and($org['centerB']->fresh()->primary_center_manager_id)->toBe($manager->id)
-        ->and($manager->managedCenters()->pluck('centers.id')->all())->toEqualCanonicalizing([$org['centerA']->id, $org['centerB']->id])
-        ->and($org['centerManager']->fresh()->managedCenters()->pluck('centers.id')->all())->toBe([])
-        ->and($org['centerManager']->fresh()->is_active)->toBeTrue()
-        ->and(User::query()->where('role', UserRole::CenterManager->value)->where('is_center_login', false)->count())->toBe(2);
-});
-
-it('replaces the manager on one center and leaves the old manager other centers alone', function () {
+it('rejects a second center manager and keeps the existing replacement workflow', function () {
     $org = seedOrg();
     $coordinator = createManagerCoordinator('Replace Coord', '9123456920');
     $coordinator->coordinatedCenters()->attach([$org['centerA']->id, $org['centerB']->id]);
     $org['centerManager']->managedCenters()->attach($org['centerB']->id);
     $org['centerA']->forceFill(['primary_center_manager_id' => $org['centerManager']->id])->save();
     $org['centerB']->forceFill(['primary_center_manager_id' => $org['centerManager']->id])->save();
+    $before = User::query()->count();
 
     Livewire::actingAs($coordinator)
-        ->test(ListEmployees::class)
-        ->callAction('createCenterManager', [
-            'name' => 'Replacement Only A',
+        ->test(CreateEmployee::class)
+        ->fillForm([
+            'center_id' => $org['centerA']->id,
+            'full_name' => 'Duplicate Manager',
             'mobile' => '9123456921',
-            'center_ids' => [(string) $org['centerA']->id],
+            'staff_role' => UserRole::CenterManager->value,
+            'status' => true,
         ])
-        ->assertHasNoActionErrors();
+        ->call('create')
+        ->assertHasFormErrors(['center_id' => CenterManagerAccountService::DUPLICATE_CENTER_MANAGER]);
 
-    $manager = User::query()->where('login_id', '9123456921')->firstOrFail();
+    expect(User::query()->where('login_id', '9123456921')->exists())->toBeFalse()
+        ->and(User::query()->where('name', 'Duplicate Manager')->exists())->toBeFalse()
+        ->and(User::query()->count())->toBe($before)
+        ->and($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$org['centerManager']->id])
+        ->and($org['centerB']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$org['centerManager']->id]);
 
-    expect($org['centerA']->fresh()->centerManagers()->count())->toBe(1)
+    $result = app(CenterManagerAccountService::class)->provisionForCoordinator($coordinator, [
+        'name' => 'Replacement Only A',
+        'mobile' => '9123456921',
+        'center_ids' => [$org['centerA']->id],
+    ]);
+
+    $manager = $result['user'];
+
+    expect($result['created'])->toBeTrue()
+        ->and($manager->login_id)->toBe('9123456921')
+        ->and($manager->must_change_password)->toBeTrue()
+        ->and(Hash::check('6921', $manager->password))->toBeTrue()
         ->and($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$manager->id])
         ->and($org['centerA']->fresh()->primary_center_manager_id)->toBe($manager->id)
         ->and($org['centerB']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$org['centerManager']->id])
         ->and($org['centerB']->fresh()->primary_center_manager_id)->toBe($org['centerManager']->id)
         ->and($org['centerManager']->fresh()->managedCenters()->pluck('centers.id')->all())->toBe([$org['centerB']->id])
         ->and($org['centerManager']->fresh()->is_active)->toBeTrue()
-        ->and($manager->managedCenters()->pluck('centers.id')->all())->toBe([$org['centerA']->id]);
+        ->and($org['centerManager']->fresh()->exists)->toBeTrue();
 });
 
-it('blocks a coordinator from assigning or editing a manager outside their centers', function () {
+it('blocks a coordinator from another center and from privileged login roles', function () {
     $org = seedOrg();
     $coordinator = createManagerCoordinator('Scoped Coord', '9123456930');
     $coordinator->coordinatedCenters()->attach($org['centerA']->id);
@@ -170,30 +228,56 @@ it('blocks a coordinator from assigning or editing a manager outside their cente
     $otherCoordinator = createManagerCoordinator('Other Coord', '9123456932');
     $otherCoordinator->coordinatedCenters()->attach($org['centerB']->id);
     $password = $outside->getRawOriginal('password');
+    $org['centerA']->centerManagers()->detach();
+    $org['centerA']->forceFill(['primary_center_manager_id' => null])->save();
 
-    expect(fn () => app(CenterManagerAccountService::class)->provisionForCoordinator($coordinator, [
+    expect(fn () => app(CenterManagerAccountService::class)->createOnlyForCoordinator($coordinator, [
         'name' => 'Should Not Exist',
         'mobile' => '9123456933',
-        'center_ids' => [$org['centerB']->id],
+        'center_id' => $org['centerB']->id,
     ]))->toThrow(ValidationException::class);
 
-    $blocked = false;
-    try {
-        Livewire::actingAs($coordinator)
-            ->test(ListEmployees::class)
-            ->callAction('createCenterManager', [
-                'name' => 'Should Not Exist',
-                'mobile' => '9123456933',
-                'center_ids' => [(string) $org['centerB']->id],
-            ]);
-    } catch (Throwable) {
-        $blocked = true;
-    }
+    Livewire::actingAs($coordinator)
+        ->test(CreateEmployee::class)
+        ->fillForm([
+            'center_id' => $org['centerB']->id,
+            'full_name' => 'Should Not Exist',
+            'mobile' => '9123456933',
+            'staff_role' => UserRole::CenterManager->value,
+            'status' => true,
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['center_id']);
 
-    expect($blocked || User::query()->where('login_id', '9123456933')->doesntExist())->toBeTrue()
+    expect(User::query()->where('login_id', '9123456933')->exists())->toBeFalse()
         ->and(User::query()->where('name', 'Should Not Exist')->exists())->toBeFalse()
         ->and($org['centerB']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$outside->id])
-        ->and($outside->fresh()->getRawOriginal('password'))->toBe($password);
+        ->and($outside->fresh()->getRawOriginal('password'))->toBe($password)
+        ->and($org['centerA']->fresh()->centerManagers()->count())->toBe(0);
+
+    foreach ([UserRole::Admin->value, UserRole::Director->value, UserRole::CenterCoordinator->value] as $role) {
+        expect(fn () => app(CenterStaffCredentialService::class)->placeEmployee([
+            'center_id' => $org['centerA']->id,
+            'full_name' => 'Privileged '.$role,
+            'mobile' => '9123456934',
+            'staff_role' => $role,
+            'status' => true,
+        ]))->toThrow(ValidationException::class);
+
+        Livewire::actingAs($coordinator)
+            ->test(CreateEmployee::class)
+            ->fillForm([
+                'center_id' => $org['centerA']->id,
+                'full_name' => 'Privileged '.$role,
+                'mobile' => '9123456934',
+                'staff_role' => $role,
+                'status' => true,
+            ])
+            ->call('create');
+
+        expect(User::query()->where('name', 'Privileged '.$role)->exists())->toBeFalse()
+            ->and(Employee::query()->where('full_name', 'Privileged '.$role)->exists())->toBeFalse();
+    }
 
     $this->actingAs($coordinator);
     $this->get(OrgUserResource::getUrl('edit', ['record' => $outside]))->assertNotFound();
@@ -205,18 +289,85 @@ it('blocks a coordinator from assigning or editing a manager outside their cente
     expect(app(OrganizationAccessService::class)->canChangeOrgUserRole($coordinator, $outside))->toBeFalse()
         ->and(app(OrganizationAccessService::class)->canManageOrgUser($coordinator, $outside))->toBeFalse()
         ->and(app(OrganizationAccessService::class)->canManageOrgUser($coordinator, $org['admin']))->toBeFalse()
-        ->and(app(OrganizationAccessService::class)->canManageOrgUser($coordinator, $coordinator))->toBeFalse();
-
-    expect($coordinator->fresh()->role)->toBe(UserRole::CenterCoordinator->value)
+        ->and(app(OrganizationAccessService::class)->canManageOrgUser($coordinator, $coordinator))->toBeFalse()
+        ->and($coordinator->fresh()->role)->toBe(UserRole::CenterCoordinator->value)
         ->and($coordinator->fresh()->coordinatedCenters()->pluck('centers.id')->all())->toBe([$org['centerA']->id])
         ->and($outside->fresh()->managedCenters()->pluck('centers.id')->all())->toBe([$org['centerB']->id]);
 });
 
-it('lets a coordinator assign an existing manager to another of their centers and edit only in-scope managers', function () {
+it('lets admin and director keep their existing center manager creation paths', function () {
+    $org = seedOrg();
+    $access = app(OrganizationAccessService::class);
+
+    expect($access->creatableOrgUserRoles($org['admin']))->toContain(UserRole::CenterManager->value)
+        ->and($access->creatableOrgUserRoles($org['director']))->toContain(UserRole::CenterManager->value);
+
+    Livewire::actingAs($org['admin'])
+        ->test(EditCenter::class, ['record' => $org['centerA']->getKey()])
+        ->assertActionHasLabel(
+            TestAction::make('createOption')->schemaComponent('centerManagers'),
+            '+ Create New Center Manager',
+        );
+
+    Livewire::actingAs($org['director'])
+        ->test(EditCenter::class, ['record' => $org['centerA']->getKey()])
+        ->assertActionHasLabel(
+            TestAction::make('createOption')->schemaComponent('centerManagers'),
+            '+ Create New Center Manager',
+        );
+
+    Livewire::actingAs($org['admin'])
+        ->test(CreateOrgUser::class)
+        ->fillForm([
+            'role' => UserRole::CenterManager->value,
+            'name' => 'Admin Created Manager',
+            'login_id' => 'admincm01',
+            'email' => 'admincm01@fieldtrack.local',
+            'password' => 'CenterMgr@123',
+            'managedCenters' => [$org['centerB']->id],
+            'is_active' => true,
+            'must_change_password' => true,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $adminManager = User::query()->where('login_id', 'admincm01')->firstOrFail();
+    expect($adminManager->role)->toBe(UserRole::CenterManager->value)
+        ->and($adminManager->managedCenters()->pluck('centers.id')->all())->toBe([$org['centerB']->id])
+        ->and($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$org['centerManager']->id]);
+
+    $centerC = Center::query()->create([
+        'scheme_id' => $org['projectB']->id,
+        'name' => 'Center C',
+        'code' => 'CC',
+        'is_active' => true,
+    ]);
+    $org['director']->directedCenters()->attach($centerC->id);
+
+    Livewire::actingAs($org['director'])
+        ->test(CreateOrgUser::class)
+        ->fillForm([
+            'role' => UserRole::CenterManager->value,
+            'name' => 'Director Created Manager',
+            'login_id' => 'dircm01',
+            'email' => 'dircm01@fieldtrack.local',
+            'password' => 'CenterMgr@123',
+            'managedCenters' => [$centerC->id],
+            'is_active' => true,
+            'must_change_password' => true,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $directorManager = User::query()->where('login_id', 'dircm01')->firstOrFail();
+    expect($directorManager->role)->toBe(UserRole::CenterManager->value)
+        ->and($directorManager->managedCenters()->pluck('centers.id')->all())->toBe([$centerC->id]);
+});
+
+it('still lets a coordinator edit an in-scope manager without the removed button', function () {
     $org = seedOrg();
     $coordinator = createManagerCoordinator('Assign Coord', '9123456940');
     $coordinator->coordinatedCenters()->attach([$org['centerA']->id, $org['centerB']->id]);
-    $keptPassword = $org['centerManager']->getRawOriginal('password');
     $outsideOnly = User::query()->create([
         'name' => 'Foreign Manager',
         'email' => 'foreign-manager@fieldtrack.local',
@@ -235,42 +386,9 @@ it('lets a coordinator assign an existing manager to another of their centers an
     $outsideOnly->managedCenters()->attach($third->id);
     $third->forceFill(['primary_center_manager_id' => $outsideOnly->id])->save();
 
-    Livewire::actingAs($coordinator)
-        ->test(ListEmployees::class)
-        ->callAction('createCenterManager', [
-            'existing_manager_id' => (string) $org['centerManager']->id,
-            'center_ids' => [(string) $org['centerB']->id],
-        ])
-        ->assertHasNoActionErrors()
-        ->assertNotified('Existing Center Manager assigned.');
-
-    expect($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$org['centerManager']->id])
-        ->and($org['centerB']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$org['centerManager']->id])
-        ->and($org['centerB']->fresh()->primary_center_manager_id)->toBe($org['centerManager']->id)
-        ->and($org['centerManager']->fresh()->managedCenters()->pluck('centers.id')->all())
-        ->toEqualCanonicalizing([$org['centerA']->id, $org['centerB']->id])
-        ->and($org['centerManager']->fresh()->getRawOriginal('password'))->toBe($keptPassword)
-        ->and($org['centerManager']->fresh()->must_change_password)->toBeFalse()
-        ->and($third->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$outsideOnly->id]);
-
-    Livewire::actingAs($coordinator)
-        ->test(ListEmployees::class)
-        ->callAction('createCenterManager', [
-            'existing_manager_id' => (string) $outsideOnly->id,
-            'center_ids' => [(string) $org['centerA']->id],
-        ])
-        ->assertHasNoActionErrors();
-
-    expect($outsideOnly->fresh()->managedCenters()->pluck('centers.id')->all())
-        ->toEqualCanonicalizing([$third->id, $org['centerA']->id])
-        ->and($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$outsideOnly->id])
-        ->and($org['centerB']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([$org['centerManager']->id])
-        ->and($third->fresh()->primary_center_manager_id)->toBe($outsideOnly->id)
-        ->and($org['centerManager']->fresh()->managedCenters()->pluck('centers.id')->all())->toBe([$org['centerB']->id]);
-
-    Livewire::actingAs($coordinator)
-        ->test(EditOrgUser::class, ['record' => $outsideOnly->getKey()])
-        ->assertForbidden();
+    $this->actingAs($coordinator)
+        ->get(OrgUserResource::getUrl('edit', ['record' => $outsideOnly]))
+        ->assertNotFound();
 
     Livewire::actingAs($coordinator)
         ->test(EditOrgUser::class, ['record' => $org['centerManager']->getKey()])
@@ -284,8 +402,8 @@ it('lets a coordinator assign an existing manager to another of their centers an
     expect($org['centerManager']->fresh()->name)->toBe('CM Renamed')
         ->and($org['centerManager']->fresh()->role)->toBe(UserRole::CenterManager->value)
         ->and($org['centerManager']->fresh()->managedCenters()->pluck('centers.id')->all())->toBe([$org['centerB']->id])
-        ->and($coordinator->fresh()->role)->toBe(UserRole::CenterCoordinator->value)
+        ->and($org['centerA']->fresh()->centerManagers()->pluck('users.id')->all())->toBe([])
+        ->and($third->fresh()->primary_center_manager_id)->toBe($outsideOnly->id)
         ->and($coordinator->fresh()->coordinatedCenters()->pluck('centers.id')->all())
-        ->toEqualCanonicalizing([$org['centerA']->id, $org['centerB']->id])
-        ->and($org['admin']->fresh()->role)->toBe(UserRole::Admin->value);
+        ->toEqualCanonicalizing([$org['centerA']->id, $org['centerB']->id]);
 });

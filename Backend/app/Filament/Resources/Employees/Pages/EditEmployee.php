@@ -5,6 +5,8 @@ namespace App\Filament\Resources\Employees\Pages;
 use App\Enums\CenterStaffRole;
 use App\Filament\Resources\Employees\EmployeeResource;
 use App\Models\Center;
+use App\Models\User;
+use App\Services\CenterStaffCredentialService;
 use App\Services\OrganizationAccessService;
 use App\Support\UserIdentity;
 use Filament\Resources\Pages\EditRecord;
@@ -29,7 +31,14 @@ class EditEmployee extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $actor = auth()->user();
-        abort_unless($actor !== null, 403);
+        abort_unless($actor instanceof User, 403);
+
+        $submittedRole = (string) ($data['staff_role'] ?? $this->record->staff_role);
+        if (CenterStaffCredentialService::rejectsLoginRole($submittedRole)) {
+            throw ValidationException::withMessages([
+                'data.staff_role' => 'You cannot assign this login role.',
+            ]);
+        }
 
         $access = app(OrganizationAccessService::class);
         $centerIds = $access->visibleCenterIds($actor) ?? [];

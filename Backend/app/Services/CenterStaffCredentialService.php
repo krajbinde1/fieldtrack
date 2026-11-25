@@ -14,6 +14,17 @@ class CenterStaffCredentialService
 {
     public bool $reusedExistingAccount = false;
 
+    public static function rejectsLoginRole(string $role): bool
+    {
+        return in_array($role, [
+            UserRole::Admin->value,
+            UserRole::Director->value,
+            UserRole::CenterCoordinator->value,
+            UserRole::CenterManager->value,
+            UserRole::ProjectHead->value,
+        ], true);
+    }
+
     /**
      * Creates a field user, or assigns an existing employee account to another center.
      *
@@ -21,6 +32,13 @@ class CenterStaffCredentialService
      */
     public function placeEmployee(array $data): Employee
     {
+        $staffRole = (string) ($data['staff_role'] ?? '');
+        if (self::rejectsLoginRole($staffRole)) {
+            throw ValidationException::withMessages([
+                'staff_role' => 'You cannot assign this login role.',
+            ]);
+        }
+
         $name = trim((string) ($data['full_name'] ?? ''));
         $mobile = UserIdentity::normalizeMobile((string) ($data['mobile'] ?? ''));
         $centerId = (int) ($data['center_id'] ?? 0);

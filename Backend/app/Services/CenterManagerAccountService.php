@@ -15,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 class CenterManagerAccountService
 {
+    public const DUPLICATE_CENTER_MANAGER = 'This center already has a Center Manager. Replace the existing assignment instead of creating another account.';
+
     public static function credentialMessage(string $loginId, string $password): string
     {
         return 'Center Manager created. Login ID: '.$loginId.'. Temporary password: '.$password.'.';
@@ -63,6 +65,36 @@ class CenterManagerAccountService
         }
 
         return $this->createAndInstall($actor, $data, $centerIds);
+    }
+
+    /**
+     * Create a Center Manager for one of the coordinator's centers.
+     * A center that already has a manager is rejected. This does not replace that manager.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{user: User, created: bool, login_id: string, password: ?string}
+     */
+    public function createOnlyForCoordinator(User $actor, array $data): array
+    {
+        abort_unless($actor->isCenterCoordinator(), 403);
+
+        $centerIds = $this->normalizeIds($data['center_ids'] ?? []);
+        if ($centerIds === [] && filled($data['center_id'] ?? null)) {
+            $centerIds = $this->normalizeIds([$data['center_id']]);
+        }
+
+        try {
+            $this->assertCentersInScope($actor, $centerIds, 'center_id');
+            $this->assertCentersAreOpen($centerIds);
+
+            return $this->createAndInstall($actor, [
+                'name' => $data['name'] ?? $data['full_name'] ?? '',
+                'mobile' => $data['mobile'] ?? '',
+                'email' => $data['email'] ?? null,
+            ], $centerIds);
+        } catch (ValidationException $exception) {
+            throw $this->remapCenterManagerErrors($exception);
+        }
     }
 
     /**
@@ -255,6 +287,48 @@ class CenterManagerAccountService
                 $center->forceFill(['primary_center_manager_id' => $manager->id])->save();
             }
         });
+    }
+
+    /**
+     * @param  list<int>  $centerIds
+     */
+    private function assertCentersAreOpen(array $centerIds): void
+    {
+        foreach ($centerIds as $centerId) {
+            $center = Center::query()->find($centerId);
+            if (! $center instanceof Center) {
+                throw ValidationException::withMessages([
+                    'center_id' => 'You can only assign a Center Manager to your centers.',
+                ]);
+            }
+
+            $hasManager = $center->centerManagers()
+                ->where('users.role', UserRole::CenterManager->value)
+                ->where('users.is_center_login', false)
+                ->exists();
+            $primaryId = (int) ($center->primary_center_manager_id ?? 0);
+
+            if ($hasManager || $primaryId > 0) {
+                throw ValidationException::withMessages([
+                    'center_id' => self::DUPLICATE_CENTER_MANAGER,
+                ]);
+            }
+        }
+    }
+
+    private function remapCenterManagerErrors(ValidationException $exception): ValidationException
+    {
+        $mapped = [];
+        foreach ($exception->errors() as $key => $messages) {
+            $key = match ($key) {
+                'name' => 'full_name',
+                'center_ids' => 'center_id',
+                default => $key,
+            };
+            $mapped[$key] = $messages;
+        }
+
+        return ValidationException::withMessages($mapped);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Employees;
 
 use App\Enums\CenterStaffRole;
+use App\Enums\UserRole;
 use App\Filament\Concerns\ScopesRecordsByOrganization;
 use App\Filament\Resources\Employees\Pages\CreateEmployee;
 use App\Filament\Resources\Employees\Pages\EditEmployee;
@@ -144,6 +145,10 @@ class EmployeeResource extends Resource
     private static function identityRule(Get $get, ?Employee $record): \Closure
     {
         return function (string $attribute, mixed $value, \Closure $fail) use ($get, $record): void {
+            if ((string) $get('staff_role') === UserRole::CenterManager->value) {
+                return;
+            }
+
             try {
                 UserIdentity::assertAvailable(
                     (string) $get('full_name'),
@@ -196,7 +201,15 @@ class EmployeeResource extends Resource
             TextInput::make('email')->label('Email (optional)')->email()->nullable(),
             Select::make('staff_role')
                 ->label('Login Role')
-                ->options(CenterStaffRole::options())
+                ->options(function (string $operation): array {
+                    $options = CenterStaffRole::options();
+                    $actor = auth()->user();
+                    if ($operation === 'create' && $actor instanceof User && $actor->isCenterCoordinator()) {
+                        return [UserRole::CenterManager->value => UserRole::CenterManager->label()] + $options;
+                    }
+
+                    return $options;
+                })
                 ->required()
                 ->live()
                 ->native(false),
